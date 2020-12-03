@@ -1,5 +1,5 @@
 import os
-path = '/Users/rubenbiskupec/Desktop/intelli-search/documents'
+path = '/Users/rubenbiskupec/Desktop/intelli-search/documents1/documenti'
 files = os.listdir(path)
 
 
