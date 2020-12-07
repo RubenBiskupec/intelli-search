@@ -1,0 +1,1946 @@
+Computers and Chemical Engineering 143 (2020) 107122
+
+ 
+
+   
+
+SE
+
+Computers and Chemical Engineering
+
+journal homepage: www.elsevier.com/locate/compchemeng
+
+Contents lists available at ScienceDirect
+
+Computers
+AW aCe
+sea O NITY
+
+ 
+
+ 
+
+Predicting chattering alarms: A machine Learning approach
+
+Nicola Tamascelli*, Nicola Paltrinieri®*, Valerio Cozzani?
+
+4 Department of Civil, Chemical, Environmental and Materials Engineering, University of Bologna, Bologna, Italy
+> Department of Mechanical and Industrial Engineering, NTNU, Trondheim, Norway
+
+ 
+
+ARTICLE INFO
+
+Article history:
+
+Received 29 July 2020
+
+Revised 30 September 2020
+Accepted 5 October 2020
+Available online 6 October 2020
+
+Keywords:
+
+Machine Learning
+Data Mining
+
+Alarm management
+
+ABSTRACT
+
+Alarm floods represent a widespread issue for modern chemical plants. During these conditions, the num-
+ber of alarms may be unmanageable, and the operator may miss safety-critical alarms. Chattering alarms,
+which repeatedly change between the active and non-active states, are responsible for most of the alarm
+records within a flood episode. Typically, chattering alarms are only addressed and removed retrospec-
+tively (e.g. during periodic performance assessments). This study proposes a Machine-Learning based ap-
+proach for alarm chattering prediction. Specifically, a method for dynamic chattering quantification has
+been developed, whose results have been used to train three different Machine Learning models - Linear,
+Deep, and Wide&Deep models. The algorithms have been employed to predict future chattering behavior
+based on actual plant conditions. Performance metrics have been calculated to assess the correctness of
+
+Alarm floods
+Chattering alarms
+Chattering prediction
+
+1. Introduction
+
+The digital revolution and the advent of Distributed Control
+Systems have undeniably improved the flexibility of industrial
+alarm systems (Shaw, 1993). Installing new alarms has become rel-
+atively simple and economical (Katzel, 2007), but the misconcep-
+tion that more alarms would improve safety and reliability persists
+in some cases. On the contrary, too many alarms can negatively
+affect the performance of the alarm system and prevent an ade-
+quate operator’s response (Kondaveeti et al., 2013; Laberge et al.,
+2014). Unsatisfactory alarm rationalization is expressed by episodes
+where an excessive number of alarms are triggered in a short pe-
+riod (ANSI/ISA, 2016; EEMUA, 2013; Laberge et al., 2014). A specific
+term is coined to define a period of intense alarm activity - an
+“alarm flood” (Beebe et al., 2012). Hundreds or even thousands of
+alarms may be triggered during a flood episode, causing a substan-
+tial distraction to the operators, and increasing the risk of missing
+critical alarms (Laberge et al., 2014).
+
+Several studies, accident reports, and standard manuals have
+cited alarm floods as a contributing factor to financial loss, in-
+juries, and deaths in the chemical industry (Beebe et al., 2012;
+EEMUA, 2013; Stanton and Barber, 1995), including the investiga-
+tion report on the explosion in Pembroke Refinery on the 24 July
+1994 (Health and Safety Executive, 1997). The accident was caused
+
+* Corresponding author.
+E-mail address: nicola.paltrinieri@ntnu.no (N. Paltrinieri).
+
+https: //doi.org/10.1016/j.compchemeng.2020.107122
+
+predictions and to compare the performance of the three models.
+
+© 2020 The Authors. Published by Elsevier Ltd.
+
+This is an open access article under the CC BY license (http://creativecommons.org/licenses/by/4.0/)
+
+by a faulty control valve, which was stuck in a closed position. Un-
+fortunately, the control system erroneously indicated that the valve
+was open, and operators had not been able to identify the prob-
+lem. Due to the blocked valve, the liquid had accumulated inside a
+debutanizer column, causing the pressure to increase over the PSV
+setpoint. A liquid-vapor stream entered the flare pipe that even-
+tually broke since it was not designed to handle liquids. Roughly
+10 to 20 tons of partially vaporized flammable materials were re-
+leased and mixed with air, forming a flammable cloud that ignited
+and exploded 4 hours after the valve failure, and 20 seconds af-
+ter the pipe rupture. As a consequence, 26 workers were injured,
+and the refinery was severely damaged: £48 million were spent
+on rebuilding the damaged plant, to which the costs of prolonged
+business interruption should be added. During the accident, alarms
+were notified to the operators at the rate of one every two to
+three seconds. Approximately 275 alarms were triggered in the last
+eleven minutes before the accident, without a concrete effect on
+the possibility of preventing the accident.
+
+Most of the alarm events within a flood episode are produced
+by alarms that oscillate between the active and not active state
+with high frequency -i.e., chattering alarms. Standard manuals
+have been published (ANSI/ISA, 2016; EEMUA, 2013), providing
+guidelines for proper alarm rationalization and management, sug-
+gesting strategies for chattering and floods reduction. Still, chatter-
+ing alarms are only addressed and removed retrospectively. Rather
+than addressing the problem after chattering has happened, a
+method to predict future chattering based on actual process con-
+ditions would significantly improve the performance of the alarm
+
+0098-1354/© 2020 The Authors. Published by Elsevier Ltd. This is an open access article under the CC BY license (http://creativecommons.org/licenses/by/4.0/)
+N. Tamascelli, N. Paltrinieri and V. Cozzani
+
+Definitions
+
+Accuracy the ratio of number of correct
+predictions to total number of
+predictions.
+
+Alarm flood a condition during which the
+
+alarm rate is greater than the
+
+operator can effectively manage
+
+(e.g., more than 10 alarms per 10
+
+minutes).
+
+a code defining the alarm status.
+
+a field device, control system,
+
+or Human Machine Interface that
+
+can trigger a change in the alarm
+status.
+
+a database where unique alarms
+
+data are represented as sequences
+
+of 0’s and 1’s at one-second sam-
+pling.
+
+an alarm that repeatedly transi-
+
+tions between the active and the
+
+not active states in a short period
+
+(e.g., 3 or more alarm records in
+
+one minute).
+
+an index to quantify the amount
+
+of chattering that a unique alarm
+
+has shown over a certain time pe-
+riod.
+
+Dynamic Chattering Index an index to quantify the amount
+of chattering that a unique alarm
+has shown up to one hour after
+each alarm event.
+
+Alarm identifier
+Alarm source
+
+Binary Database
+
+Chattering alarm
+
+Chattering Index
+
+Example the description of an alarm event
+in terms of features and related
+label.
+
+Feature a meaningful attribute of an
+alarm event.
+
+Label the category of an alarm event
+
+— “Y” for “Chattering within one
+hour”, “N” for “Not Chattering
+within one hour”.
+
+an alarm that annunciates exces-
+sively, unnecessarily, or does not
+return to normal after the opera-
+tor action is taken.
+
+the fraction of positively pre-
+dicted labels that are, in fact, pos-
+itive.
+
+an adjustable parameter used to
+convert raw predicted probabili-
+ties into predicted labels.
+
+Nuisance alarm
+
+Precision
+
+Probability Threshold
+
+Recall the fraction of real positive labels
+correctly predicted.
+Run Length the time difference in seconds
+
+between two consecutive alarm
+events from the same _ unique
+alarm.
+
+the unique combination of an
+alarm source and an identifier.
+the description of an alarm event
+in terms of a list of features.
+
+Unique alarm
+
+Unlabeled examples
+
+system. Nevertheless, predictive methods based on first principles
+would be complicated to obtain because many variables influence
+
+ 
+
+Computers and Chemical Engineering 143 (2020) 107122
+
+the dynamics of the system (Ahmed et al., 2013). In this multivari-
+ate context, a statistical data-based approach appears to be more
+feasible. Chemical plants produce a large quantity of process and
+alarm data on a daily basis (Reis and Kenett, 2018). Thus, the use
+of Machine Learning techniques appears to be an interesting op-
+portunity to extract knowledge from these data and to build pre-
+dictive models. Various researches have focused on the develop-
+ment of Machine Learning algorithms for fault detection and diag-
+nosis (Mahadevan and Shah, 2009; Miao et al., 2013; Zhong et al.,
+2014), risk assessment (Paltrinieri et al., 2019), process simulation
+(Aleixandre et al., 2015; Zhang et al., 2010), and dimensionality re-
+duction (Ge et al., 2017). However, to the best of our knowledge,
+there is not a direct application of these algorithms for alarm chat-
+ter prediction.
+
+The present study proposes a Machine Learning approach for
+chattering prediction. An industrial alarm database has been used
+to support the analysis. Initially, a modified version of the Chat-
+tering Index proposed by Kondaveeti et al. (2013) has been devel-
+oped and used to classify historical alarm events as “Chattering
+within an hour” or “Not Chattering within an hour” (i.e., alarms
+that will/will not show chattering within one hour after an alarm
+event). The results of this method, named Dynamic Chattering In-
+dex, have been used to train and evaluate three different Machine
+Learning classification models -i.e., Linear, Deep, and Wide&Deep
+models. Each algorithm has been trained and assessed indepen-
+dently on the same dataset. Performance metrics have been calcu-
+lated to assess the correctness of predictions and to compare the
+performance of the three models.
+
+The paper is organized in 8 Sections. Section 2 provides
+an overview of industrial alarms and alarm databases, includ-
+ing definitions of nuisance alarms, chattering, and alarm floods.
+Section 3 focuses on the database used in this work; a brief de-
+scription of the plant section that generated the alarms is also
+provided. Section 4 describes the methodology, which includes
+the preprocessing of alarm data, the development of the Dy-
+namic Chattering Index, the Machine Learning models, and the
+performance metrics that have been used to evaluate the models.
+Section 5 provides a detailed description of the Machine Learn-
+ing simulations. The results of the simulations are presented in
+Section 6 and discussed in Section 7. Finally, conclusions are sum-
+marized in Section 8.
+
+2. Alarms in the chemical industry
+
+Disturbances of various nature cause inherent process fluctua-
+tion during daily operations. Typically, minor deviations are man-
+aged by the Basic Process Control System (BPCS), and process oscil-
+lations are maintained to an acceptable level. However, situations
+may arise where automatic systems fail to restore normal opera-
+tions, and human intervention is needed. In these circumstances,
+alarms inform the operator that process conditions are significantly
+deviating from their normal operating state (ANSI/ISA, 2016). Each
+alarm should support a timely and effective response by providing
+guidance to a set of corrective actions.
+
+2.1. Nuisance, chattering and alarm floods
+
+If an alarm does not convey any new information, or if no cor-
+rective action is possible, the alarm is ineffective. These types of
+alarms are called “nuisance” and are often caused by poorly man-
+aged alarm systems (ANSI/ISA, 2016; Kondaveeti et al., 2010). Dif-
+ferent types of nuisance alarms can be identified (e.g., Chattering,
+Fleeting, Stale alarms)(ANSI/ISA, 2016), but in this study the at-
+tention has been directed to chattering alarms - i.e., alarms that
+“repeatedly transitions between the active state and the not active
+state in a short period of time” (ANSI/ISA, 2016). A rule of thumb
+N. Tamascelli, N. Paltrinieri and V. Cozzani
+
+Table 1
+
+Computers and Chemical Engineering 143 (2020) 107122
+
+Selection of the most common and significant alarm attributes presented to the operator.
+
+Attribute Description
+
+Timestamp Date and time (GMT) of the alarm event.
+
+Source The source that triggered the alarm. It might be a measuring instrument or a PLC function.
+Jxxx The safety interlock logic associated with the alarm, where “xxx” is a three digits code.
+
+Alarm Identifier
+Data Value
+Eng. Unit
+
+The value of the process variable.
+
+to determine chattering behavior is three or more alarm records
+(from the same alarm source) in one minute (Kondaveeti et al.,
+2010).
+
+Besides, alarm floods -i.e., periods when the alarm rate ex-
+ceeds 10 alarms/operator per ten minutes time interval- are an-
+other common issue in modern alarm systems (ANSI/ISA, 2016;
+Laberge et al., 2014). Due to the intense alarm activity, hundreds
+of alarm records may be produced in a short time. The workload
+caused by flood episodes is often overwhelming: the operator can-
+not provide an appropriate response, and crucial alarms are likely
+to be missed (Ahmed et al., 2013). Usually, most of the alarms in-
+side a flood episode come from a limited number of alarm sources
+(ANSI/ISA, 2016). Furthermore, alarm floods are strongly related to
+chattering alarms due to their potential to cause a large number
+of alarm events in a short time span. For this reason, identifying
+and removing chattering alarms is a crucial step to improve the
+performance of the alarm system and to avoid flood episodes.
+
+2.2. Alarm attributes
+
+Alarm events are described through a list of attributes. Each at-
+tribute defines a characteristic of an event such as the time of the
+alarm occurrence (i.e., the Timestamp), the Source that triggered
+the alarm, the alarm status, and more. Table 1 describes a list of
+attributes that are most frequently presented to the operator. It is
+worth mentioning that different companies use different messages
+and different sets of alarm attributes. The table is thus a selection
+of the most common and significant alarm attributes.
+
+When an alarm is triggered, a message appears on the operator
+console. An example is:
+
+“LIO1 LEVEL DO1 J434 PV = 98,0% HHH”
+
+The alarm message reports the source of the alarm (the level
+indicator 01), a brief explanation of the measured variable (the
+level in drum 01), the associated safety function (J434), the value
+of the process value (98 %) and finally, the alarm status (High Level
+-i.e., “HHH”).
+
+For a more comprehensive understanding of the following anal-
+yses, the alarm identifier must be described more in detail. The
+identifiers “HHH” and “HTRP” inform that the measured variable
+has exceeded the “high” and “very high” threshold respectively,
+“LLL” and “LTRP” refer to the “low” and “very low” threshold, “IOP”
+informs about an instrumental failure or out-of-range measure,
+“ACK” indicates that the operator has acknowledged the alarm. The
+alarm identifier may include the word “Recover” (e.g. “HHH Re-
+cover”, “LTRP Recover”), that indicates that the original alarm has
+been recovered (i.e., the alarm is not active anymore). In addition,
+two more attributes must be described, the Active Time Delta and
+the Condition Name, which have been used in the analyses but are
+not listed in Table 1. The Active Time Delta (ATD) is the number of
+seconds between an alarm and its recovery. The Condition Name
+(CN) is the alarm identifier of the initial alarm event (e.g., if the
+alarm is an “LLL Recover”, CN will be “LLL”).
+
+In spite of the variety of different attributes, an alarm event
+is uniquely identified by three attributes only (Kondaveeti et al.,
+2010):
+
+A code that defines the alarm status (e.g. “HHH”, “HTRP”, “LLL”, “IOP”, “HHH Recover”, “ACK”).
+
+The units of measure of the process variable (e.g. “ % ”, “°C”, “ KPa ”).
+
+1. Time Stamp;
+
+2. Source;
+
+3. Alarm Identifier.
+Also, the combination of an alarm source and an_identi-
+fier (e.g., “LIO1 HHH”, “P1103 LTRP”) is called a unique alarm
+(Kondaveeti et al., 2010).
+
+2.3. Alarm databases
+
+Chemical plants produce a massive amount of data on a daily
+basis (Kordic et al., 2010). Alarm events are continuously recorded
+and stored in alarm databases, which are characterized by a large
+search-space and may contain years of alarm data (Kordic et al.,
+2010). Typically, alarm events are collected as chronologically or-
+dered time sequences (Weiss, 2010). Each row of the database rep-
+resents an event, and each column represents an attribute of the
+alarm event. Obviously, there is not a single database format: dif-
+ferent companies use different Distributed Control Systems (DCS).
+The format, the codes and the set of displayed features may vary
+accordingly. Typically, an alarm database contains more features
+than those presented in Table 1, but most of these additional fea-
+tures are either redundant or not useful for the analyses.
+
+The analysis of the alarm history is a crucial step in monitor-
+ing the alarm system performance (ANSI/ISA, 2016). Periodic study
+of the alarm database allows the production of performance met-
+rics and the detection of nuisance alarms. An example of a per-
+formance metric suggested by ANSI/ISA (2016) is the “Percentage
+of time the alarm system is in a flood condition”, which must be
+lower than 1 % to grant stable operations. Furthermore, the stan-
+dard states that chattering alarms must not be tolerated, and ac-
+tions must be taken to resolve any chattering that occurs. Nev-
+ertheless, due to the complexity and quantity of data in alarm
+databases, the extraction of relevant information is not trivial and
+usually requires time and resources (Kordic et al., 2010).
+
+3. Case-study: ammonia production plant layout and alarms
+
+The industrial alarm database used in this study is provided
+by an international chemical company and consists of alarm data
+that were collected in a plant section for ammonia synthesis. The
+process involves the manipulation of a significant amount of dan-
+gerous substances (e.g., methane, hydrogen, ammonia), and se-
+vere operating conditions are often required (e.g., high temper-
+ature, high pressure, corrosive fluids). According to the Direc-
+tive 2012/18/EU of the European Parliament and of the Council
+(European Union, 2012), the plant has been classified as an upper-
+tier establishment due to its potential to cause major accidents.
+
+The ammonia production plant comprises four sections:
+
+. Desulfurization and Reforming;
+
+. Water-Gas Shift, CO2 Removal, and Methanation;
+
+. Ammonia synthesis and Cooling circuit;
+
+. Anhydrous ammonia storage, Pipeline, and Loading/unloading
+tankers.
+
+Ww GW NH =
+
+Fig. 1 shows a schematic representation of the plant layout
+for ammonia production, excluding storage, loading, and unloading
+N. Tamascelli, N. Paltrinieri and V. Cozzani
+
+Desulphurization
+
+Natural Gas
+
+Process Air
+
+fet =
+
+Reforming
+
+ 
+
+Computers and Chemical Engineering 143 (2020) 107122
+
+ 
+
+ 
+
+Water-Gas Shift CO, Absorption
+7
+xX
+LO
+©)
+Cy}
+Cy}
+
+Flue Gas
+Purge
+Compressor Cy
+CT
+af | [. o-O-© ©
+CV
+IK
+Expansion Cooling Synthesis Methanation
+
+Fig. 1. Simplified process scheme of the ammonia production plant considered.
+
+(Section 4). Natural Gas, Air, and Steam are used as raw materi-
+als for ammonia synthesis, according to the following exothermic
+reaction:
+
+Orace KJ
+AH, [25°C] = 92.44— (1)
+
+The reaction is carried out in two catalytic reactors arranged in
+series. The required nitrogen comes from process air, which en-
+ters the secondary reforming reactor. The hydrogen is produced
+through natural gas steam reforming in two distinct reforming
+stages. The first stage (primary reformer) is a vertical, side fired,
+proprietary reactor. The second stage (secondary reformer) is an
+autothermal adiabatic reactor. Typical temperature and pressure of
+the gas stream leaving the reforming section are 1000°C and 25 -
+AO bar, respectively (Jennings, 1991). The catalysts used in the re-
+forming reactors and in the downstream sections are sensitive to
+sulfur compounds (Aika et al., 1995). To avoid catalyst deactivation
+and poisoning, sulfur compounds are removed from natural gas in
+two reactors arranged in series. Similarly, carbon oxides must be
+removed because they are poisonous to the catalyst (Aika et al.,
+1995). For this reason, carbon monoxide is converted into carbon
+dioxide in two Water-Gas Shift reactors. Carbon dioxide is then re-
+moved in an absorption column where a Vetrocoke solution is used
+as a solvent (Giammarco and Giammarco, 1973). Finally, the resid-
+ual amount of carbon oxides is removed in a Methanation reactor.
+The process stream leaving the methanator, which has the required
+purity for ammonia production, is compressed and sent to the am-
+monia synthesis loop, where ammonia is synthesized and liquefied
+through subsequent cooling and expansion units. Due to thermo-
+dynamic and kinetic constraints, the ammonia synthesis has low
+single-pass conversion (Jennings, 1991). Therefore, part of the gases
+released during the liquefaction process, which consists mainly of
+unreacted compounds, are recycled back to the reactors.
+
+No +3 H,2 @ 2 NH3
+
+3.1. The alarm database
+
+The alarm database of the ammonia plant contains alarm events
+collected between July 2017 and November 2017. In total, 26 473
+alarm events (rows of the database) occurred during the obser-
+
+vation period. Each event is described by a set of 39 attributes
+(columns of the database).
+
+Alarms are not evenly spread over the observation period. The
+alarm daily annunciation rate is shown in Fig. 2. Over 96 % of the
+alarm events included in the database occurred between Septem-
+ber and October 2017. The unusually high alarm rate was caused
+by a total power outage, which led to an unintended plant shut
+down. The plant instability and the abnormal alarm annunciation
+rate persisted over one month after the blackout, due to the emer-
+gency shutdown and the subsequent startup procedure. During the
+event, a significant number of alarm floods occurred. Therefore, the
+analyses described in this work have focused on that specific time-
+lapse (September 9th to October 9th). Over the period of concern,
+189 alarm sources produced a total of 25572 alarms. More than 72
+% of them were triggered by ten alarm sources only, as shown in
+Fig. 3.
+
+4. Methodology
+
+The approach follows the steps depicted in Fig. 4.
+
+4.1. Data preprocessing
+
+Raw alarm data must be prepared for the analysis.
+
+4.1.1. Attribute selection and data cleaning
+
+The columns of the database that are either empty or not useful
+for the analysis have been removed (step 1.1 in Fig. 4). For exam-
+ple, the column “PlantHierarchy” contains standardized codes that
+refer to a specific plant inside the production site. The column has
+been removed because every alarm considered in this study comes
+from the ammonia production plant.
+
+Machine Learning algorithms cannot process null (missing) val-
+ues. For this reason, columns including null values were further
+analyzed, and, when relevant, null values were substituted by spe-
+cific input values. Several techniques exist to impute missing val-
+ues (Hastie et al., 2009). If the value is relevant for the analysis,
+N. Tamascelli, N. Paltrinieri and V. Cozzani
+
+5000
+
+Computers and Chemical Engineering 143 (2020) 107122
+
+ 
+
+4000
+
+3000
+
+=====ss5=--@
+
+ 
+
+2000
+
+Number of alarms
+
+al
+
+in
+
+@--
+
+ 
+
+1000
+
+ 
+
+ 
+
+@e- Ton ——<—<<2e oe ee
+
+5
+
+ 
+
+Sep-09
+
+| Se a
+
+_.-@--- 8"
+eco
+
+z.
+
+eo
+
+ 
+
+ 
+
+~
+‘l
+
+Oct-09 Nov-30
+
+Observation period
+
+Fig. 2. Alarms’ daily annunciation rate. Each circle represents the number of alarms that occurred during one day.
+
+ 
+
+ 
+
+ 
+
+ 
+
+ 
+
+ 
+
+ 
+
+ 
+
+ 
+
+ 
+
+ 
+
+ 
+
+ 
+
+ 
+
+ 
+
+4000
+
+3000
+”
+-
+San
+&
+x
+=
+
+o 2000
+vo
+2
+=
+=)
+=a
+
+1000
+
+0
+
+& © % z & A 9 S o> és
+2) S sy’ <\ “\ S Ss > ¥)
+ee e SY Prd Prd v Rg wv wv wv
+rae &
+
+Top 10 Alarm Sources
+
+Fig. 3. The ten alarm sources with the larger alarm count over the observation period (September - October 2017).
+
+one may decide to replace it with the mean or median of the non-
+missing values (Brink et al., 2016). If the missing value is not rel-
+evant, or if there is no way to guess the value through statistical
+calculations, it might be replaced with a user-defined global con-
+stant (Han et al., 2012). For example, the column “Eng. Unit” (see
+Table 1) contains a considerable amount of missing value due to
+alarms that are not associated with a measuring instrument (e.g.
+alarm generated by ad-hoc logics). Therefore, it has been decided
+to replace the missing values in the column with the symbol “- ”
+(step 1.2 in Fig. 4).
+
+As a result, a “clean” database is obtained (step 1.3 in Fig. 4),
+which contains only meaningful attributes and no missing values.
+
+4.1.2. Binary Database creation
+Unique alarms (i.e. the unique combination of an alarm source
+and an identifier) have been represented as binary sequences (step
+
+1.4 in Fig. 4). According to Kondaveeti et al. (2010), the binary rep-
+resentation of a unique alarm is an array whose elements rep-
+resent one-second-spaced time bins. For a one-month-long ob-
+servation period, the array has 2592000 elements (i.e., seconds
+in one month). The value of an element of the array can be ei-
+ther “1” or “O”. A “1” in the sequence indicates that the unique
+alarm occurred at that very moment. On the contrary, a “O” means
+that the unique alarm did not happen. In this way, alarm oc-
+currences are represented as 1’s in the array. Finally, binary se-
+quences are grouped in a matrix (step 1.5 in Fig. 4). Rows con-
+taining zeroes only can be safely removed by the Binary Database
+(Kondaveeti et al., 2010).
+
+Although it is not compulsory, representing alarm data as bi-
+nary sequences will greatly simplify the calculation of the Dynamic
+Chattering Index.
+N. Tamascelli, N. Paltrinieri and V. Cozzani
+
+=o
+
+—
+—_
+=—
+
+Computers and Chemical Engineering 143 (2020) 107122
+
+=
+=
+
+  
+
+Fig. 4. Workflow of the analysis carried out. Colors represent three main stages. Stage 1 (orange): Data preprocess, Stage 2 (blue): Dynamic Chattering Indices calculation,
+Stage 3 (green): Machine Learning simulations. Each stage is divided into several steps, which are arranged chronologically and identified by two numbers (e.g., 1.1, 2.2, 3.5).
+(For interpretation of the references to color in this figure legend, the reader is referred to the web version of this article.).
+
+penne awn, pocomennne! Nemeneneny pane nnnnenn enn en enn nnnnn, yoree Senne, ee mnet enon.
+iS NEF eT Ae a a, ee ace EE pT Ta an: nan
+
+Fig. 5. Schematic representation of a unique alarm. Red sticks represent alarm
+events. Seconds between two subsequent sticks represent a run-length. (For inter-
+pretation of the references to color in this figure legend, the reader is referred to
+the web version of this article.).
+
+4.2. The Dynamic Chattering Index
+
+The mathematical formulation of the Dynamic Chattering Index
+is based on the method described by Kondaveeti et al. (2013) for
+the calculation of the Chattering Index. Both indices rely on the
+run-lengths distribution to quantify alarm chatter. A run-length is
+the “time difference in seconds between two consecutive alarms
+on the same tag” (Kondaveeti et al., 2013). As an example, the run-
+lengths related to a fictitious unique alarm are shown in Fig. 5.
+
+In the figure, the red marks represent an alarm event (i.e., a “1”
+in the binary sequence), the number of seconds between two con-
+secutive marks (i.e., the time between two subsequent “1’s” in the
+binary sequence) represent a run-length. Intuitively, considering
+the whole observation period, if a unique alarm has a high num-
+ber of short run-lengths, it is highly probable that the alarm has
+shown chattering. The alarm sequence described in Fig. 5 indicates
+Chattering because the alarm has occurred six times in less than
+30 seconds. The Chattering Index in Kondaveeti et al. (2013) is
+
+b= > Pe (2)
+
+reN
+
+where
+
+e ris a natural number that represents a run-length [s] (e.g. r=5,
+7, 10, 13 for alarm data in Fig. 5);
+
+e P, represents the probability that a run length is equal to r sec-
+onds, i.e.,
+
+ere NU
+
+where
+
+P. (3)
+
+e n; is the number of run lengths equal to r seconds (e.g. ns = 2
+and n7 = nyg = Ny3= 1 for alarm data in Fig. 5);
+
+e > ny represents the total number of run-lengths, which is
+reN
+one less than the unique alarm’s occurrences over the obser-
+
+vation period (e.g., the alarm in Fig. 5 occurred 6 times, the
+summation is equal to 5).
+
+The Chattering Index indicates the mean frequency of annun-
+ciation of a unique alarm (units of w are alarms ) and it assumes
+a value between O and 1. A threshold value is needed to as-
+sess whether a unique alarm has shown chattering during the
+observation period. Kondaveeti et al. (2013) propose a threshold
+value equal to 0.05 (i.e., y >0.05 indicates alarm chatter). For in-
+stance, considering the example presented in Fig. 5, the probabili-
+ties (Eq. (3)) are Ps; = 2h and P7 = Pig = Py3 = "5 . The Chattering
+Index (Eq. (2)) is:
+
+21 1 1 1 1
+which confirms that the alarm has shown Chattering behavior.
+
+In fact, once the observation period is defined, a single w is
+obtained for each unique alarm. Although meaningful, the index is
+relatively static: observing the Chattering Index, one can determine
+whether the unique alarm has shown Chattering, but no further
+conclusion can be drawn (e.g., when exactly the alarm has shown
+Chattering). To overcome this limitation, the Chattering Index ap-
+proach has been modified, and the Dynamic Chattering Index has
+been developed. The core idea is to calculate a regular Chattering
+Index every time a unique alarm occurs (i.e., every time a “1” is
+N. Tamascelli, N. Paltrinieri and V. Cozzani
+
+found in the binary representation of the alarm). Another key fea-
+ture is that the calculations of the Dynamic Chattering Index in-
+volve only alarm events that occurred up to one hour after the
+alarm event of concern. If a unique alarm has n 1’s in the binary
+sequence, n-1 Dynamic Chattering Indices are calculated (the last
+event is excluded from the calculation). By this procedure, each “1”
+in the binary sequence is associated with a Dynamic Chattering
+Index, which quantifies the amount of chatter that the alarm has
+shown during the following hour.
+
+Considering a generic alarm event with index i, the calculation
+of the Dynamic Chattering Index involves four steps (step 2.1 in
+Fig. 4).
+
+1. The largest index k that meets the condition (Timestamp, —
+Timestamp;) < 1 h is selected, and the binary sequence is re-
+duced in such a way that only alarm events having index
+j€[i,k] are taken.
+
+2. The run-lengths (r) and the number of run-lengths (nr) of the
+reduced binary sequence are calculated. It is worth noting that
+as long as the reduced binary sequence does not include the
+last alarm event (i.e., if k < n), one run-length can be obtained
+for each of the alarms in the reduced sequence (i.e., the last el-
+ement of the sequence is also included in the run-lengths cal-
+culations).
+
+3. Probabilities are calculated according to Eq. (3).
+
+4. The Dynamic Chattering Index of the alarm event is calculated
+according to Eq. (2).
+
+The steps presented above are repeated V ic [0, n— 1] to ob-
+tain the n - 1 Dynamic Chattering Indices of the unique alarm of
+concern. Finally, the procedure is repeated for each of the unique
+alarms in the Binary Database.
+
+The same threshold value discussed above has been used for
+alarm classification. If an alarm event has wp >0.05, the unique
+alarm will show chattering within one hour.
+
+Eventually, a Dynamic Chattering Index has been calculated for
+each alarm event (step 2.2 in Fig. 4). The use of a threshold al-
+lows classifying alarms into two categories, “Chattering within one
+hour” and “Not Chattering within one hour”. This result has been
+used to train and evaluate the Machine Learning algorithms that
+will be described in the following section.
+
+4.3. Machine Learning
+
+Machine Learning (ML) can be defined as “computational meth-
+ods using experience to improve performance or to make accurate
+predictions” (Mohri et al., 2012). Due to the ever-increasing com-
+putation capabilities of modern calculators and to the development
+of computer technologies, the number of ML algorithms and their
+applications have witnessed extraordinary growth during the last
+few years (Liu et al., 2018). Despite the immense number of dif-
+ferent algorithms, there are only three categories of ML methods,
+which are: Supervised Learning, Unsupervised Learning, and Rein-
+forcement Learning. Within the present work, Binary Classification
+algorithms have been used, which fall into the Supervised Learning
+category.
+
+A Classification algorithm takes as an input a list of features
+(i.e., meaningful attributes) of the object that must be classified
+and returns a label (i.e., the class of the object). For instance, these
+algorithms are employed to classify emails into “Spam” and “Not
+Spam” while, in the present study, the algorithm aims to classify
+alarm events into “Chattering within one hour” or “No Chattering
+within one hour”. If the objects are classified into two classes only,
+the problem is called Binary Classification.
+
+The selection of the most relevant features is a crucial step, and
+it may significantly affect the performance of the algorithm. The
+
+Computers and Chemical Engineering 143 (2020) 107122
+
+selection of the set of features that best represent the problem un-
+der assessment is mostly guided by experience, and a trial and er-
+ror approach is often required (Brink et al., 2016)(step 3.5 in Fig. 4).
+
+The Machine Learning Classification workflow is presented in
+Fig. 6. Two distinct stages are necessary to build and test the algo-
+rithm: Training and Evaluation.
+
+During the training stage (step 2 in Fig. 6), the algorithm re-
+ceives a set of examples. An example is a list of features (e.g., the
+attributes of an alarm event) and the related label. From the exam-
+ples, the algorithm “learns” the relation between features (Y) and
+labels (X) by optimizing the weights of an internal function (f).
+
+Y=f (X) (5)
+
+The weights are adjusted by an optimization algorithm, which
+aims to minimize the “distance” between f(X) and Y. Different
+types of functions exist, as well as different optimization methods.
+
+Later, during the evaluation phase (step 3 in Fig. 6), a new
+series of unlabeled examples (i.e., only features) are fed to the
+trained algorithm, which predicts the labels. Finally, the perfor-
+mance of the algorithm is quantified by comparing predicted labels
+with true labels (step 4 in Fig. 6).
+
+It is worth mentioning that the raw output of a Classification
+algorithm is not a label, but the label’s probability (Brink et al.,
+2016). For example, the algorithm used in this work returns the
+likelihood of a unique alarm being “Chattering within one hour”
+or “Not chattering within one hour”. A threshold is needed to con-
+vert probabilities into the final label, which is 0.5 by default (i.e., if
+the “Chattering within one hour” label’s probability is > 0.5, the
+model will label the alarm as “Chattering within one hour”). The
+probability threshold is an adjustable parameter, and it can signif-
+icantly affect the model’s performance (Google, 2020a).
+
+4.3.1. Models
+
+A model can be defined as “a function with learnable
+parameters that maps an input to an output. The optimal param-
+eters are obtained by training the model on data. A well-trained
+model will provide an accurate mapping from the input to the de-
+sired output” (TensorFlow.org, 2020a). Basically, the model defines
+the mathematical structure of the function f in Eq. (5). Three differ-
+ent models have been used in this study: a Linear model, a Deep
+Neural Network, and a Wide&Deep model.
+
+4.3.1.1. Linear model. Linear models represent the labels as a linear
+combination of the features (Hastie et al., 2009).
+
+p
+Y = Bo+ > °XjB; (6)
+j=l
+where:
+e Y = labels;
+© X = [Xj, Xz, ..., Xp] = the features vector;
+
+e Xj = a feature;
+¢ Bo = intercept (or bias);
+e B; = coefficient (or weight).
+
+In this representation, each feature has its own weight. There-
+fore, the model can assess how much a feature weights on the cal-
+culation of the label, but it cannot quantify the influence of com-
+binations of features. This limitation is partially solved by cross-
+ing two or more features to create a new, more meaningful, syn-
+thetic feature (Google, 2020b). Despite that, the linear model lacks
+in generalization, and it cannot interpret the combination of fea-
+tures that never occurred during the training phase (Cheng et al.,
+2016).
+
+Although simple, the model is widely used (James et al., 2013)
+because it is robust, fast, and performs well on large datasets. Fur-
+thermore, the weights values are easily accessible, allowing the
+N. Tamascelli, N. Paltrinieri and V. Cozzani
+
+Training
+Database
+Machine Learning
+
+Database
+
+ 
+
+  
+
+CCC)
+
+Evaluation 6
+
+Database
+
+Computers and Chemical Engineering 143 (2020) 107122
+
+Machine Learning
+Model
+
+A
+|
+Trained Model
+
+A
+
+ 
+
+  
+
+Performance
+
+Fig. 6. Binary Classification Workflow. 1 - the database is divided into Training and Evaluation Databases. 2 - Training Database is fed to the ML model; a trained model is
+obtained. 3 - Evaluation Database is fed to the trained model, which predicts the labels. 4 - performance metrics are calculated.
+
+user to evaluate which features are more meaningful for the prob-
+lem under assessment (Brink et al., 2016).
+
+The model employed in this work uses FTRL algorithm as an
+optimizer (TensorFlow.org, 2020b).
+
+4.3.1.2. Deep Neural Network. Deep Neural Networks consist of in-
+terconnected layers. The first layer of the network is the vector of
+the features (X), and the last layer is the vector of the labels (Y).
+Between the first and the last layer there are the so-called hid-
+den layers (H). Each hidden layer is made of a certain number of
+hidden units (Z). The number of hidden layers and hidden units
+is a design parameter that can greatly affect the performance of
+the algorithm. Generally speaking, it is better to use a large num-
+ber of hidden layers and units. As a drawback, bigger networks
+require more computational effort than networks with few layers.
+The model used in this work has three hidden layers, with 1024,
+512 and 256 hidden units, respectively. A schematic representation
+of a Neural Network is shown in Fig. 7.
+
+The connections (i.e., solid lines) in Fig. 7 represent non-linear
+transformations. For example, the hidden units of the first and sec-
+ond hidden layers can be calculated as follows
+
+Z} =0 (ai +a} X) i-1,...,M (7)
+Z?=0 (yity;' Z') i=1,..., N (8)
+where:
+
+° Aoi. Yo) = biases;
+¢ Qj, Yj = vectors of model coefficients;
+° zk = the i—th hidden unit of the k — th hidden layer;
+e Zl= [Zj, Z), Zh, ..., Zl:
+e o = activation function.
+Biases and coefficients are optimized during the training of the
+
+algorithm. The model employed in this work uses Adagrad algo-
+rithm as an optimizer (TensorFlow.org, 2020c), and the activation
+
+Labels
+
+Input H1 H2 H3
+
+ 
+
+Fig. 7. Deep Neural Network with P features (orange circles), and three hidden lay-
+ers (H1, H2, H3), which contain M, N, and S hidden units, respectively. The output
+layer (green circles) contains two labels (Y1 and Y2). (For interpretation of the ref-
+erences to color in this figure legend, the reader is referred to the web version of
+this article.).
+
+function is the linear rectifier (TensorFlow.org, 2020d).
+o (XxX) = max (0, x) (9)
+
+According to Eqs. (7) and (8), the activation function converts
+the linearly combined units of a layer into the hidden units of the
+following layer; this allows the model to capture non-linear inter-
+features relationships and strengthen its generalization capabilities.
+
+Deep Neural Networks represent state-of-the-art algorithms
+for audio-video processing (i.e, speech and image recognition)
+(Brink et al., 2016; Hastie et al., 2009) and their applications are
+rapidly spreading among different sectors. Although flexible, these
+N. Tamascelli, N. Paltrinieri and V. Cozzani
+
+Labels
+
+ 
+
+Features (linear part) Features (deep part)
+
+Fig. 8. Wide&Deep model, made of a linear (left) and a Deep (right) parts. The
+linear part takes K features (red circles). The Deep part is made of 3 hidden layers
+(blue circles) with M, N, and S hidden units, and takes P features (orange circles).
+The output layer (green circles) contains two labels (Y1 and Y2). (For interpretation
+of the references to color in this figure legend, the reader is referred to the web
+version of this article.).
+
+models may over-generalize and detect non-existent relationships
+between features. Furthermore, they are harder to optimize com-
+pared with simpler models (e.g., the linear model).
+
+4.3.1.3. Wide and Deep model. In an attempt to overcome the lim-
+itations of the models discussed above, Cheng et al. (2016) pro-
+posed a hybrid model, which is composed of a Wide part (i.e.,
+linear) and a Deep part (i.e., Deep Neural Network), as shown in
+Fig. 8.
+
+During the training phase, the parameters of the linear and
+deep parts are optimized simultaneously using FTRL and Adagrad
+algorithms. The linear part of the model could comprise both raw
+features and crossed-features; in this work, only crossed-features
+are used. The hybrid model has proven to combine the advantages
+of the linear model (e.g., robustness, memorization capability) and
+the Deep model (e.g., generalization, flexibility) minimizing their
+drawbacks (Cheng et al., 2016).
+
+4.3.2. Performance indicators
+
+The performance of a classification algorithm can be assessed
+by comparing predicted labels and true labels. For concision pur-
+poses, the label “No Chattering within one hour” will be referred
+to as the label “N”, while “Chattering within one hour” will be re-
+ferred to as the label “Y”. Three metrics have been used to assess
+the performance
+
+TP + TN
+Accuracy = Tp IN + FP + EN 0)
+TP
+Accuracy = PP (11)
+TP
+Accuracy = PN (12)
+where
+
+e TP=True Positive -i.e. predicted label =Y, true label =Y;
+e TN=True Negative -i.e. predicted label =N, true label =N;
+e FP=False Positive -i.e. predicted label = Y, true label =N;
+e FN=False Negative -i.e. predicted label=N, true label =Y.
+
+Computers and Chemical Engineering 143 (2020) 107122
+
+Table 2
+
+Alarm features used in the simulations. Features names have been
+coded for concision purposes. Codes are represented in the first column
+and described in the second column. The last two columns represent
+the features format used in the linear and Deep models.
+
+Feature Description Format
+Linear Deep
+
+Y Year of the alarm event Num. Num.
+M Minute of the alarm event Num. Num.
+D Day of the alarm event Num. Num.
+H Hour of the alarm event Num. Num.
+m Minute of the alarm event Num. Num.
+S Seconds of the alarm event Num. Num.
+SO Source (see Table 1) Categ Dense
+ID Identifier (see Table 1) Categ. Dense
+CN Condition Name (see Section 2.2) Categ Dense
+JX Alarm Safety function (see Table 1) Categ. Dense
+ATD Active Time Delta (see Section 2.2) Num. Num.
+VAL Data Value (see Table 1) Num. Num.
+UNI Eng. Unit (see Table 1) Categ. Dense
+
+The summation of TP and TN represents the number of cor-
+rect predictions and the summation of FN and FP is the number
+of wrong predictions. The Accuracy is the number of correct pre-
+dictions divided by the total number of predictions, the Precision
+is the fraction of correct positive predictions, and the Recall is the
+fraction of real positive correctly predicted; the metrics assume
+values between 0 and 1; the larger the value, the better the metric.
+
+As it has already been discussed, Machine Learning algorithms
+use a probability threshold to determine the predicted label. There-
+fore, changing the probability threshold can greatly affect the al-
+gorithm’s performance as it modifies the values of TP, TN, FP,
+and FN. Unfortunately, Precision and Recall are often in tension
+(Google, 2020a), changes in the threshold that aim to increase the
+Precision may cause the Recall to decrease, and vice versa.
+
+It is worth noting that all the metrics discussed above must be
+considered to evaluate the performance of a Machine Learning al-
+gorithm (Google, 2020c). A high Accuracy alone is meaningless and
+does not necessarily indicate good performances. In this work, “le-
+gitimate” alarms (i.e., that are not going to show chattering) must
+not be labeled as chattering ones. Therefore, the Precision is the
+metric that must be optimized.
+
+5. Simulations
+
+Three simulations have been performed, one for each model
+described in Section 4.3.1. The Machine Learning algorithms have
+been built using TensorFlow r1.15 (TensorFlow.org, 2020e) running
+on Python 3.7.4 (Python.org, 2019). The first step to build the
+Machine Learning algorithms is the feature selection (step 3.1 in
+Fig. 4). A preliminary screening has already been performed during
+“Attribute selection and data cleaning” (section 11) when the not
+useful columns have been removed from the raw alarm database.
+Still, there is no guarantee that the algorithms will perform bet-
+ter if all columns of the “clean” database are used as features. As
+previously argued, feature selection often requires a trial and er-
+ror approach. Different features have been tested. The best set (i.e.,
+the one that has generated the best performance) is presented in
+Table 2, which contains the name and description of each feature.
+
+After features selection, the alarm database has been re-
+organized and converted into a new database (step 3.2 in Fig. 4),
+which contains only the features listed in Table 2. Each row of the
+new database represents an alarm event, each of the first thirteen
+columns represents a feature, and the last column contains the la-
+bels. A label can be either “Y” (if wp => 0.05 -i.e., the unique alarm
+will show chattering within one hour) or “N” (if Wp < 0.05 -i.e.,
+the unique alarm will not show chattering within one hour).
+N. Tamascelli, N. Paltrinieri and V. Cozzani
+
+True label
+
+Predicted Labels
+
+a)
+
+ 
+
+Predicted Labels
+b)
+
+Computers and Chemical Engineering 143 (2020) 107122
+
+3000
+
+2200
+
+1400
+
+ 
+
+600
+
+Predicted Labels
+C)
+
+Fig. 9. Confusion matrices of the linear (a), Deep (b), and Wide&Deep (c) models. The label “N” means “No chattering within one hour”, “Y” means “Chattering within one
+hour”. TN, FP, TN, and FN are obtained using a probability threshold equal to 0.5 and color-coded according to the color bar on the right. (For interpretation of the references
+to color in this figure legend, the reader is referred to the web version of this article.).
+
+THOLD = 0.05
+
+Precision
+
+0.0 0.2 0.4 0.6 08 1.0
+Recall
+
+a)
+
+THOLD = 0.29
+
+ 
+
+0.0 0.2 0.4 0.6 0.8 1.0
+Recall
+
+THOLD = 0.41
+
+0.0 0.2 0.4 0.6 0.8 1.0
+Recall
+
+b) C)
+
+Fig. 10. Precision-Recall curves of the linear (a), Deep (b), and Wide&Deep (c) models. Probability thresholds between 0 and 1 have been used. Points of the curves represent
+the couple Precision - Recall at a specific threshold. Proceeding from Recall =O to Recall = 1, the threshold decreases from 1 to 0 in a non-linear fashion. Red markers indicate
+Precision =0.9, which is obtained at Threshold =THOLD. (For interpretation of the references to color in this figure legend, the reader is referred to the web version of this
+
+article.).
+
+Next, the database has been divided into two sections, to ob-
+tain the training database and the evaluation database (step 1 in
+Fig. 6). The first part, which contains *% of the alarm data, has been
+used to train the models, and the second part (% of the database)
+to evaluate them. The last column of the evaluation database has
+been removed and stored as a separate variable. This prevents the
+model from gaining access to the actual labels during the evalu-
+ation. Additionally, since chattering alarms are not spread evenly
+throughout the original database, the database has been shuffled
+before the division (i.e., rows have been randomly rearranged).
+
+Prior to starting the simulations, one must ensure that the fea-
+tures are fed to the algorithm in a proper format. While Machine
+Learning models accept numerical features as an input, strings of
+characters (e.g., the features Identifier, Source, and Eng. Unit in
+Table 1) cannot be fed directly into the model and must be con-
+verted into a categorical or dense format. Non-numerical features
+that are fed to the linear model have been converted into categor-
+ical features (TensorFlow.org, 2020f). On the contrary, Deep Neural
+Networks do not accept categorical features as an input. Therefore,
+non-numerical features have been mapped into dense features
+(TensorFlow.org, 2020g). The last two columns of Table 2 sum-
+marize the features format used in the linear and deep models.
+Furthermore, three crossed features have been used in the linear
+model and in the linear part of the Wide&Deep model, which are
+[SO x CN x JX], [SO x CN x ID], and [VAL x UNI]. This enables the
+linear model to assess non-linear relationships between features.
+In summary, the Linear model uses three crossed features in ad-
+
+10
+
+dition to the features in Table 2. The Deep model and the deep
+part of the Wide&Deep model use the features in Table 2, but no
+crossed features (because Deep models have intrinsic generaliza-
+tion capabilities). The linear portion of the Wide&Deep model uses
+three crossed features only.
+
+Finally, the models have been trained and evaluated, as shown
+in Fig. 6 (step 3.3 in Fig. 4). After the simulations, the algorithm
+provided raw label probabilities, which have been converted into
+predicted labels using 0.5 as a threshold (step 3.4 in Fig. 4). Next,
+predicted labels have been compared with true labels (i.e., the la-
+bels that the model should have predicted), the number of TP, TN,
+FP, and FN has been calculated. Accuracy, Precision, and Recall of
+the model have been obtained according to Eqs. (10)-(12). Finally,
+the performance metrics have been calculated again using different
+probability thresholds in order to study the effect of this parameter
+on the final results.
+
+6. Results
+
+The number of TP, TN, FP, and FN are presented in Fig. 9, which
+contains three confusion matrices, one for each model. The axes
+of a confusion matrix represent the true labels and the predicted
+labels. From top left clockwise, the elements of a confusion matrix
+are the number of true negatives, false positives, true positives, and
+false negatives. A probability threshold equal to 0.5 has been used.
+
+Metrics in Fig. 9 indicate that the number of correct predictions
+is one order of magnitude higher than the number of wrong pre-
+dictions. Moreover, the number of False Positives is always lower
+N. Tamascelli, N. Paltrinieri and V. Cozzani
+
+Table 3
+
+Accuracy, precision, and recall achieved by the Ma-
+chine Learning models. Metrics are obtained using
+a probability threshold equal to 0.5.
+
+Model Accuracy Precision Recall
+Linear 0.947 0.941 0.938
+Deep 0.937 0.929 0.926
+Wide&Deep 0.919 0.919 0.892
+
+than the number of False Negatives. The Accuracy, Precision, and
+Recall achieved by each algorithm are shown in Table 3.
+
+Values in Table 3 indicate that the linear model produces the
+largest metrics. Similarly, the Deep model achieves a better perfor-
+mance than the Wide&Deep model.
+
+Fig. 10, shows the Precision-Recall (P-R) curves of the three
+models calculated using different probability thresholds.
+
+As previously stated, classification algorithms provide the la-
+bel probability of the events that are included in the evaluation
+database. A threshold value is needed to convert probabilities into
+labels. If the threshold is equal to 0, every alarm event in the eval-
+uation database will be labeled as “Y”. Oppositely, if the threshold
+is equal to 1, every alarm event in the evaluation database will be
+labeled as “N”. Lowering the threshold causes the Recall to either
+decrease or to remain constant. Instead, Precision may increase or
+decrease when the threshold is reduced. Each point of the blue
+curves in Fig. 10 represents the Precision and Recall values ob-
+tained using a specific threshold. For a specific model (panels a, b,
+and c in Fig. 10), thresholds larger than THOLD ensures a Precision
+larger than 0.9.
+
+7. Discussion
+
+The Chattering Index proposed by Kondaveeti et al. (2013) is a
+valuable tool for addressing Chattering alarms retrospectively, but
+it does not fulfill the need for dynamicity required to achieve the
+objectives of the study. In fact, the Chattering Index quantifies the
+amount of chattering that an alarm has shown over the entire ob-
+servation period: results are static, meaning that the index can be
+used to measure the chattering severity, but it does not provide
+any information about when, or why, the chattering has happened.
+For these reasons, the index has been modified, and a dynamic ap-
+proach has been developed.
+
+The Dynamic Chattering Index aims at quantifying the likeli-
+hood of alarm chatter after each alarm occurrence, linking past
+and actual process conditions to future alarm behavior. A threshold
+has been used to classify alarm events in two categories, “Chatter-
+ing within one hour” and “Not chattering within one hour”. The
+Dynamic version of the Chattering Index provides a more detailed
+picture of the alarm system performance if compared to the Chat-
+tering Index: the former classifies alarm events, the latter classi-
+fies unique alarms. In future works, the Chattering Index may be
+used to strengthen the Machine Learning simulations since it rep-
+resents a meaningful piece of information about the past behavior
+of a unique alarm. For instance, one Chattering Index may be cal-
+culated for each alarm event in the database, taking into account
+only alarms that occurred before each event. This index may be
+used as a new feature in the Machine Learning simulations, allow-
+ing the model to learn the relation between past and future chat-
+tering. The approach has not been pursued in this study because
+the authors decided to exclude synthetic features (i.e., that requires
+calculation) and focus the attention on ready-to-use features (i.e.,
+directly provided by the alarm system).
+
+The Dynamic Chattering Index method requires to select a
+threshold (for alarm classification) and the length of the time in-
+
+11
+
+Computers and Chemical Engineering 143 (2020) 107122
+
+Table 4
+
+Fictitious alarm sequence. Each row represents an alarm event.
+The last column contains the Dynamic Chattering Index of the
+event i (first row the table). The symbol “ \ ” indicates a value
+that is either not calculated or not relevant for the analysis.
+
+Index Timestamp Run-length [s] Wo
+
+i 09/09/2017 16:07:24 3 0.069
+i+1 09/09/2017 16:07:27 234 \
+i+2 09/09/2017 16:11:21 133 \
+i+3 09/09/2017 16:13:34 1559 \
+i+4 09/09/2017 16:39:33 2160 \
+i+5 09/09/2017 17:15:33 \ \
+
+terval (to obtain the reduced binary sequence, according to step 1
+of the procedure described in Section 4.2). In this work, a time in-
+terval equal to 1 h has been used because it appears to be a good
+balance between dynamicity (that cannot be achieved using large
+time intervals) and statistical relevance (that cannot be achieved
+using short time intervals). However, the choice has been arbitrary
+and guided by general considerations. For example, longer time in-
+tervals (e.g., 2 hours or more) may cause the index to detect Chat-
+tering even if it only appears in the last minutes of the time se-
+quence. As a result, the index would indicate chattering for two or
+more hours while the alarm would not exhibit chattering for most
+of the time. Oppositely, shorter time intervals (e.g., 30 minutes or
+less) may cause the index to overestimate short run lengths and
+to detect chattering were no - or low - chattering exists; this is-
+sue partially affects also the index used in this study. In fact, the
+Dynamic Chattering Index relies strongly on statistical methods,
+which perform better when a large amount of data is analyzed.
+Unlike the Chattering Index, which considers the entire observa-
+tion period, the Dynamic Chattering Index calculations involve a
+relatively short time interval. It may happen that the unique alarm
+under assessment occurred a few times during the hour, and this
+could lead to unexpected results. For instance, few alarm events in
+the reduced binary sequence will produce relatively large proba-
+bilities, since the denominator in Eq. (3) will be small. Besides, if
+some of the few run-lengths involved in the calculation are short
+(e.g., 1 - 10 s), the combination of short run-lengths and large
+probabilities will cause Eq. (2) to produce a large Dynamic Chat-
+tering Index, most likely higher than 0.05 Tamascelli et al., 2020.
+
+As an example, consider alarm data represented in Table 4. The
+calculation of the Dynamic Chattering Index of the event i includes
+all the alarms in Table 4 except the last one (because it happened
+later than one hour after the event i). Observing the run-lengths,
+one may conclude that the alarm did not show chattering since
+they appear to be long enough, and the 3 seconds long run-length
+alone does not seem sufficient to suggest chattering. Despite that,
+the calculation of the Dynamic Chattering Index leads to an unex-
+pected result. In particular, the run-length count and the probabili-
+ties are nr=1 andP, = "5 V r. Therefore, the Dynamic Chattering
+Index is
+
+Wo = §
+
+(44 A+ --- + xy) = 0.067 + 8.5-104
+
++++-4+9.2-10-5 = 0.069
+
+Which is greater than 0.05, and suggests chattering within one
+hour. Focusing on how each run-length impacts the index calcula-
+tion, one can observe that a run-length equal to 3 s alone produces
+a contribution of 0.067, which is greater than 0.05. This behavior
+is due both to an extremely short run length and to large proba-
+bilities (caused by few alarms being triggered during the observa-
+tion period). Usually, if many alarms occurred within the observa-
+tion period, the effect of a few short run-lengths is mitigated by a
+small probability value. Instead, if few alarms were triggered, the
+probability increases, the mitigation effect stops, and an unreliably
+
+(13)
+N. Tamascelli, N. Paltrinieri and V. Cozzani
+
+high Wp is produced. The issue might be avoided by excluding ex-
+tremely short run-lengths or extending the time interval. The first
+solution has the disadvantage of ignoring extreme chattering be-
+havior, and the second may cause loss of dynamicity. For the rea-
+sons mentioned above, future research should be devoted to the
+improvement of the Dynamic Chattering Index calculation in order
+to achieve higher reliability. For example, alarm sequences affected
+by the issues described above might be isolated, and different in-
+dices with different time intervals (e.g., 30 minutes, 1 hour, and
+2 hours) might be tested on these sequences to assess which one
+performs better (i.e., which one does not overestimate the effect
+of few, extremely short, run lengths). Also, the Dynamic Chatter-
+ing Index described in this study might be modified to take into
+account the number of alarm events considered in the calculation
+-e.g., a weighting function might be created to dampen the effects
+of the combination of few alarms and short run lengths. In addi-
+tion, indices calculated with different time intervals may be aggre-
+gated and used together to obtain a single, more comprehensive,
+and informative index.
+
+The results of the Dynamic Chattering Index approach have
+been used to train three Machine Learning models for Chattering
+prediction. The models have shown good performances in predict-
+ing alarm chatter: results in Table 3 indicate that a high Accu-
+racy can be achieved while maintaining high Precision. These flexi-
+ble and dynamic tools may significantly improve the operators’ re-
+sponse in different situations. During alarm floods, early warning
+of chattering may be delivered to the operator, who may decide to
+silence the alarm before it becomes a nuisance. In addition, the
+models could warn that the chattering is going to end (ie., the
+model predicts an “N” after a sequence of “Y”), and the operator
+may decide to restore the alarm without the burden of checking
+it periodically. During normal operations, early warnings of chat-
+tering may allow the operator to investigate the issue in advance,
+and the ability to detect the end of a chattering sequence would
+prevent the alarm from being forgotten in a silenced status. In gen-
+eral, the models could help to increase risk awareness by providing
+quick and ready-to-use information and by reducing the need for
+manual intervention.
+
+When the standard probability threshold is used (i.e., 0.5),
+the linear model qualifies as the best model since it produces
+the largest metrics (Table 3). Deep and Wide&Deep models show
+slightly smaller metrics and may need more optimization to im-
+prove their performance. On the contrary, the simpler but more ro-
+bust linear model has performed better without the need of a spe-
+cific optimization. The reasons why this has happened are diverse.
+For instance, DNN and Wide&Deep models are prone to overgen-
+eralization and may detect inter-feature relationships where no re-
+lationship exists. The problem described in this study may need a
+model that is better at memorizing (e.g., Linear) rather than gener-
+alizing (e.g., DNN, Wide&Deep). Future research should investigate
+whether different optimization strategies (e.g., different hyperpa-
+rameters, learning decay, activation functions) could improve the
+performance of advanced but sensitive models such as the Deep
+and Wide&Deep.
+
+P-R curves in Fig. 10 suggest that precisions larger than 0.9
+can always be achieved while maintaining the Recall close to
+0.9 by varying the probability threshold. If the threshold is fur-
+ther reduced (i.e., below 0.05 for the linear model, 0.29 for the
+Deep, and 0.41 for the Wide&Deep), the Precision drops signif-
+icantly. The selection of the best threshold (i.e., threshold tun-
+ing) strongly depends on the specific problem under assessment
+(e.g., unbalanced/balanced dataset, cost-sensitive/insensitive classi-
+fication)(Brink et al., 2016; Google, 2020d; Ling and Sheng, 2008).
+Misclassifying legitimate alarms (FP) is more critical than mis-
+classifying chattering alarms (FN) as a False Positive may cause
+the operator to silence a legitimate alarm. Therefore, False Pos-
+
+12
+
+Computers and Chemical Engineering 143 (2020) 107122
+
+itives must be avoided, and Precision must be increased. Unfor-
+tunately, increasing the Precision often causes the Recall to de-
+crease (Brink et al., 2016). The best threshold must ensure a high
+Precision while maintaining the Recall to an adequate level. Ac-
+ceptable thresholds may be identified by selecting minimum val-
+ues of Precision and Recalls, but selecting the best threshold re-
+quires more considerations. Often when classification errors have
+different criticality, a process similar to cost-benefit analysis is
+needed to identify the best threshold value (Ling and Sheng, 2008;
+Sheng and Ling, 2006). Other approaches involve the optimization
+of the weighted harmonic mean between Precision and Recall (Fg
+- measure)(Chai, 2005; Paltrinieri et al., 2020).
+
+As a final note on thresholds and P-R curves, it is worth noting
+that the linear model provides Precisions greater than 0.90 when
+thresholds between 1 and 0.05 are used. This means that when-
+ever the model predicts the label “1” (i.e., “Chattering within one
+hour”), it produces a large probability value, which is often larger
+than 0.95 (i.e., 1 - 0.05). In other words, the linear model is ex-
+tremely “confident” when predicting chattering alarms.
+
+Focusing on the Linear model, the nature of wrong predictions
+(i.e, FN and FP) has been studied more in detail. Three leading
+causes of error have been identified:
+
+1. The model could not identify the beginning of a chattering se-
+ries.
+
+2. The model could not identify the end of a chattering series.
+
+3. The model labels all the events of the unique alarm of concern
+as “y” or “N”,
+
+Cause 1 occurs when the model fails to identify the first ele-
+ment of a Chattering sequence or, in other words, it fails to de-
+tect the first unique alarm event labeled as “Y” after one or more
+events labeled as “N”. Fig. 11 clarifies this insight. As one might
+notice, the first event of the chattering sequence (the red dot in
+Fig. 11) has been incorrectly labeled (true label is Y, predicted la-
+bel is N), and a False Negative has been produced as a conse-
+quence. Later in time, the model has correctly identified chattering
+(green dots). Also, the model has correctly predicted the end of the
+chattering sequence, which occurred at 13:56:00 (not displayed in
+Fig. 11).
+
+Cause 2 occurs when the model fails to identify the last el-
+ement of a Chattering sequence. Fig. 12 provides an example of
+this. The last two unique alarm events of the series (red dots)
+have been incorrectly labeled (the true label is N, while the pre-
+dicted label is Y), and two False Positive have been produced as a
+consequence.
+
+Regarding cause 3, it may happen that if the true labels related
+to a unique alarm are strongly unbalanced (i.e., mostly “Y” or “N”),
+the model will deduce that all the events produced by that par-
+ticular unique alarm must be labeled as “Y” or “N”, depending on
+which is the most frequent. For instance, this behavior has been
+observed for both the unique alarms “LI315 IOP” and “TI542 IOP”:
+the first produced a total of 18 alarm events and only 5 of them
+were “Not Chattering within one hour”, the latter produced only 4
+“Chattering within one hour” events out of 38 in total. As a conse-
+quence, the algorithm has predicted that all the events produced
+by “LI315 IOP” must be labeled as “Y”, and events produced by
+“TI542 IOP” must be labeled as “N”.
+
+Poor data distribution, as well as the use of too small datasets,
+may play a crucial role in causing the issues described above. For
+this reason, it might be worthwhile to consider a more exten-
+sive database for further analyses. Besides, different sets of features
+should be tested to resolve the misidentification of chattering se-
+quences boundaries.
+N. Tamascelli, N. Paltrinieri and V. Cozzani
+
+Alarm state
+
+ 
+
+Computers and Chemical Engineering 143 (2020) 107122
+
+OO © GOO ©
+11
+
+|
+|
+|
+|
+|
+|
+|
+!
+|
+|
+|
+
+4
+; por
+<r
+
+Time
+
+Fig. 11. Detail of a Chattering sequence produced by the unique alarm FI234 LTRP. Colored dots represent alarm events (alarm state=“ON”). True label is “Y” for all the
+events in the figure. Blue dots refer to alarm events included in the Training database, other colors refer to events included in the Evaluation database. Red dots indicate a
+wrong prediction (a False Negative), green dots indicate a correct prediction (a True Positive). (For interpretation of the references to color in this figure legend, the reader
+
+is referred to the web version of this article.).
+
+Alarm state
+
+Ad
+a>
+4°
+
+ 
+
+Time
+
+Fig. 12. Detail of a Chattering sequence produced by the unique alarm FI234 LTRP. Colored dots represent alarm events (alarm state =“ON”). True labels of the last three
+elements are “N”, other events have “Y” as True labels. Blue dots refer to alarm events included in the Training database, other colors refer to events included in the
+Evaluation database. Red dots indicate a wrong prediction (a False Positive), green dots indicate a correct prediction (a True Positive). (For interpretation of the references to
+
+color in this figure legend, the reader is referred to the web version of this article.).
+
+8. Conclusions
+
+A Machine Learning method for chattering prediction was de-
+veloped. Analyses have involved the formulation of the Dynamic
+Chattering Index to perform a preliminary classification of his-
+torical alarm data. This new index overcomes the limitations of
+the Chattering Index, providing more flexible and dynamic results,
+which can be used to link actual process conditions to future alarm
+behavior.
+
+Three different Machine Learning models -Linear, Deep, and
+Wide&Deep- have been trained and evaluated. The models have
+been tested on the ability to predict future chattering behavior
+based on actual process conditions. The performance metrics and
+the P-R curves indicate robustness and good prediction capability
+of the models. The method may be used to build an online tool for
+chattering prediction and decision-making support. For instance,
+the algorithm could provide early warnings of possible chattering,
+
+13
+
+and actions might be taken by the operator to avoid this event.
+Consequently, the workload would be reduced, and the risk of
+alarm floods would be minimized. In general, the approach demon-
+strates that advanced analysis techniques can be used to extract
+knowledge from historical data and perform accurate predictions.
+A data-driven approach for process monitoring and control appears
+to be a valuable and interesting opportunity to exploit process data
+and increase process safety and stability.
+
+Declaration of Competing Interest
+
+The authors declare that they have no known competing finan-
+cial interests or personal relationships that could have appeared to
+influence the work reported in this paper.
+N. Tamascelli, N. Paltrinieri and V. Cozzani
+CRediT authorship contribution statement
+
+Nicola Tamascelli: Conceptualization, Methodology, Software,
+Validation, Formal analysis, Writing - original draft, Writing - re-
+view & editing, Visualization. Nicola Paltrinieri: Conceptualization,
+Methodology, Software, Data curation, Supervision, Project admin-
+istration, Funding acquisition. Valerio Cozzani: Supervision, Project
+administration, Funding acquisition.
+
+Acknowledgments
+
+The authors would like to gratefully acknowledge Yara Interna-
+tional for the support and the data provided.
+
+References
+
+Ahmed, K., Izadi, I., Chen, T., Joe, D., Burton, T., 2013. Similarity analysis of industrial
+alarm flood data. IEEE Trans. Autom. Sci. Eng. 10, 452-457. https://doi.org/10.
+1109/TASE.2012.2230627.
+
+Aika, K., Christiansen, LJ., Dybkjaer, I., Hansen, J.B., Nielsen, P.E.H., Nielsen, A.,
+Stoltze, P., Tamaru, K., 1995. Ammonia. Springer Berlin Heidelberg, Berlin, Hei-
+delberg https://doi.org/10.1007/978-3-642-79197-0.
+
+Aleixandre, J., Alvarez, I., Garcia, M., Lizama, V., 2015. Application of multivariate
+regression methods to predict sensory quality of red wines. Czech J. Food Sci.
+33, 217-227. https://doi.org/10.17221/370/2014-CJFS.
+
+ANSI/ISA, 2016. ANSI/ISA-18.2-2016 management of alarm systems for the process
+industries. ANSI/ISA.
+
+Beebe, D., Ferrer, S., Logerot, D., 2012. Alarm floods and plant incidents 17.
+
+Brink, H., Richards, J., Fetherolf, M., 2016. Real-World Machine Learning, first ed.
+Manning Publications, Shelter Island.
+
+Chai, K.M.A., 2005. Expectation of f-measures: tractable exact computation and
+some empirical observations of its properties. SIGIR 2005 Proc. 28th Annu. Int.
+ACM SIGIR Conf. Res. Dev. Inf. Retr., pp. 593-594.
+
+Cheng, H.-T., Koc, L., Harmsen, J., Shaked, T., Chandra, T., Aradhye, H., Anderson, G.,
+Corrado, G., Chai, W., Ispir, M., 2016. Wide & deep learning for recommender
+systems,. In: Proceedings of the 1st Workshop on Deep Learning for Recom-
+mender Systems, pp. 7-10.
+
+Directive 2012/18/EU of the European Parliament and of the Council of 2012 on
+the control of major-accident hazards involving dangerous substances, OJ L 197,
+2012. https://doi.org/10.3000/19770677.L_2012.197.eng.
+
+EEMUA, 2013. EEMUA Publication 191 alarm systems - a guide to design, manage-
+ment and procurement.
+
+Ge, Z., Song, Z., Ding, S.X., Huang, B., 2017. Data mining and analytics in the process
+industry: the role of machine learning. IEEE Access 5, 20590-20616. https://doi.
+org/10.1109/ACCESS.2017.2756872.
+
+Giammarco, G., Giammarco, P., 1973. Process for eliminating CO2 and/or H2S from
+gaseous mixtures. 3725592.
+
+Google, 2020a. Classification: precision and recall [WWW _ Document]. URL
+https://developers.google.com/machine-learning/crash-course/classification/
+precision-and-recall (accessed 1.24.20).
+
+Google, 2020b. Feature crosses [WWW Document]. URL https://developers.google.
+
+com/machine-learning/crash-course/feature-crosses/video-lecture (accessed
+1.24.20).
+Google, 2020c. Classification: accuracy [WWW _ Document]. URL https:
+
+//developers.google.com/machine-learning/crash-course/classification/accuracy
+(accessed 1.24.20).
+
+Google, 2020d. Classification: thresholding [WWW _ Document]. URL https:
+//developers.google.com/machine-learning/crash-course/classification/
+thresholding (accessed 6.15.20).
+
+Han, J., Kamber, M., Pei, J., 2012. Data Mining: Concepts and Techniques,
+Data Mining: Concepts and Techniques. Elsevier Inc https://doi.org/10.1016/
+C2009-0-61819-5.
+
+Hastie, T., Friedman, R., Tibshirani, J., 2009. The Elements of Statistical Learning.
+Springer-Verlag, New York https://doi.org/10.1007/978-0-387-84858-7.
+
+Health and Safety Executive, 1997. The Explosion and Fires at the Texaco Refinery,
+Milford Haven, 24 July 1994. HSE Books, Incident Report Series.
+
+James, G., Hastie, T., Tibshirani, R., Witten, D., 2013. An Introduction to Statistical
+Learning: with Applications in R. Springer-Verlag, New York https://doi.org/10.
+1007/978- 1-4614- 7138-7.
+
+Jennings, J.R., 1991. Catalytic Ammonia Synthesis. Springer Science & Business Media
+https://doi.org/10.1007/978-1-4757-9592-9.
+
+14
+
+Computers and Chemical Engineering 143 (2020) 107122
+
+Katzel, J.. 2007. Control engineering | Managing alarms [WWW Document]. URL
+www.controleng.com/articles/managing-alarms (accessed 1.23.20).
+
+Kondaveeti, S.R., Izadi, I., Shah, S.L. Black, T., 2010. Graphical representation of
+industrial alarm data. IFAC Proc. Vol. 11, 181-186. https://doi.org/10.3182/
+20100831 -4-fr-2021.00033.
+
+Kondaveeti, S.R., Izadi, I., Shah, S.L., Shook, D.S., Kadali, R., Chen, T., 2013. Quantifi-
+cation of alarm chatter based on run length distributions. Chem. Eng. Res. Des.
+91, 2550-2558. https://doi.org/10.1016/j.cherd.2013.02.028.
+
+Kordic, S., Lam, C.P., Xiao, J., Li, H., 2010. Patterns Relevant to the Temporal Data-
+Context of an Alarm of Interest, in. In: Dynamic and Advanced Data Mining for
+Progressing Technological Development. IGI Global, pp. 18-39.
+
+Laberge, J.C., Bullemer, P., Tolsma, M., Reising, D.V.C., 2014. Addressing alarm flood
+situations in the process industries through alarm summary display design and
+alarm response strategy. Int. J. Ind. Ergon. 44, 395-406. https://doi.org/10.1016/
+j.ergon.2013.11.008.
+
+Ling, C.X., Sheng, V.S., 2008. Cost-sensitive learning and the class imbalance prob-
+lem. Encycl. Mach. Learn. 231-235 https://doi.org/10.1.1.15.7095.
+
+Liu, J., Kong, X., Xia, F, Bai, X., Wang, L. Qing, Q., Lee, I., 2018. Artificial intelli-
+gence in the 21st century. IEEE Access 6, 34403-34421. https://doi.org/10.1109/
+ACCESS.2018.2819688.
+
+Mahadevan, S., Shah, S.L., 2009. Fault detection and diagnosis in process data using
+one-class support vector machines. J. Process Control 19, 1627-1639. https://doi.
+org/10.1016/j.jprocont.2009.07.011.
+
+Miao, A., Ge, Z., Song, Z., Zhou, L., 2013. Time neighborhood preserving embedding
+model and its application for fault detection. Ind. Eng. Chem. Res. 52, 13717-
+13729. https://doi.org/10.1021 /ie400854f.
+
+Mohri, M., Rostamizadeh, A., Talwalkar, A., 2012. Foundations of Machine Learning.
+Adaptive Computation and Machine Learning series, first ed MIT Press, Cam-
+bridge.
+
+Paltrinieri, N., Comfort, L., Reniers, G., 2019. Learning about risk: Machine Learning
+for risk assessment. Saf. Sci. 118, 475-486. https://doi.org/10.1016/j.ssci.2019.06.
+001.
+
+Paltrinieri, N., Patriarca, R., Stefana, E., Brocal, F, Reniers, G., 2020. Meta-learning
+for safety management. Chem. Eng. Trans. 82. DOI https://doi.org/10.3303/
+CET2082029.
+
+Python.org, 2019. Python Release Python 3.7.4 | Python.org [WWW Document]. URL
+https://www.python.org/downloads/release/python-374/ (accessed 4.23.20).
+Reis, ML.S., Kenett, R., 2018. Assessing the value of information of data-centric ac-
+tivities in the chemical processing industry 4.0. AIChE J. 64, 3868-3881. https:
+
+//doi.org/10.1002/aic.16203.
+
+Shaw, J.A., 1993. DCS-based alarms: integrating traditional functions into mod-
+ern technology. ISA Trans. 32, 177-181. https://doi.org/10.1016/0019-0578(93)
+90039-Y.
+
+Sheng, V.S., Ling, C.X., 2006. Thresholding for making classifiers cost-sensitive. Proc.
+Natl. Conf. Artif. Intell. 1, 476-481.
+
+Stanton, N.A., Barber, C., 1995. Alarm-initiated activities: an analysis of alarm han-
+dlingby operators using text-based alarm systems in supervisory control sys-
+tems. Ergonomics 38, 2414-2431. https://doi.org/10.1080/00140139508925276.
+
+Tamascelli, N., Arslan, T., Shah, S.L., Paltrinieri, N., Cozzani, V., 2020. A Machine
+Learning Approach to Predict Chattering Alarms. Chem. Eng. Trans. 82. DOI
+https://doi.org/10.3303/CET2082032 (accessed 1.24.20).
+
+TensorFlow.org, 2020a. Models and layers | TensorFlow.js [WWW Document]. URL
+https://www.tensorflow.org/js/guide/models_and_layers (accessed 1.24.20).
+TensorFlow.org, 2020b. tf.keras.optimizers.Ftrl | TensorFlow Core v2.1.0 [WWW Doc-
+ument]. URL https://www.tensorflow.org/api_docs/python/tf/keras/optimizers/
+
+Ftrl (accessed 4.25.20).
+
+TensorFlow.org, 2020c. tf.keras.optimizers.Adagrad | TensorFlow Core v2.1.0
+[WWW Document]. URL https://www.tensorflow.org/api_docs/python/tf/keras/
+optimizers/Adagrad (accessed 4.25.20).
+
+TensorFlow.org, 2020d. tf.nn.relu | TensorFlow Core v2.1.0 [WWW Document]. URL
+https://www.tensorflow.org/api_docs/python/tf/nn/relu (accessed 4.23.20).
+
+TensorFlow.org, 2020e. Tensorflow [www document]. Url https://www.tensorflow.
+org/ (accessed 4.23.20).
+
+TensorFlow.org, 2020f. tf.feature_column.categorical_column_with_vocabulary_list
+[WWW Document]. URL _ https://www.tensorflow.org/api_docs/python/tf/
+feature_column/categorical_column_with_vocabulary_list (accessed 4.23.20).
+
+TensorFlow.org, 2020g. tf.feature_column.indicator_column | TensorFlow Core
+v2.1.0 [WWW Document]. URL https://www.tensorflow.org/api_docs/python/tf/
+feature_column/indicator_column (accessed 4.23.20).
+
+Weiss, J., 2010. Protecting Industrial Control Systems from Electronic Threats, first
+ed. Momentum Press, New York.
+
+Zhang, Y., Teng, Y., Zhang, Y., 2010. Complex process quality prediction using modi-
+fied kernel partial least squares. Chem. Eng. Sci. 65, 2153-2158. https://doi.org/
+10.1016/j.ces.2009.12.010.
+
+Zhong, S., Wen, Q., Ge, Z., 2014. Semi-supervised Fisher discriminant analysis model
+for fault classification in industrial processes. Chemom. Intell. Lab. Syst. 138,
+203-211. https://doi.org/10.1016/j.chemolab.2014.08.008.

@@ -1,0 +1,1556 @@
+International Journal on Software Tools for Technology Transfer (2020) 22:729-740
+https://doi.org/10.1007/s10009-020-00552-5
+
+GENERAL ®)
+
+Check for
+updates
+
+Special Issue: TACAS 2018
+
+Efficient monitoring of hyperproperties using prefix trees
+Bernd Finkbeiner! - Christopher Hahn! - Marvin Stenger! - Leander Tentrup'
+
+Published online: 20 February 2020
+© The Author(s) 2020
+
+Abstract
+
+Hyperproperties, such as non-interference and observational determinism, relate multiple computation traces with each other
+and are thus not monitorable by tools that consider computations in isolation. We present the monitoring approach implemented
+in the latest version of RVHyper, a runtime verification tool for hyperproperties. The input to the tool are specifications
+given in the temporal logic HyperLTL, which extends linear-time temporal logic (LTL) with trace quantifiers and trace
+variables. RVHyper processes execution traces sequentially until a violation of the specification is detected. In this case,
+a counterexample, in the form of a set of traces, is returned. RVHyper employs a range of optimizations: a preprocessing
+analysis of the specification and a procedure that minimizes the traces that need to be stored during the monitoring process.
+In this article, we introduce a novel trace storage technique that arranges the traces in a tree-like structure to exploit partially
+equal traces. We evaluate RVHyper on existing benchmarks on secure information flow control, error correcting codes, and
+symmetry in hardware designs. As an example application outside of security, we show how RVHyper can be used to detect
+spurious dependencies in hardware designs.
+
+Keywords Runtime verification - Monitoring - Hyperproperties
+
+1 Introduction ples include information flow policies, such as observational
+
+determinism [33,34,42], (quantitative) non-interference [33,
+
+Hyperproperties [10] are widely studied in (but not lim-
+ited to) the context of secure information flow control. They
+generalize trace properties in that they not only check the
+correctness of individual computation traces in isolation,
+but relate multiple computation traces to each other. Exam-
+
+This work was partially supported by the German Research
+Foundation (DFG) as part of the Collaborative Research Center
+“Methods and Tools for Understanding and Controlling Privacy”
+(CRC 1223) and the Collaborative Research Center “Foundations of
+Perspicuous Software Systems” (TRR 248, 389792660), and by the
+European Research Council (ERC) Grant OSARES (No. 683300).
+
+EI Christopher Hahn
+Hahn @react.uni-saarland.de
+
+Bernd Finkbeiner
+Finkbeiner @react.uni-saarland.de
+
+Marvin Stenger
+Stenger @react.uni-saarland.de
+
+Leander Tentrup
+
+Tentrup @ react.uni-saarland.de
+
+Reactive Systems Group, Saarland University, Saarbriicken,
+Germany
+
+36,41] as well as symmetry [26] and spurious dependencies
+in hardware designs [23], error correcting codes [26], and
+anti-doping of automotive software [14].
+
+In this article, we present the monitoring approach imple-
+mented in the latest version of RVHyper, an automata-based
+monitoring tool for hyperproperties [24]. In dynamic verifi-
+cation of hyperproperties, efficient and light-weight monitor-
+ing techniques are instrumented in systems, which are usually
+far beyond the scope of static verification approaches. By
+doing so, countermeasures are enacted before, for example,
+irreparable information leaks happen. A runtime verifica-
+tion tool for hyperproperties is in particular useful if the
+implementation of a security critical system is not avail-
+able. Even without access to the source code, monitoring the
+observable execution traces still detects insecure information
+flow. RVHyper also supports the verification workflow by
+providing a method to test and develop specifications: Spec-
+ifications can be checked on sample traces without the need
+for a complete model. Based on the feedback of RVHyper,
+the specification can be refined until it matches the intended
+meaning.
+
+Q) Springer
+730
+
+The input of RVHyper is given in the temporal logic
+HyperLTL [9], which expresses temporal hyperproperties
+by extending linear-time temporal logic with explicit trace
+quantification (see [11] for a recent study of hyperlogics).
+HyperLTL has been used extensively to specify hyperprop-
+erties of practical interest (e.g. [14,21,23—26]). For example,
+observational determinism is expressed as the following for-
+mula:
+
+Va0.Wit' (On = On')Win # in’),
+
+stating that every trace pair zr, 7’ has to agree on the output
+as long as it agrees on the inputs as well. When detecting a
+violation, RVHyper outputs a counterexample, which is a set
+of traces that does not satisfy the input formula.
+
+Efficient model checking, synthesis, and satisfiability
+checking tools for HyperLTL already exist [12,19—22,25,
+26]. Implementing an efficient runtime verification tool
+for HyperLTL specifications is, despite recent theoretical
+progress [1,5—7,24,28,29,37], difficult: In principle, the mon-
+itor not only needs to process every observed trace, but must
+also store every trace observed so far, so that future traces
+can be compared with the traces seen so far.
+
+The previous version of RVHyper tackles this challeng-
+ing problem by implementing two optimizations [23,24]: a
+specification analysis to detect exploitable properties of a
+hyperproperty, such as symmetry and a trace analysis, which
+detects all redundant traces that can be omitted during the
+monitoring process. A limitation of the trace analysis, which
+is based on a language inclusion check, is that only entire
+traces can be analyzed and pruned. For example, consider
+the traces ty) = {a}{a}{} and t2 = {a}{}{a} of length 3 and
+the HyperLTL formula Vz.Vz2'.O(az — —b,’). Neither ft;
+nor f2 is dominated by the other trace, in the sense of the trace
+analysis, 1.e., that one of the traces poses strictly less require-
+ments on future traces [24]. The traces, however, are equal on
+the first position. This provides an opportunity for optimiza-
+tion, which our new approach exploits. We introduce a novel
+trace storage technique (that also has massive impact on the
+running time), such that RVHyper can also handle partially
+equal traces by storing them in a tree structure.
+
+We evaluate RVHyper on existing benchmarks such as
+classical information flow security by checking for violations
+of non-interference or monitoring error-resistant encoder.
+HyperLTL is, however, not limited to security policies. As
+an example of such an application beyond security, we show
+how RVHyper can be used to detect spurious dependencies
+in hardware designs.
+
+Structure of this article The remainder of this article is
+structured as follows. We begin by giving preliminaries on
+HyperLTL, its finite trace semantics and notation in Sect. 2.
+In Sect. 3, we present automata-based monitoring approach
+implemented in RVHyper, before discussing optimizations
+
+Q) Springer
+
+B. Finkbeiner et al.
+
+in Sect. 4 that make the monitoring feasible in practice. In
+Sect. 5, we evaluate RVHyper with a focus on the novel stor-
+age optimization technique using our tree data structure.
+
+This is a revised and extended version of a paper that
+
+appeared at TACAS 2018 [23]. Our contribution and exten-
+sion compared to [23] is the inclusion of a new trace storage
+optimization technique presented in Sect. 4.2 and an extended
+evaluation in Sect. 5.
+Related work The temporal logic HyperLTL was introduced
+to model check security properties of reactive systems [9,26].
+For one of its predecessors, SecLTL [16], there has been a
+proposal for a white-box monitoring approach [17] based
+on alternating automata. A recent survey on algorithms for
+monitoring hyperproperties is given in [28]. Agrawal and
+Bonakdarpour [1] were the first to study the monitoring
+problem of HyperLTL for the sequential model. They give
+a syntactic characterization of monitorable HyperLTL for-
+mulas. They present a first monitoring algorithm based on
+a progression logic expressing trace interdependencies and
+the composition of an LTL3 monitor. A first constraint-based
+approach has been outlined in [7], which works for a subclass
+of HyperLTL specifications. The idea is to identify a set of
+propositions of interest and store corresponding constraints.
+A constraint-based algorithm for the complete fragment of
+V* HyperLTL formulas has been proposed in [29]. The algo-
+rithms rewrite a HyperLTL formula and an incoming event
+into aconstraint composed of a plain LTL requirement as well
+as a HyperLTL requirement. An constraint system is built
+incrementally: The HyperLTL partis encoded with variables,
+which will be incrementally defined with more incoming
+events of a trace. Like with our monitoring algorithm, they
+do not have access to the implementation (black box), but in
+contrast to our work, they do not provide witnessing traces
+as a monitor verdict.
+
+In [5], the authors study the complexity of monitoring
+hyperproperties. They show that the form and size of the
+input as well as the formula have a significant impact on
+the feasibility of the monitoring process. They differentiate
+between several input forms and study their complexity: a set
+of linear traces, tree-shaped Kripke structures, and acyclic
+Kripke structures. For acyclic structures and alternation-free
+HyperLTL formulas, the problems complexity gets as low
+as NC.In [6,37], the authors study where static analysis can
+be combined with runtime verification techniques to monitor
+HyperLTL formulas beyond the alternation-free fragment.
+
+For certain information flow policies, like non-interference
+and some extensions, dynamic enforcement mechanisms
+have been proposed. Techniques for the enforcement of infor-
+mation flow policies include tracking dependencies at the
+hardware level [38], language-based monitors [2—-4,35,40],
+and abstraction-based dependency tracking [8,27,30]. Secure
+multi-execution [15] is a technique that can enforce non-
+interference by executing a program multiple times in differ-
+Efficient monitoring of hyperproperties using prefix trees
+
+ent security levels. To enforce non-interference, the inputs
+are replaced by default values whenever a program tries to
+read from a higher security level.
+
+2 Preliminaries
+
+Let AP be a finite set of atomic propositions, and let = 24°
+be the corresponding alphabet. An infinite trace t € X® is
+an infinite sequence over the alphabet. A subset T C X®
+is called a trace property. A hyperproperty H C 2°") is
+a generalization of a trace property. A finite trace t € XT
+is a finite sequence over &. In the case of finite traces, |r|
+denotes the length of a trace. We use the following notation
+to access and manipulate traces: Let t be a trace andi be a
+natural number. t[i] denotes the ith element of t. Therefore,
+t[O] represents the first element of the trace. Let 7 be natural
+number. If 7 > i andi < |r|, thent[i, 7] denotes the sequence
+t{i|t{i + 1]---t[min(,, |t| — 1)]. Otherwise, it denotes the
+empty trace €. t[i) denotes the suffix of f starting at position
+i. For two finite traces s and t, we denote their concatenation
+by s -f.
+
+HyperLTL syntax HyperLTL [9] extends LTL with trace vari-
+ables and trace quantifiers. Let V be a finite set of trace
+variables. The syntax of HyperLTL is given by the grammar
+
+Var.g|dr.o|w
+ax |PAWl|-vlOvlwuy,
+
+Q:
+w:
+
+where a € AP is an atomic proposition and zm € Visa
+trace variable. Atomic propositions are indexed by trace vari-
+ables. The explicit trace quantification enables us to express
+properties like “on all traces g must hold,” expressed by
+Va.g. Dually, we can express “there exists a trace such
+that g holds,’ expressed by dz.g. We use the standard
+derived operators release pRw := 7(-gU-), eventually
+Y¢g := truel/g, globally Ug := -—-¢@, and weak until
+01W@2 := (g1U¢2) VLIg,. As we use the finite trace seman-
+tics, Cg denotes the strong version of the next operator, 1.e.,
+if a trace ends before the satisfaction of g can be determined,
+the satisfaction relation, defined below, evaluates to false.
+To enable duality in the finite trace setting, we additionally
+use the weak next operator Ov which evaluates to true if
+a trace ends before the satisfaction of g can be determined
+and is defined as Ov = 30 7@. We call w of a Hyper-
+LTL formula Q.y, with an arbitrary quantifier prefix Q, the
+body of the formula. A HyperLTL formula Q.y is in the
+alternation-free fragment if either Q consists solely of uni-
+versal quantifiers or solely of existential quantifiers. We also
+denote the respective alternation-free fragments as the V”
+fragment and the 3” fragment, with n being the number of
+quantifiers in the prefix.
+
+731
+
+Finite trace semantics We recap the finite trace semantics
+for HyperLTL [7], which is itself based on the finite trace
+semantics of LTL [32]. Let Wn : V ~ &X* be a partial
+function mapping trace variables to finite traces. We define
+€[O] as the empty set. IIgn[i) denotes the trace assignment
+that is equal to gn(z7)[i) for all w € dom(ITfn). By slight
+abuse of notation, we write tf € II, to access traces f in
+the image of IIgn. The satisfaction of a HyperLTL formula
+y over a finite trace assignment IIgny and a set of finite traces
+T , denoted by Ign Fr 9g, is defined as follows:
+
+Man Er ax if a € Ign() [0]
+
+Nin Fr =e if fin Fr @
+
+in -re Vw if Wen Fr g or Wen Fr wv
+
+Han Fr Og if Vt € Tn. |t] > 1 and Mgnl[1) Er ge
+
+in -r guy = if ti < minen,, |t|. Mainld) Fr w
+AV] <t.Mgnly) Fr e
+
+fn Fr dx.g if dat € T such that Wgp[a7 b ft] Fr gp
+
+fn Fr Va.g if Vt € T holds that gala t+ t] Fr g
+
+The hyperproperty represented by a HyperLTL formula ¢,
+denoted by 7{(¢), is the set {T C &® | T F g}.
+
+3 Runtime verification of hyperproperties
+with RVHyper
+
+In this section, we present an overview over RVHyper, before
+describing the implementation setup, present the monitoring
+algorithm, and discuss our optimization techniques.
+
+The input of RVHyper is given as a universally quantified
+HyperLTL formula and, in addition, the observed behavior
+of the system under consideration. The observed behavior
+is represented as a trace set T, where each t € T rep-
+resents a previously observed execution of the system to
+monitor. RVHyper can therefore detect violations of every
+monitorable k-safety hyperproperty (see [24] for an exten-
+sive study of monitorability of hyperproperties). If RVHyper
+detects that the system violates the hyperproperty, it outputs
+a counterexample, i.e., a k-ary tuple of traces, where k is the
+number of quantifiers in the HyperLTL formula.
+
+3.1 Implementation details
+
+RVHyper'! is written in C++. We use spot [18] for building the
+deterministic monitor automata and the Buddy BDD library
+for handling symbolic constraints. We use the HyperLTL
+satisfiability solver EAHyper [19,22] to determine whether
+the input formula is reflexive, symmetric, or transitive.
+
+' The implementation is available at https://react.uni-saarland.de/tools/
+rvhyper/.
+
+Q) Springer
+732
+
+Or = O7! Ata = Val
+
+ 
+
+Fig.1 Visualization of a monitor template corresponding to the formula
+given in Example |. We use a symbolic representation of the transition
+function 6. We depict a sink rejecting state g_.
+
+Depending on those results, we omit redundant tuples in the
+monitoring algorithm.
+
+3.2 Online monitoring algorithm
+
+For the online algorithm, we use standard techniques for
+building LTL monitoring automata and use this to instan-
+tiate this monitor by the traces as specified by the HyperLTL
+formula. Let AP be a set of atomic propositions and V =
+{71,..., 2} aset of trace variables. A deterministic monitor
+template M = (x, QO, 64, qo, F) is a tuple of a finite alphabet
+D = 20APxY) | anon-empty set of states Q, a partial transition
+function 6: Q x & ~~ Q, a designated initial state gg € Q,
+and a set of accepting states F C Q.The instantiated automa-
+ton runs in parallel over traces in (2AP)* and thus, we define
+a run with respect to a n-ary tuple N € ((24P)*)” of finite
+traces. A run of N is a sequence of states goq1 ---Gm € Q”,
+where m is the length of the smallest trace in N, starting in
+the initial state go such that for all? withO <7 < m, it holds
+that
+
+Sta. U ta@xp}) =ai4-.
+
+j=1aeN(j)(i)
+
+A tuple N is accepted if there is a run on M that ends in an
+accepting state. For LTL, such a deterministic monitor can
+be constructed in doubly exponential time in the size of the
+formula [13,39].
+
+Example 1 As an example formula, consider again the obser-
+vational determinism formula introduced in the introduction:
+
+Va.Va' (On = On!) Win x i’),
+
+The corresponding monitor template is depicted in Fig. 1.
+
+The algorithm for monitoring HyperLTL formulas when
+traces are given sequentially to the monitor is presented as
+Algorithm 1. After building the deterministic monitoring
+automaton M,, the algorithm accepts new traces and after-
+ward proceeds with the pace of the incoming stream. We have
+a variable S that maps tuples of traces to states of the deter-
+ministic monitor. Whenever the current trace f progresses,
+
+Q) Springer
+
+B. Finkbeiner et al.
+we progress every tuple (t;,..., t,) that contains t with one
+of the following outcomes:
+
+1. One of the traces ft}, ..., tf; may have ended, and thus, we
+check if the monitor is in an accepting state and report a
+violation if this is not the case.
+
+2. There is a successor state in the monitor, and thus, we
+update S.
+
+3. There is no successor state, and hence, we report a vio-
+lation.
+
+When a new trace t starts, only new tuples are considered for
+S that are tuples t € (T U {t})” containing the new trace f.
+
+input :V” HyperLTL formula ¢
+output: satisfied or n-ary tuple witnessing violation
+1 My = (Ly, QO, 40,6, F) = build_template (9);
+2T <9;
+3 §:T" > Q  //initially empty;
+4 t // container for the subsequently incoming event traces
+
+5 while there is a new event trace do
+
+6 t<e // initialize empty trace;
+
+7 for t € ((T U {t})” \ T”) do init S for every new tuple t
+8 | S(t) <— qo;
+
+9 end
+
+10 while p € & is a new input event do
+
+u t'<tp  //append p tot;
+
+12 for ((t1,...,tn),q) € S where t € {t),...,t,} do//
+
+progress every state in S
+
+ 
+
+13 if at* € {t),..., t,}. |t*| < |t| then // some trace
+ended
+
+14 if g ¢ F then
+
+15 remove (ft),...,¢,) from S;
+
+16 | continue;
+
+17 else
+
+18 return violation and witnessing tuple
+
+(t},...,t))3
+
+19 end
+
+20 t < (t),...,t,), where #; is replaced with t’, for each
+tj =;
+
+21 if 5(¢, Uj_, sete) (@ 7) ) = q' then
+
+22 | Sit) <q’;
+
+23 else
+
+24 | return violation and witnessing tuple t;
+
+25 end
+
+26 end
+
+27 t<t’ //re-assignt;
+
+28 end
+
+29 T <T U{t};
+
+30 //add t to already seen traces
+
+31 end
+
+32 return satisfied;
+
+Algorithm 1: Online monitoring algorithm for
+V"HyperLTL: the algorithm subsequently reads event
+traces and monitors them against already seen traces.
+Already seen traces are stored in T before continuing with
+a new event trace.
+Efficient monitoring of hyperproperties using prefix trees
+
+Example 2 We continue Example | by showing how the algo-
+rithm progresses on the given formula. Assume for the sake
+of readability that we have a single input proposition i and
+a single output proposition o. Furthermore, assume that we
+have already seen the trace fo = {i}{i, o}{o}, thatis, T = {fo}
+and S(to, to) = go. We now show how the algorithm contin-
+ues with a fresh trace f;. In lines 6-8, we add the pairs (fo, 1),
+(to, t)), and (t1, t;) with the initial state go to S. Let p = {i}be
+the first input proposition; thus, t; = {i}. Since fo[O] = rf, [0],
+the monitor remains in go for every tuple. Let p = {i} be the
+next input proposition; thus, t; = {z}{z7}. Consider the tuple
+(to, t1). As to[1] and t[1] are equal with respect to 7 but
+differ in o, the monitor progresses to the rejecting state g1
+and the algorithm terminates by reporting the violation. If
+the previous input proposition is p = {}, both tuples (%o, t)
+and (ft), 9) would progress to the accepting sink state g+ as
+the input proposition is different to fo[1]. Assume two more
+inputs, e.g., t) = {i}{i}{}{}; then the pairs (%, to), (to, 11),
+and (t;, f9) are removed from S as f is strict longer than fo.
+
+4 Optimizations
+
+In this section, we present three optimizations implemented
+in RVHyper, which, as we will see in the evaluation sec-
+tion, are necessary to make the automata-based monitoring
+approach feasible in practice. We begin by explaining a spec-
+ification analysis, which is a preprocessing step that exploits
+properties of the specification to reduce the algorithmic work-
+load. In the subsequent section, we show how RVHyper
+tackles the problem of potentially unbounded memory con-
+sumption: We recap the trace analysis, which was so far
+the only storage optimization implemented in RVHyper. We
+then provide a novel storage optimization technique based
+on prefix trees, so-called tries, to exploit partial equality of
+the given traces.
+
+4.1 Specification analysis
+
+In the example execution in Example 2, we have seen that
+the algorithm had to do more work than necessary to monitor
+observational determinism. For example, a tuple (f, t) for
+some trace ¢t cannot violate observational determinism as the
+traces are equal. Further, from the pairs (t, t’) and (t’, t) for
+some traces ¢ and t’, we only need to check one of them as
+a violation in one of them implies the violation in the other
+pair. We can automatically check for such conditions and,
+thus, omit unnecessary work.
+
+RVHyper implements the specification analysis with the
+HyperLTL satisfiability solver EAHyper [19,22]. The spec-
+ification analysis is a preprocessing step that analyzes the
+HyperLTL formula under consideration. EAHyper can detect
+whether a formula is (1) symmetric, 1.e., we halve the num-
+
+733
+
+ber of instantiated monitors, (2) transitive, 1.e., we reduce the
+number of instantiated monitors to two, or (3) reflexive, 1.e.,
+we can omit the self-comparison of traces.
+
+Definition 1 [24] Let w be the quantifier-free part of some
+HyperLTL formula g over trace variables V. We say @ is
+invariant under trace variable permutation o : VY —> VY, if for
+any set of traces T C X® and any assignment IT : V > T,
+(4, 11,0) Fw & @, Moo, 0) F w. We say ¢ is symmetric,
+if it is invariant under every trace variable permutation in V.
+
+Symmetry is particularly interesting since many informa-
+tion flow policies satisfy this property. Consider, for example,
+observational determinism: W2z.Vz'. (0, = O7/)Wliz F
+i’). RVHyper detects symmetry by translating this formula
+to a formula that is unsatisfiable if there exists no set of traces
+for which every trace pair violates the symmetry condition:
+da. Arc’. (ox = 07')Win F iz')) “ (ox = 07')Win F
+in’)). If the resulting formula turns out to be unsatisfiable,
+RVHyper omits the symmetric instantiations of the monitor
+automaton.
+
+Definition 2 [24] Let w be the quantifier-free part of some
+HyperLTL formula @ over trace variables {7r1, 72}. Let T =
+{t1, to, t3} € X&® be athree-elemented set of traces. We define
+the assignment IT;,; : V > X® by Tj, ; := {71 > tj, 72
+t;}. We say ¢ is transitive, if for all three-elemented sets
+T it holds that (J, 111,2,0) F w A @, T123,0) F vw >
+(D, 11,3, 0) FW.
+
+While symmetric HyperLTL formulas allow us to prune
+half of the monitor instances, transitivity of a HyperLTL for-
+mula has an even larger impact on the required memory.
+Equality, i.e., W.W2’. (az < dz’), for example, is transi-
+tive and symmetric and allows us to reduce the number of
+monitor instances to one, since we can check equality against
+any reference trace.
+
+Definition 3 [24] Let w be the quantifier-free part of some
+HyperLTL formula g over trace variables VY. We say @ is
+reflexive, if for any trace tf € X® and the corresponding
+assignment IT: V > {t}, @, 11,0) Fw.
+
+Lastly, if a formula is reflexive, RVHyper omits the com-
+position of a trace with itself during the monitoring process.
+For example, equality and observational determinism have
+reflexive HyperLTL formulas.
+
+Example 3 Consider again the observational determinism
+formula from Example |. We have seen that this formula
+is both, reflexive and symmetric; thus, we can omit those
+instances in the algorithm.
+
+4.2 Optimizing trace storage
+
+The main obstacle in monitoring hyperproperties is the poten-
+tially unbounded space consumption. Previously, RVHyper
+
+Q) Springer
+734
+
+employed a trace analysis technique to detect redundant
+traces, with respect to a given HyperLTL formula, 1.e., traces
+that can be safely discarded without losing any information
+and without losing the ability to return a counterexample.
+
+Definition 4 [24] Given a HyperLTL formula g, a trace set
+T, and an arbitrary t € TR, we say that ¢ is (J, g)-redundant
+if T is a model of ¢ if and only if T U {t} is a model of @ as
+well, formally
+
+VT’ DT.T' €H@) ST’ U{t} €H@).
+
+Definition 5 [24] Given r,t’ € &°, we say t dominates t'
+with respect to g (or simply t dominates t’ if it is clear from
+the context) if t’ is ({t}, @)-redundant.
+
+Example 4 For observational determinism, a trace t is dom-
+inated by a trace t’ if |t| < |t’| and both traces agree on the
+input propositions.
+
+This is efficiently implemented in RVHyper (cf. Algo-
+rithm 2) and is guaranteed to catch all redundant traces. In
+our experiments [23,24], we made the observation that traces
+often share the same prefixes, leading to a lot of redundant
+monitor automaton instantiations, repetitive computations,
+and duplicated information when those traces get stored.
+
+The trace analysis, as it is based on a language inclusion
+check of the entire traces, cannot handle partial redundancy,
+for example, in the case that traces have redundant prefix
+requirements. This leaves room for optimization, which we
+address by implementing a frie data structure for managing
+the storage of incoming traces.
+
+input : HyperLTL formula ¢, redundancy free trace set 7, fresh
+trace t
+output: redundancy free set of traces Tinin C T U {t}
+1 My = build_template (9)
+
+foreach t’ ¢ T do
+
+if t’ dominates t then
+| return 7;
+
+end
+
+end
+
+foreach t’ ¢ T do
+
+if t dominates t’ then
+| T= T\ tr};
+
+10 end
+
+11 end
+
+12 return T U {ft};
+Algorithm 2: Trace analysis algorithm to minimize trace
+
+storage.
+
+ 
+
+2
+3
+4
+5
+6
+7
+8
+9
+
+ 
+
+Tries, also known as prefix trees, are a tree data structure,
+which can represent a set of words over an alphabet in a
+compact manner. The root of a trie is identified with the
+empty word €; additionally, each node can have several child
+
+Q) Springer
+
+B. Finkbeiner et al.
+
+nodes, each of which corresponds to a unique letter getting
+appended to the representing word of the parent node. So the
+set of words of a trie is identified with the set of words the
+leaf nodes represent.
+
+Definition 6 A trie is a four tuple (X, 7, —~, to) consisting
+of
+
+— A finite alphabet &,
+
+— A non-empty set of states T,
+
+— A transition function —>: 7 x © > T,
+
+— And a designated initial state t € JT called the root.
+
+Instead of ((t, a), t’) €—>, we will write t —> 1’ in the
+following. For a trie to be of valid form, we restrict —> such
+that, Vt, tT’ € T.\{t —> tla ed} <1.
+
+In our case, the alphabet would be the set of propositions
+used in the specification, and the word built by the trie rep-
+resents the traces. Instead of storing each trace individually,
+we store all of them in one trie structure, branching only in
+case of deviation. This means equal prefixes only have to be
+stored once. Besides the obvious benefits for memory, we
+also can make use of the maintained trie data structure to
+improve the runtime of our monitoring algorithms. As traces
+with same prefixes end up corresponding to the same path in
+the trie, we only have to instantiate the monitor automaton
+as much as the trie contains branches.
+
+Example 5 Consider the following traces of length 6 over the
+alphabet 2':2}:
+
+|
+~
+
+Li ttey, t,o}, th. ta th t,o}
+2 {tt}, tt, Of, th, th, th. 1
+3 Ui, Ut. tt ty
+
+SH (a. OU UUs
+
+| |
+~ ~ ~
+a
+
+After processing the traces sequentially, the resulting trie
+looks as follows:
+
+ 
+Efficient monitoring of hyperproperties using prefix trees
+4.3 Trie-based monitoring algorithm
+
+We depict a trie-based offline monitoring algorithm in Fig. 3.
+For the sake of readability, we assume that there are as many
+traces as universal quantifiers that we progress through all
+traces in parallel, and that all traces have the same length.
+This is merely a simplification in the presentation, and one
+can build the trie in a sequential fashion for online monitoring
+by a slight modification of the presented algorithm.
+
+Without using tries, our monitoring algorithm was based
+on instantiating the deterministic monitor template M, with
+tuples of traces. Now, we instantiate My with tuples of tries.
+Initially, we only have to create the single instance having
+the root of our trie.
+
+input :V” HyperLTL formula g
+output: satisfied or n-ary tuple witnessing violation
+
+1 Mog = (Xv, Q,g0, 5, F) = build_template (9)
+28:7" -Q
+
+3 T :=new_trie()
+
+4i:=(t],...,%)€ 7”
+
+5 I := {i} //set of not-yet terminated branches
+
+6 while p <— new event (in X&") do
+7 for 1 < j <ndo
+
+8 i(j) <add_child(i(j), p(j)) //add child with
+value p(j) to i(/) if needed
+9 end
+10 // update set of active branches
+i I —UberlG@, i) |i) Sade D1 <j <n}
+12 foreachi € J do
+13 progress every state in S according to 6;
+14 if violation in Mg then
+15 // return sequence from root to i
+16 t <- (rooted_sequence (i(1)),...,rooted_
+sequence (i(n)) )
+17 return witnessing tuple t”
+18 end
+19 end
+20 end
+
+21 return satisfied if Vic J... S(i) € F else violation
+
+Algorithm 3: Offline algorithm using trie data structure.
+
+The trie-based algorithm has much in common with its
+previously discussed trace-based counterpart. Initially, we
+have to build the deterministic monitor automaton My =
+(Xy, Q, qo, 6, F). We instantiate the monitor with a fresh
+trie root to. A mapping from trie instantiations to a state in
+My S : T” — Q stores the current state of every active
+branch of the trie, stored in the set /. For each of the incom-
+ing traces, we provide an entry in a tuple of tries tT, and each
+entry gets initialized to t9. During the run of our algorithm,
+these entries are updated such that they always correspond
+to the word built by the traces up to this point. For as long
+as there are traces left, which have not yet ended, and we
+have not yet detected a violation, we will proceed updating
+
+735
+
+the entries in i as follows. Having entry t and the correspond
+trace sequence proceeds with a, if dt’ € T.t —“. 1’, we
+update the entry to t’; otherwise, we create such a child node
+of tT (add_child in line 8). Creating a new node in the trie
+always occurs when the prefix of the incoming trace starts
+to differ from already seen prefixes. After having moved one
+step in our traces sequences, we have to reflect this step in
+our trie structure, in order for the trie-instantiated automata
+to correctly monitor the new propositions. As a trie node can
+branch to multiple child nodes, each monitor instantiation
+is replaced by the set of instantiations, where all possible
+child combinations of the different assigned tries are exis-
+tent (update of J in line 11). Afterward, we update S in the
+same way as in Algorithm 2; thus, we omit algorithmic details
+here. If a violation is detected here, that is, there is no tran-
+sition in the monitor corresponding to i, we will return the
+corresponding counterexample as a tuple of traces, as those
+can get reconstructed by stepping upwards in the tries of i. If
+the traces end, we check if every open branch i € / is in an
+accepting state.
+
+5 Evaluation
+
+In the following, we evaluate the new version of RVHyper,
+especially the novel trace storage optimization. We use sev-
+eral benchmarks: an encoder that guarantees a Hamming
+distance of 2, violations of non-interference on randomly
+generated traces, and a symmetry property on an implemen-
+tation of the Bakery protocol. As an example how RVHyper
+can be used outside security runtime verification, we give a
+case study on detecting spurious dependencies in hardware
+designs.
+
+5.1 Error correcting codes
+
+We monitored whether an encoder preserves a Hamming dis-
+tance of 2. We randomly built traces of length 50. In each
+position of the trace, the corresponding bit had a 1% chance
+to be flipped. The specification can be encoded as the follow-
+ing HyperLTL formula [26]:
+
+Var (O(in in) > ((On <> On")
+U((On On!) A Q((On <> On U(0n  O7'))))).
+
+The right plot of Fig. 2 shows the results of our experiments.
+We compared the naive monitoring approach to different
+combinations of RVHyper’s optimizations. The specification
+analysis returns in under one second with the result that the
+formula is symmetric and reflexive. Hence, as expected, this
+preprocessing step has a major impact on the running time
+of the monitoring process as more than half of the, in general
+
+Q) Springer
+736
+
+necessary, monitor instantiations can be omitted. A combi-
+nation of the specification and trace analysis performs nearly
+equally well as naively storing the traces in our trie data struc-
+ture. Combining the trie data structure with the specification
+analysis performs best and results in a tremendous speedup
+compared to the naive approach.
+
+5.2 Checking non-interference
+
+Non-interference [33] is an important information flow
+policy demanding that an observer of a system cannot infer
+any high security input of a system by observing only low
+security input and output. Formally, we specify that all low
+security outputs 0°” have to be equal on all system execu-
+tions as long as the low security inputs i! of those executions
+are the same: Vz, 11’. (OY oo” Wii™ oe io”). This
+class of benchmarks has previously been used to evaluate
+RVHyper [23]. We repeated the experiments, to show that
+using the trie data structure is a valid optimization. The
+results are depicted in Table 1. We chose a trace length of
+50 and monitored non-interference on 2000 randomly gen-
+erated traces, where we distinguish between an input range
+of 8 to 64 bits. The results show that the trie optimization
+has an enormous impact compared to a naive approach that
+solely relies on the specification analysis. As expected, the
+difference in runtime is especially high on experiments where
+traces collapse heavily in the trie data structure, i.e., produc-
+ing almost no instances that must be considered during the
+monitoring process.
+
+5.3 Symmetry in mutual exclusion protocols
+
+In this benchmark (introduced as a case study in [26]), we
+monitor whether a Verilog implementation of the Bakery pro-
+tocol [31] from the VIS verification benchmark satisfies a
+symmetry property. Symmetry violations indicate that cer-
+tain clients are privileged. The Bakery protocol is a classical
+protocol implementing mutual exclusion, working as fol-
+lows: Every process that wishes to access a critical resource
+draws a ticket, which is consecutively numbered. The pro-
+cess with the smallest number may access the resource first.
+If two processes draw a ticket concurrently, i.e., obtaining
+the same number, the process with the smaller process [D
+may access the resource first. We monitored the following
+HyperLTL formula [26]:
+
+Var.Vr’ .L(sym(select, , select’) A pause, = pause,,)
+> Ulpe)x = pe()a A pe())x = pe()z"),
+
+where select indicates the process ID that runs in the next
+step and pause indicates whether the step is stuttering. Each
+process 7 has a program counter pc(z) and when process 7 1s
+
+Q) Springer
+
+B. Finkbeiner et al.
+
+selected, pc(i) is executed. sym(select,, select,,”) states that
+process 0 is selected on trace z and process | is selected
+on trace z’. Unsurprisingly, the implementation violates the
+specification, as it is provably impossible to implement a
+mutual exclusion protocol that is entirely symmetric [32].
+Figure 3 shows the results of our experiment. In this bench-
+mark, we can observe that the language inclusion check, on
+which the trace optimization is based on, produces an over-
+head during the monitoring. Since the traces differ a lot, the
+trace analysis cannot prune enough traces to be valuable.
+As there are only a few instances (in this case 4), the trie
+optimization outperforms the previous version of RVHyper
+massively on such a low instance count. The specification
+analysis, however, is always a valuable optimization.
+
+5.4 Case study: detecting spurious dependencies in
+hardware designs
+
+While HyperLTL has been applied to a range of domains,
+including security and information flow properties, we focus
+in the following on a classical verification problem, the inde-
+pendence of signals in hardware designs. We demonstrate
+how RVHyper can automatically detect such dependencies
+from traces generated from hardware designs.
+
+Input and output The input to RVHyper is a set of traces anda
+HyperLTL formula. For the following experiments, we gen-
+erate a set of traces from the Verilog description of several
+example circuits by random simulation. If a set of traces vio-
+lates the specification, RVHyper returns a counterexample.
+Specification We consider the problem of detecting whether
+input signals influence output signals in hardware designs.
+We write i % o to denote that the inputs i do not influence the
+outputs 0. Formally, we specify this property as the following
+HyperLTL formula:
+
+V01V702. (On, = On) WV (iz, x in),
+
+where i denotes all inputs except i. Intuitively, the formula
+asserts that for every two pairs of execution traces (711, 772),
+the value of o has to be the same until there is a difference
+between zr; and zr in the input vector i, i.e., the inputs on
+which 0 may depend.
+
+Sample hardware designs We apply RVHyper to traces gen-
+erated from the following hardware designs. Note that, since
+RVHyper observes traces and treats the system that generates
+the traces as a black box, the performance of RVHyper does
+not depend on the size of the circuit.
+
+Example 6 (XOR) As a first example, consider the XOR func-
+tiono =i@i’. In the corresponding circuit, every jth output
+bit o; is only influenced by the jth input bits 7; andi i:
+Efficient monitoring of hyperproperties using prefix trees
+
+naive
+spec analysis
+trace analysis
+--=-. spec & trace analysis
+tries
+
+ 
+
+spec analysis & tries
+
+runtime in msec.
+
+10° 10+ 102
+
+probability for input bit flip x10~4
+
+ 
+
+10% 0 200 400 600 800
+
+737
+
+untime in msec.
+
+Yr
+
+ 
+
+1,000
+
+# of instances
+
+Fig.2 Left: monitoring of black box circuits (mux example). Right: hamming-distance preserving encoder; runtime comparison of naive monitoring
+
+approach with different optimizations and a combination thereof
+
+Table 1 Non-interference benchmark: monitored 2000 traces of length 50 with an increasing input size
+
+ 
+
+   
+    
+
+ 
+
+ 
+
+ 
+
+Instance Only spec analysis
+# Instances # Transitions Time (ms)
+8-bit 19,99,000 43,12,932 14,807
+16-bit 19,99,000 27,72,001 11,166
+24-bit 19,99,000 24,01,723 11,330
+32-bit 19,99,000 22,36,529 13,814
+40-bit 19,99,000 21,48,818 15,353
+48-bit 19,99,000 21,02,689 18,769
+56-bit 19,99,000 20,74,460 22,310
+64-bit 19,99,000 20,63,497 32,617
+linear
+spec & trace analysis
+trace analysis
+150 spec analysis
+naive
+spec analysis & tries
+© 100-7
+a
+50 4
+0
+
+ 
+
+ 
+
+ 
+
+!
+0 500 1,000 1,500
+
+number of traces
+
+I
+2,000
+
+Tries + spec analysis
+
+ 
+
+ 
+
+ 
+
+# Instances # Transitions #Trie nodes Time (ms)
+2 26,734 11,262 226
+34,365 87,258 285
+45,757 93,353 416
+16 68,364 95,237 636
+32 1,03,315 96,273 1033
+64 1,63,888 96,941 1994
+128 2,68,094 97,506 3580
+248 4,34,705 97,831 7561
+log
+10? 4
+|
+10! 3
+2 10° 4
+2 |
+10-1 :
+10-7 J
+10-3 4
+I I
+0 500 1,000 1,500 2,000
+
+number of traces
+
+Fig.3 Experiment of monitoring symmetry on an implementation of the Bakery protocol
+
+Example 7 (MUX) This example circuit is depicted in Fig. 4.
+There is a black box combinatorial circuit, guarded by a mul-
+tiplexer that selects between the two input vectors i and i’
+and an inverse multiplexer that forwards the output of the
+black box either toward 0 or 0’. Despite there being a syn-
+tactic dependency between o and i’, there is no semantic
+
+dependency, i.e., the output 0 does solely depend on i and
+the selector signal.
+
+When using the same example, but with a sequential cir-
+cuit as black box, there may be information flow from the
+input vector i’ to the output vector o because the state of the
+latches may depend on it. We construct such a circuit that
+leaks information about i’ via its internal state.
+
+Q) Springer
+738
+
+The left part of Fig. 2 shows the total runtime of RVHyper
+with the different optimizations and a combination thereof.
+As observed in our previous experiments, the specification
+
+ 
+
+Fig.4 MUX circuit with black box
+
+1 module counter (increase ,decrease,overflow);
+2 input increase;
+
+3 input decrease;
+
+4 output overflow;
+
+5
+
+6 reg[2:0] counter;
+
+7
+
+8 assign overflow = (counter==3’bi11
+9 && increase && !decrease);
+
+10
+
+11 initial
+
+12 begin
+
+13 counter = 0;
+
+14 end
+
+15 always @($global_clock)
+
+16 begin
+
+17 if (increase && ! decrease)
+
+18 counter = counter + 1;
+
+19 else if (!increase && decrease
+20 && counter > 0)
+
+21 counter = counter - 1;
+
+22 else
+
+23 counter = counter;
+
+24 end
+
+25 endmodule
+
+Fig.5 Verilog description of Example 8 (counter)
+
+Table 2 Results of RVHyper on traces generated from circuit instances
+
+Instance Property Satisfied # Traces
+XOR io 7% 00 No 18
+XOR 11 % 00 Yes 1000
+Counter incr % overflow No 1636
+Counter decr ~% overflow No 1142
+MUX i 40 Yes 1000
+MUX2 i 40 No 82
+
+B. Finkbeiner et al.
+
+analysis, if applicable as in this case, is a valuable optimiza-
+tion consistently reducing the runtime and does so also when
+combined with the trace analysis. As expected, the runtime
+is halved by exploiting symmetry and reflexivity in the for-
+mula. From the plot, we can also infer that the trace analysis
+is effective in a context with a majority of redundant traces.
+For such a highly redundant setup, the trace analysis reduces
+the overall runtime of the monitoring algorithm by several
+magnitudes. With a decrease in similarity and redundancy in
+the traces, the positive effect of the trace analysis steadily
+decreases up until the overhead of the trace analysis itself
+gets noticeable. The decrease in runtime for configurations
+without trace analysis, which comes with reduced traces sim-
+ilarity, is explained by the fact that the more the input of the
+monitored traces is different, the earlier trace tuples can get
+pruned as they satisfy the specification and thereby reduce the
+computational burden of the algorithm. This is also the reason
+why the configurations with trace analysis show decreas-
+ing runtime behavior again as soon as the aforementioned
+effects dominate the runtime characteristics of the monitoring
+approach. In contrast to that, the trie optimization provides a
+stable improvement on the running time.
+
+Example 8 (counter) Our last example is a binary counter
+with two input control bits incr and decr that increments and
+decrements the counter. The corresponding Verilog design is
+shown in Fig. 5. The counter has a single output, namely a
+signal that is set to one when the counter value overflows.
+Both inputs influence the output, but timing of the overflow
+depends on the number of counter bits.
+
+Results The results of multiple random simulations are given
+in Table 2. Even the previous version of RVHyper was able to
+scale up to thousands of input traces with millions of mon-
+itor instantiations. The novel implemented optimization of
+RVHyper, 1.e., storing the traces in a prefix tree data struc-
+ture combined with our specification analysis, results in a
+remarkable speedup. Particularly interesting is the reduction
+in the number of instances in the counterexample. As there is
+only one input, the traces collapse in our trie data structure.
+
+Prototype RV Hyper
+Time (ms) # Instances Time (ms) # Instances
+12 222 6 18
+16,913 499,500 1613 127
+28,677 1,659,446 370 2
+15,574 887,902 253 22,341
+14,885 49,9500 496 32
+140 3704 27 1913
+
+Every instance was run ten times with different seeds, and the average is reported. Prototype refers to the first version of RVHyper [23] and RVHyper
+
+to the current implementation including the trie optimization
+
+Q) Springer
+Efficient monitoring of hyperproperties using prefix trees
+
+For the two instances, where the property is satisfied (XOR
+and MUX), RVHyper has not found a violation for any of the
+runs. For instance, where the property is violated, RVHyper
+was able to find counterexamples.
+
+6 Conclusion
+
+RVHyper monitors a running system for violations of a
+HyperLTL specification. We have introduced a novel trace
+storage optimization, based on a prefix tree data structure, to
+existing optimizations implemented in RVHyper.
+
+We demonstrated the impact of the optimizations on
+RVHypers performance on several benchmarks of runtime
+verification problems. By providing a use case on how
+RVHyper can be used to detect spurious dependencies in
+hardware design, we showed how RVHyper can be used
+outside of classical security monitoring problems. The func-
+tionality of RVHyper thus complements model checking
+tools for HyperLTL, like MCHyper [26], tools for satisfi-
+ability checking, like EAHyper [22], and tools for synthesis,
+like BoSyHyper [21].
+
+RVHyper is in particular useful during the development
+of a HyperLTL specification, where it can be used to check
+the HyperLTL formula on sample traces without the need
+for a complete model. Based on the feedback of the tool, the
+user can refine the HyperLTL formula until it captures the
+intended policy.
+
+In our current approach, the trace analysis and the trie rep-
+resentation are separate optimizations that cannot be applied
+at the same time. The integration of the two optimization is
+an interesting challenge for future work.
+
+Acknowledgements Open Access funding provided by Projekt DEAL.
+
+Open Access This article is licensed under a Creative Commons
+Attribution 4.0 International License, which permits use, sharing, adap-
+tation, distribution and reproduction in any medium or format, as
+long as you give appropriate credit to the original author(s) and the
+source, provide a link to the Creative Commons licence, and indi-
+cate if changes were made. The images or other third party material
+in this article are included in the article’s Creative Commons licence,
+unless indicated otherwise in a credit line to the material. If material
+is not included in the article’s Creative Commons licence and your
+intended use is not permitted by statutory regulation or exceeds the
+permitted use, you will need to obtain permission directly from the copy-
+right holder. To view a copy of this licence, visit http://creativecomm
+ons.org/licenses/by/4.0/.
+
+References
+
+1. Agrawal, S., Bonakdarpour, B.: Runtime verification of k-safety
+hyperproperties in HyperLTL. In: Proceedings of CSF, pp. 239-
+252. IEEE Computer Society (2016). https://doi.org/10.1109/CSF.
+2016.24
+
+10.
+
+11.
+
+12.
+
+13.
+
+14.
+
+15.
+
+16.
+
+17.
+
+18.
+
+19.
+
+739
+
+Askarov, A., Sabelfeld, A.: Tight enforcement of information-
+release policies for dynamic languages. In: Proceedings of CSF, pp.
+43-59. IEEE Computer Society (2009). https://doi.org/10.1109/
+CSF.2009.22
+
+Austin, T.H., Flanagan, C.: Permissive dynamic information flow
+analysis. In: Proceedings of PLAS, p. 3. ACM (2010). https://doi.
+org/10.1145/1814217.1814220
+
+Bichhawat, A., Rajani, V., Garg, D., Hammer, C.: Information flow
+control in WebKit’s JavaScript bytecode. In: Proceedings of POST.
+LNCS, vol. 8414, pp. 159-178. Springer (2014). https://doi.org/10.
+1007/978-3-642-54792-8_9
+
+Bonakdarpour, B., Finkbeiner, B.: The complexity of monitoring
+hyperproperties. In: Proceedings of CSF, pp. 162-174. IEEE Com-
+puter Society (2018). https://doi.org/10.1109/CSF.2018.00019
+Bonakdarpour, B., Sanchez, C., Schneider, G.: Monitoring hyper-
+properties by combining static analysis and runtime verification.
+In: Proceedings of ISoLA. LNCS, vol. 11245, pp. 8—27. Springer
+(2018). https://doi.org/10.1007/978-3-030-03421-4_2
+
+Brett, N., Siddique, U., Bonakdarpour, B.: Rewriting-based run-
+time verification for alternation-free HyperLTL. In: Proceedings
+of TACAS. LNCS, vol. 10206, pp. 77-93 (2017). https://doi.org/
+10.1007/978-3-662-54580-5_5
+
+Chudnov, A., Kuan, G., Naumann, D.A.: Information flow moni-
+toring as abstract interpretation for relational logic. In: Proceedings
+of CSF, pp. 48-62. IEEE Computer Society (2014). https://doi.org/
+10.1109/CSF.2014.12
+
+Clarkson, M.R., Finkbeiner, B., Koleini, M., Micinski, K.K., Rabe,
+M.N., Sanchez, C.: Temporal logics for hyperproperties. In: Pro-
+ceedings of POST. LNCS, vol. 8414, pp. 265-284. Springer (2014).
+https://doi.org/10.1007/978-3-642-54792-8 15
+
+Clarkson, M.R., Schneider, F.B.: Hyperproperties. J. Comput.
+Secur. 18(6), 1157-1210 (2010). https://doi.org/10.3233/JCS-
+2009-0393
+
+Coenen, N., Finkbeiner, B., Hahn, C., Hofmann, J.: The hierarchy
+of hyperlogics. In: Proceedings of LICS, pp. 1-13. IEEE (2019).
+https://doi.org/10.1109/LICS.2019.8785713
+
+Coenen, N., Finkbeiner, B., Sanchez, C., Tentrup, L.: Verifying
+hyperliveness. In: Proceedings of CAV. LNCS, vol. 11561, pp. 121-
+139. Springer (2019). https://doi.org/10.1007/978-3-030-25540-
+4 7
+
+d’Amorim, M., Rosu, G.: Efficient monitoring of omega-
+languages. In: Proceedings of CAV. LNCS, vol. 3576, pp. 364-378.
+Springer (2005). https://doi.org/10.1007/11513988_36
+
+D’ Argenio, P.R., Barthe, G., Biewer, S., Finkbeiner, B., Hermanns,
+H.: Is your software on dope? Formal analysis of surreptitiously
+“enhanced” programs. In: Proceedings of ESOP. LNCS, vol. 10201,
+pp. 83-110. Springer (2017). https://doi.org/10.1007/978-3-662-
+54434-1_4
+
+Devriese, D., Piessens, F.: Noninterference through secure multi-
+execution. In: Proceedings of SP, pp. 109-124. IEEE Computer
+Society (2010). https://doi.org/10.1109/SP.2010.15
+
+Dimitrova, R., Finkbeiner, B., Kovacs, M., Rabe, M.N., Seidl, H.:
+Model checking information flow in reactive systems. In: Proceed-
+ings of VMCAI. LNCS, vol. 7148, pp. 169-185. Springer (2012).
+https://doi.org/10.1007/978-3-642-27940-9_12
+
+Dimitrova, R., Finkbeiner, B., Rabe, M.N.: Monitoring temporal
+information flow. In: Proceedings of ISoLA. LNCS, vol. 7609,
+pp. 342-357. Springer (2012). https://doi.org/10.1007/978-3-642-
+34026-0_26
+
+Duret-Lutz, A., Lewkowicz, A., Fauchille, A., Michaud, T.,
+Renault, E., Xu, L.: Spot 2.0—a framework for LTL and o-
+automata manipulation. In: Proceedings of ATVA. LNCS, vol.
+9938, pp. 122-129 (2016). https://doi.org/10.1007/978-3-319-
+46520-3_8
+
+Finkbeiner, B., Hahn, C.: Deciding hyperproperties. In: Pro-
+ceedings of CONCUR. LIPIcs, vol. 59, pp. 13:1—13:14. Schloss
+
+Q) Springer
+740
+
+20.
+
+21.
+
+22.
+
+23.
+
+24.
+
+25.
+
+26.
+
+27.
+
+28.
+
+29.
+
+30.
+
+Dagstuhl—Leibniz-Zentrum fuer Informatik (2016). https://doi.
+org/10.4230/LIPIcs. CONCUR.2016.13
+
+Finkbeiner, B., Hahn, C., Hans, T.: MGHyper: Checking satis-
+fiability of HyperLTL formulas beyond the 4*V* fragment. In:
+Proceedings of ATVA. LNCS, vol. 11138, pp. 521-527. Springer
+(2018). https://doi.org/10.1007/978-3-030-01090-4_31
+Finkbeiner, B., Hahn, C., Lukert, P., Stenger, M., Tentrup, L.: Syn-
+thesizing reactive systems from hyperproperties. In: Proceedings
+of CAV. LNCS, vol. 10981, pp. 289-306. Springer (2018). https://
+doi.org/10.1007/978-3-319-96145-3_16
+
+Finkbeiner, B., Hahn, C., Stenger, M.: EAHyper: satisfiability,
+implication, and equivalence checking of hyperproperties. In: Pro-
+ceedings of CAV. LNCS, vol. 10427, pp. 564-570. Springer (2017).
+https://doi.org/10.1007/978-3-319-63390-9_29
+
+Finkbeiner, B., Hahn, C., Stenger, M., Tentrup, L.: RVHyper: A
+runtime verification tool for temporal hyperproperties. In: Proceed-
+ings of TACAS. LNCS, vol. 10806, pp. 194-200. Springer (2018).
+https://doi.org/10.1007/978-3-319-89963-3_11
+
+Finkbeiner, B., Hahn, C., Stenger, M., Tentrup, L.: Monitoring
+hyperproperties. Form. Methods Syst. Des. (2019). https://doi.org/
+10.1007/s10703-019-00334-z
+
+Finkbeiner, B., Hahn, C., Torfah, H.: Model checking quantita-
+tive hyperproperties. In: Proceedings of CAV. LNCS, vol. 10981,
+pp. 144-163. Springer (2018). https://doi.org/10.1007/978-3-319-
+96145-3_8
+
+Finkbeiner, B., Rabe, M.N., Sanchez, C.: Algorithms for model
+checking HyperLTL and HyperCTL*. In: Proceedings of CAV.
+LNCS, vol. 9206, pp. 30-48. Springer (2015). https://doi.org/10.
+1007/978-3-319-21690-4_3
+
+Guernic, G.L., Banerjee, A., Jensen, T.P., Schmidt, D.A.:
+Automata-based confidentiality monitoring. In: Proceedings of
+ASIAN. LNCS, vol. 4435, pp. 75-89. Springer (2006). https://doi.
+org/10.1007/978-3-540-77505-8_7
+
+Hahn, C.: Algorithms for monitoring hyperproperties. In: Proceed-
+ings of Runtime Verification—19th International Conference, pp.
+70-90. RV 2019, Porto, 8—11 Oct (2019). https://doi.org/10.1007/
+978-3-030-32079-9_5
+
+Hahn, C., Stenger, M., Tentrup, L.: Constraint-based monitoring
+of hyperproperties. In: Proceedings of TACAS. LNCS, vol. 11428,
+pp. 115-131. Springer (2019). https://doi.org/10.1007/978-3-030-
+17465-1_7
+
+Kovacs, M., Seidl, H.: Runtime enforcement of information flow
+security in tree manipulating processes. In: Proceedings of ESSoS.
+LNCS, vol. 7159, pp. 46-59. Springer (2012). https://doi.org/10.
+1007/978-3-642-28166-2_6
+
+Q) Springer
+
+32.
+
+33.
+
+34.
+
+35.
+
+36.
+
+37.
+
+38.
+
+39.
+
+40.
+
+Al.
+
+42.
+
+B. Finkbeiner et al.
+
+. Lamport, L.: A new solution of Dijkstra’s concurrent programming
+
+problem. Commun. ACM 17(8), 453-455 (1974). https://doi.org/
+10.1145/361082.361093
+
+Manna, Z., Pnueli, A.: Temporal Verification of Reactive Systems:
+Safety. Springer, New York (1995)
+
+McLean, J.: Proving noninterference and functional correctness
+using traces. J. Comput. Secur. 1(1), 37-58 (1992). https://doi.org/
+10.3233/JCS- 1992-1103
+
+Roscoe, A.W.: CSP and determinism in security modelling. In:
+Proceedings of SP, pp. 114-127. IEEE Computer Society (1995).
+https://doi.org/10.1109/SECPRI.1995.398927
+
+Sabelfeld, A., Myers, A.C.: Language-based information-flow
+security. IEEE J. Sel. Areas Commun. 21(1), 5-19 (2003). https://
+doi.org/10.1109/JSAC.2002.806121
+
+Smith, G.: On the foundations of quantitative information flow.
+In: Proceedings of FOSSACS. LNCS, vol. 5504, pp. 288-302.
+Springer (2009). https://doi.org/10.1007/978-3-642-00596-1_21
+Stucki, S., Sanchez, C., Schneider, G., Bonakdarpour, B.: Gray-
+box monitoring of hyperproperties. In: Proceedings of Formal
+Methods—the Next 30 Years—Third World Congress, pp. 406—
+424. FM 2019, Porto, 7-11 Oct (2019). https://doi.org/10.1007/
+978-3-030-30942-8 25
+
+Suh, G.E., Lee, J.W., Zhang, D., Devadas, S.: Secure program
+execution via dynamic information flow tracking. In: Proceed-
+ings of ASPLOS, pp. 85—96. ACM (2004). https://doi.org/10.1145/
+1024393.1024404
+
+Tabakov, D., Rozier, K.Y., Vardi, M. Y.: Optimized temporal moni-
+tors for systemC. Form. Methods Syst. Des. 41(3), 236-268 (2012).
+https://doi.org/10.1007/s10703-011-0139-8
+
+Vanhoef, M., Groef, W.D., Devriese, D., Piessens, F., Rezk, T.:
+Stateful declassification policies for event-driven programs. In:
+Proceedings of CSF, pp. 293-307. IEEE Computer Society (2014).
+https://doi.org/10.1109/CSF.2014.28
+
+Yasuoka, H., Terauchi, T.: On bounding problems of quantitative
+information flow. In: Proceedings of ESORICS. LNCS, vol. 6345,
+pp. 357-372. Springer (2010). https://doi.org/10.1007/978-3-642-
+15497-3_22
+
+Zdancewic, S., Myers, A.C.: Observational determinism for con-
+current program security. In: Proceedings of CSF, p. 29. IEEE
+Computer Society (2003). https://doi.org/10.1109/CSFW.2003.
+1212703
+
+Publisher’s Note Springer Nature remains neutral with regard to juris-
+dictional claims in published maps and institutional affiliations.

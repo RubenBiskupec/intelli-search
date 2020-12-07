@@ -1,0 +1,1742 @@
+Composite Structures 253 (2020) 112755
+
+ 
+
+Contents lists available at ScienceDirect
+
+COMPOSITE
+STRUCTURES
+
+     
+
+Composite Structures
+
+ee
+
+ELSEVIER
+
+ 
+
+ae materialstoday
+
+ 
+
+journal homepage: www.elsevier.com/locate/compstruct
+
+ 
+
+A cross-sectional aeroelastic analysis and structural optimization tool for ®
+
+Check for
+
+slender composite structures updates
+
+ 
+
+Roland Feil®*, Tobias Pflumm ”, Pietro Bortolotti*, Marco Morandini ‘
+
+* National Renewable Energy Laboratory, Boulder, Colorado, USA
+> Technical University of Munich, Germany
+© Politecnico di Milano, Italy
+
+ 
+
+ 
+
+ 
+
+ARTICLE INFO ABSTRACT
+Keywords: A fully open-source available framework for the parametric cross-sectional analysis and design optimization of
+SONATA slender composite structures, such as helicopter or wind turbine blades, is presented. The framework—
+
+VABS Structural Optimization and Aeroelastic Analysis GQONATA)—incorporates two structural solvers, the commer-
+
+ANBA4 cial tool VABS, and the novel open-source code ANBA4. SONATA also parameterizes the design inputs, post-
+
+Parametric design framework . . . . . .
+
+. processes and visualizes the results, and generates the structural inputs to a variety of aeroelastic analysis
+
+Composite structures . : . : . : :
+tools. It is linked to the optimization library OpenMDAO. This work presents the methodology and explains
+the fundamental approaches of SONATA. Structural characteristics were successfully verified for both VABS
+and ANBA4 using box beam examples from literature, thereby verifying the parametric approach to generating
+the topology and mesh in a cross section as well as the solver integration. The framework was furthermore
+exercised by analyzing and evaluating a fully resolved highly flexible wind turbine blade. Computed structural
+characteristics correlated between VABS and ANBA4, including off-diagonal terms. Stresses, strains, and defor-
+mations were recovered from loads derived through coupling with aeroelastic analysis. The framework, there-
+fore, proves effective in accurately analyzing and optimizing slender composite structures on a high-fidelity
+level that is close to a three-dimensional finite element model.
+
+ 
+
+1. Introduction
+
+Modern rotor blades have complex architectures that are defined
+by a vast number of design parameters. Investigating their constraints
+and design drivers requires incorporating multidisciplinary perspec-
+tives, including the structural dynamics, aerodynamics, materials
+sciences, and manufacturability restrictions. Therefore, designing
+blades for either rotorcraft or wind turbine application can be time
+consuming and expensive. A design approach that combines the struc-
+tural dynamics and aerodynamics simultaneously rather than itera-
+tively offers a more systematic development process that results in
+better blades [1]. Hence, effects from aeroelasticity should be consid-
+ered in the earliest stages of the design process [2].
+
+State-of-the-art aeroelastic analysis tools, such as CAMRAD II [3],
+Dymore [4], MBDyn [5], and BeamDyn [6] in FAST [7,8] model the
+blade-structural dynamics with one-dimensional (1D) beam elements.
+In comparison to fully resolved three-dimensional (3D) finite element
+models, this approach simplifies the mathematical formulation and
+
+** Corresponding author.
+
+increases the computational efficiency [9]. The slender geometrical
+characteristics of rotor blades proves the simplification of approximat-
+ing them as 1D beams as sufficient [10]. However, using 1D beam ele-
+ments decouples the structural characteristics from a_ realistic
+composite-blade definition, manufacturability constraints, and blade
+structural design parameters. Therefore, occurring issues in the blade
+design are often not discovered until later, when changes become
+increasingly expensive and time consuming [11]. These issues can
+be resolved by keeping a strong connection between the aeroelastic
+and internal structural design. Although fully resolved 3D finite-
+element models would be the most accurate approach for modeling
+modern composite rotor blades, they are often not used until the final
+design stages [9,12] because of their complexity and computational
+costs. Different ways to approach modeling 1D beams based on 3D
+structural designs are required.
+
+In 1983, Giavotto et al. [13] developed a general approach for the
+characterization of anisotropic beams. It uses the de Saint—Venant’s
+principle to determine the Timoshenko stiffness matrix of a beam cross
+
+E-mail addresses: roland-feil@web.de (R. Feil), tobias.pflumm@tum.de (T. Pflumm), pietro.bortolotti@nrel.gov (P. Bortolotti), marco.morandini@polimi.it (M. Morandini).
+
+https://doi.org/10.1016/j.compstruct.2020.112755
+Received 29 June 2020; Accepted 27 July 2020
+Available online 1 August 2020
+0263-8223/Published by Elsevier Ltd.
+
+This is an open access article under the CC BY-NC-ND license (http://creativecommons.org/licenses/by-nc-nd/4.0/).
+R. Feil et al.
+
+section. This approach led to a Fortran code, called either ANBA or
+HANBA, that has never officially been released. Giavotto et al.’s formu-
+lation was adopted by many research groups who developed their own
+version of the code. Among them, NABSA [14] and BECAS [15,16] are
+worth mentioning. In 1995, Cesnik and Hodges [17] published the
+Variational Asymptotic Beam Sectional Analysis (VABS) tool that uses
+the geometrically exact beam theory [18], based on the variational
+asymptotic method [19], to accurately determine structural character-
+istics of a two-dimensional (2D) cross section. Since that time, VABS
+[14,20,21] has evolved and became a popular tool in rotor blade pre-
+design and multidisciplinary rotor design optimization. Its modeling
+capabilities have been validated in numerous publications [2,22—24].
+
+A slightly different approach was recently proposed by Morandini
+and Chierichetti [25]. It led to the Python-based open-source code
+for ANisotropic Beam Analysis: ANBA version 4.0 (ANBA4). The main
+difference between ANBA4’s approach and both previous ANBA ver-
+sions and VABS can be found in the kinematic description of the dis-
+placement field and in the slightly different theoretical approach.
+Both ANBA and VABS assume that the displacement of an arbitrary
+point is given by the sum of a cross section’s rigid rotations and trans-
+lations superposed with the warping field. The new approach of
+ANBA4 instead gets rid of the unknown and redundant cross-section
+movement and uses displacement of the points as the only unknown
+of the problem. It is then possible to compute the polynomial solutions
+of the elastic problem (the so-called de Saint-Venant’s solutions) by
+resorting to the peculiar mathematical structure of the beam problem;
+see Section 2.5.2. The same approach was later adopted by different
+authors, including the work from Han and Bauchau [26].
+
+While characterizing the blade’s internal structure with common
+computer-aided design (CAD) tools is feasible, transferring it to a
+meshed cross section is challenging in an automated design analysis
+and optimization approach. Therefore, parametric topology and mesh
+generators with respective preprocessing and postprocessing, as well
+as plotting functionalities [27] and a robust platform for software inte-
+gration [28] are needed. Li [29] presented a parametric mesh genera-
+tor that, although limited to a fixed number of layers with identical
+thickness, could efficiently model and mesh a cross-sectional layout.
+Optimizing ply thickness and fiber orientation was conducted using
+VABS as the structural solver and DYMORE to determine blade loads.
+Ghiringhelli et al. [30] coupled a custom parametric mesh generator
+by using an earlier version of ANBA to maximize the active twist
+authority of a helicopter blade cross section while accounting for sim-
+ple structural and aeroelastic constraints. By using a response surface
+method and genetic optimization algorithm, Lim et al. [31] presented
+the rotor structural design optimization of a compound rotorcraft by
+varying the web positions, number of plies, and fiber orientation.
+The approach included multiple constraints such as structural integ-
+rity, location of shear center, and discrete ply orientation. VABS was
+used as structural solver, and CAMRAD II was used to conduct the
+aeromechanical analysis.
+
+Supported by the U.S. Army, Rohl et al. [2,11] presented IXGEN, a
+cross-section mesh generator that uses a graphical modeling interface
+to define the composite layup of a rotor blade. Cross-sectional features
+such as webs, spar caps, and wrapping layers can be used as design
+variables during an optimization. The stiffness properties were deter-
+mined with VABS and applied to RCAS. IXGEN uses OpenCascade,
+an open-source CAD geometry kernel to generate 3D blade geometries
+and 2D cross-sectional meshes. The framework was applied to the
+aeroelastic analysis and design of an active twist rotor [32,33], result-
+ing in a maximization of the actuator authority. Recently, to design
+reduced-emission rotorcraft, Silva and Johnson [28] began integrating
+IXGEN into RCOTools [34], a Python-based interface between various
+rotorcraft analysis tools, such as CAMRAD II, NDARC, and Open-
+MDAO. Glaz et al. [35,36] again used VABS, applying a surrogate-
+based optimization approach to successfully reduce helicopter blade
+vibrations by optimizing the structural design. Wind-energy-related
+
+Composite Structures 253 (2020) 112755
+
+approaches were mostly derived from the aerospace world, using tools
+such as VABS or BECAS. Chen et al. [37] assessed multiple solvers for
+cross-sectional analysis of composite wind turbine blades, concluding
+that other tools such as PreComp [38], FAROB [39], and CROSTAB
+[40] perform in an inferior manner compared to VABS.
+
+This work presents the Structural Optimization and Aeroelastic
+Analysis (SONATA) framework to address the continuing need
+[31,41,42] for a comprehensive and multidisciplinary structural
+design analysis and optimization environment. It includes the determi-
+nation of cross-sectional structural properties and stress and strain
+recovery, and accounts for design and material constraints. The frame-
+work can be applied to design applications for arbitrary slender com-
+posite structures, including rotorcraft and wind turbine blades. It
+incorporates both VABS as the community-approved tool to solve
+structural properties, and ANBA4 as an additional fully open-source
+solver. Current focus is on the validation and verification of SONATA
+capabilities, and presentation of the analysis methodology, including
+the parametric topology and mesh generation of cross sections, deter-
+mination of structural characteristics, recovery analysis, and imple-
+mented preprocessing and postprocessing functionalities.
+
+In the following, the individual modules and capabilities from
+SONATA are described and validated using box beam examples from
+literature. The final analysis and evaluation of a fully resolved wind
+turbine blade showcases the tool’s applicability to complex applica-
+tions, including recovery analysis bases on loads determined through
+coupling with aeroelastic analysis. Code-to-code comparison between
+VABS and ANBA4 further verifies the structural solver modules.
+
+2. Methodology
+
+SONATA closes the gap between 1D beam finite element models
+and the 3D blade design. The 1D finite element model, which is
+required for specifying elastic beam models in aeroelastic analysis
+tools, is characterized by evaluating multiple 2D cross sections of a
+slender composite structure; see Fig. 1. SONATA incorporates a multi-
+disciplinary rotor-blade design framework; see Fig. 2. Its automatized
+and parametric setup intends to analyze and optimize slender struc-
+tures with composite layers being placed in a circumferential uniform
+scheme, and therefore, antisymmetric configuration. Such layup con-
+figurations are commonly applied to modern rotorcraft and wind tur-
+bine blades. SONATA comprises five main components:
+parametrization and surface generation, topology generation, mesh
+discretization, solving for the structural properties, and evaluating as
+well as postprocessing of the results. SONATA is based on Python.
+Its cross-sectional beam model (CBM) uses the CAD-Kernel OpenCAS-
+CADE with pythonOCC [43].
+
+3D stress and strain recovery can either be performed by applying
+user-selected load inputs or determined loads from aeroelastic analy-
+sis; see Fig. 2. The latter is especially useful when applied to, and
+wrapped in, an OpenMDAO [44] optimization. To date, such wrappers
+have been implemented for Dymore [45,46] and CAMRAD II [34] with
+application to rotorcraft, and for BeamDyn [6] with application to
+wind turbines. Existing OpenMDAO structures can fairly easily be
+adapted to feature other aeroelastic analysis codes. The focus of this
+work is to present and validate the analysis capabilities; detailed opti-
+mization studies will be subject to follow-up publications. The follow-
+ing subsections provide an overview on the fundamental SONATA
+analysis components, including descriptions of essential conventions
+and definitions.
+
+2.1. Coordinate systems
+The global coordinate system (see Fig. 3) is called the blade frame
+
+(superscript B). The radial grid of the investigated composite structure
+spans along the x}-axis. Directions, x3 and x3, then provide the area of
+R. Feil et al.
+
+  
+  
+
+Cross-sectional analysis
+=.
+
+1D beam finite element model
+
+(~.
+
+3D blade design
+
+Composite Structures 253 (2020) 112755
+
+a
+
+Fig. 1. Methodology to account for 3D structural designs in 1D beam finite element models.
+
+Beam/Blade Design
+3D Surface Generation
+
+Cross-Sectional
+Composite Topology
+
+Mesh Discretization
+
+  
+ 
+
+ 
+   
+ 
+  
+ 
+ 
+  
+
+    
+ 
+ 
+
+  
+   
+      
+
+   
+    
+ 
+   
+   
+
+ 
+
+VABS or ANBAX
+
+Inertia & Stiffness
+Properties
+
+3D Stress & Strain
+
+Recovery
+
+Results Evaluation
+& Plotting
+
+  
+     
+    
+    
+
+Loads Determination
+(CAMRAD II, Dymore,
+BeamDypn, etc.)
+
+_
+_ =
+
+   
+   
+
+—_
+_
+
+_ User-Selected
+Load Inputs
+
+Fig. 2. SONATA analysis procedure.
+
+  
+ 
+    
+
+Local CBM
+curve
+
+Profile line
+
+Fig. 3. Illustration of beam definitions.
+
+a cross section at user-defined radial grid locations, or x?-stations,
+respectively. The outer shape of a beam or blade is defined as wire-
+frames by a collection of airfoils, or other arbitrary outer shapes,
+which are projected along the nondimensional x?-axis, translated to
+
+the nondimensional twist-axis location (scaled to chord length),
+rotated by the twist angle, ©,,, around x?, scaled to the desired chord
+length, and moved onto the beam geometric curve. Because the beam
+geometric curve arbitrarily bends and twists, the structural mass and
+stiffness properties are determined in respect to the local coordinate
+system (superscript L) of the CBM, an independent axes definition that
+results in the local CBM curve. The unit vector of x} is tangent to the
+local CBM curve, and the unit vectors of x5 and x are in the plane nor-
+mal to the local CBM curve, with x5 pointing to the leading edge par-
+allel to the chord. This separation allows evaluation of cross-sectional
+properties at arbitrary reference locations within a cross section, inde-
+pendent from the outer geometry. Assuming the modeling of blade
+twist and curvature to be part of an aeroelastic analysis model would
+require the local CBM curve to be identical to the beam geometric
+curve.
+
+Fig. 4 illustrates the conventions in a 2D cross section. The
+twist-reference location is on the beam geometric curve, and the
+L-coordinates lie on the local CBM curve; see Fig. 3. Start and end loca-
+tions of the elements within the internal structural 2D finite element
+model are defined using the counter-clockwise s-coordinates; see
+Fig. 4. Its origin is typically located on the trailing edge.
+R. Feil et al.
+
+  
+  
+
+Profile line
+
+Twist axis
+
+   
+
+   
+
+s=0.8
+
+s=0.6
+
+Fig. 4. Local coordinate system (L) and s-coordinates along the arc of an outer
+shape of a cross section.
+
+ 
+
+Fig. 5. Plane (P) and material (M) coordinate systems in respect to the local
+coordinate system (L).
+
+The s-coordinates are nondimensional and range from 0 to 1 along the
+outer-boundary curve of the airfoil. They propagate through the seg-
+ments and layers with an interval tree structure as sets of consecutive
+B-splines. This method allows to efficiently find the intervals of over-
+lapping layers and to locate the corresponding start and end locations
+of each layer. The material plane defines the orientation of each mesh
+element rotated by the ply orientation angle, ©,,, around the x{-axis,
+resulting in the ply-coordinate system, P; see Fig. 5. The ply orienta-
+tion angle is determined automatically in respect to the set of B-
+splines defining each layer. Finally, the P-frame is rotated around
+the x5-axis by the given material orientation angle, 3, of an individual
+layer, resulting in the material-coordinate system, M.
+
+2.2. Initialization and parametrization
+
+SONATA input files are defined using the YAML syntax. It provides
+definitions of the outer shape and orientation in space of the beam or
+blade, including the twist, chord, twist-reference location, airfoil defi-
+nitions, and required axis locations along the radial grid. Further
+inputs are the internal structure of the cross sections, including webs,
+segments, and layers at arbitrary radial locations, airfoil outer shapes,
+
+    
+
+TTT)?
+
+ 
+
+ 
+
+ 
+
+ 
+
+Composite Structures 253 (2020) 112755
+
+and a database for material properties. The latter can accommodate
+isotropic, orthotropic, and anisotropic materials with a respective ref-
+erence index for identifications. The material orientation angle is
+neglected for layers with an isotropic material, such as for core mate-
+rial. Once the beam or blade design is loaded, the data are parameter-
+ized according to user-defined radial stations.
+
+2.3. Topology
+
+The method for generating the cross-sectional topology was
+inspired from manufacturing processes, where layers are placed on
+top of each other in negative molds consecutively from the outside
+to the inside. Each layer is described by its thickness, start and end
+locations in regard to the s-coordinates (see Fig. 4), a fiber-
+orientation angle, and an assigned material. The topology introduces
+multiple segments that can each include various numbers of layers.
+The first segment includes the layup attached to the outer-boundary
+curve of the airfoil. Following segments are ordered subsequently from
+the leading to the trailing edge and separated by webs attached to the
+innermost layer of the first segment. Webs are defined as an either
+straight or curved line between two s-coordinate locations. Fig. 6
+shows a generic example of a composite-blade cross section. It demon-
+strates the topology capabilities of SONATA and accounts for the most
+common topology requirements from rotorcraft or wind turbine
+blades, including (from the leading to the trailing edge) shell layers
+and a c-spar with filled cavities and an added circular trim mass, a
+box beam, spar caps connected by webs, shell fillers, and trailing edge
+reinforcements. Each segment can include multiple layers that can be
+individually associated with different material properties and optional
+core materials.
+
+The boundary curves separating the segments (i.e., the webs) and
+each layer within a segment are represented using counterclockwise
+sets of consecutive B-splines, with the airfoil outer shape being the
+outermost B-spline. Each layer is generated by performing a parallel
+offset according to the layer thickness of an existing B-spline and
+within its start and end positions, which are defined in s-
+coordinates. Child B-splines are connected to the parent B-splines with
+added smooth-layer cutoffs at the start and end locations.
+
+2.4. Meshing
+
+Once the cross-sectional topology has been generated, while
+respecting the layup definitions, the mesh discretization follows in a
+reverse order, from the inside to the outside. Each layer is meshed
+by orthogonal projections and corner-style differentiation. Fig. 7
+shows the first six cornerstyles that are currently implemented in
+SONATA. A layer is described by a set of two B-splines, the inner,
+Qp_spliney ANd the outer, bg_sptine. The nodes on each B-spline are called,
+accordingly, Qnodes ANd Dpodes. First, existing Gnodes are determined. In
+case that nodes are missing on the @g_ spine, additional uniformly placed
+nodes are introduced. Then, each node is projected in an orthogonal
+manner to the bg_spiine. If multiple projections exist (see Fig. 7), the
+number of projections (i.e., potential b,oaes) and the angle, a, between
+the range of projections are determined. Next, depending on the pro-
+
+Fig. 6. Topology of a generic composite-blade cross section.
+R. Feil et al.
+
+ 
+
+(a) Cornerstyle 0:
+Q > Qcrit and no exterior
+corner on bB~ spline
+
+a < Acrit aS Acrit
+
+(d) Cornerstyle 3:
+Qa < Qeri¢t and one exterior
+corner on bB~_ spline
+
+(b) Cornerstyle 1:
+Q > Qeri¢ and one exterior
+corner on bB~_ spline
+
+(e) Cornerstyle 4:
+Qa < Qerit and two exterior
+corners on bB_ spline
+
+Composite Structures 253 (2020) 112755
+
+a< Arit
+
+(c) Cornerstyle 2:
+Q@ < Qeri¢ and no exterior
+corner on bB~_ spline
+
+a < Qcrit
+
+A Anodes
+@ bnodes
+
+@ Identified corer
+® Additional nodes
+
+(f) Cornerstyle 5:
+Qa < Qeri¢ and three exterior
+corners on bB~ spline
+
+Fig. 7. Cornerstyles 0 to 5 between two sets of B-splines, the inner dg_ spline With the Gnodes, and the outer bp_ spline With the Dnoaes.
+
+jection angle, a, the defined critical projection angle, a,;,, and the
+number of potential exterior corners in between, the specific corner-
+style and the meshing procedure are determined. After all the nodes
+are placed on a set of B-splines, they are connected to form cells with
+associated material properties and fiber-orientation angles. Subse-
+quent steps improve the mesh quality by modifying sharp and large
+aspect-ratio cells and cell-orientation angles. Once every layer in a seg-
+ment has been meshed, remaining cavities are triangulated using the
+Shewchuk [47] algorithm with an area constraint. Hanging nodes
+between two neighboring segments are avoided by consolidating the
+cells on the web interfaces.
+
+An optional and final step integrates geometrical shapes in an exist-
+ing mesh. SONATA currently supports the use of circular trim masses,
+which can be modified to other arbitrary geometries. The correspond-
+ing method to map existing nodes onto the contour line of a specified
+shape is illustrated in Fig. 8. First, the number of inner nodes for each
+cell is determined. During step 1, the inner node of each cell marked
+with 1 (.e., one node of that cell is inside the shape) is moved along
+the cell edge with the shortest distance to the intersecting curve. Step
+2 then moves remaining inner nodes of cells marked with 2 along the
+cell edge, again, with the shortest distance to the intersecting curve.
+Finally, step 3 moves the outer nodes of cells marked with 3 along
+the edge direction onto the intersecting curve. Once the process is
+completed, inner cells marked with 3 and 4 are deleted, and a new
+unstructured mesh is introduced inside the given shape and allocated
+to a defined material property.
+
+SONATA is further capable of splitting quadrature mesh elements
+into triangles. This is especially useful for the ANBA4 solver that con-
+sistently requires either quadrature or triangular mesh elements, but
+does not support the combination of those. Fig. 9 shows a completely
+discretized mesh with triangular elements of a cross section displayed
+
+ 
+
+@ Original nodes — Step 1
+M Ana = Step 2
+apped nodes = Step 3
+
+Fig. 8. Mapping algorithm to integrate curves into an existing mesh.
+R. Feil et al.
+
+Composite Structures 253 (2020) 112755
+
+ 
+
+Fig. 9. Mesh discretization of a generic composite-blade cross section.
+
+for a generic composite blade. It is based on the same topology as pre-
+viously shown in Fig. 6. The final mesh of a cross section along with its
+associated material properties are then processed and connected to the
+solver, either VABS or ANBA4.
+
+2.5. Solver
+
+SONATA has been implemented to either use the commercial solver
+VABS or the open-source solver ANBA4 for conducting the cross-
+sectional structural analysis at various sections of slender composite
+structures.
+
+2.5.1. VABS
+
+VABS uses the geometrically exact beam theory [18], based on the
+variational asymptotic method [19] for determining cross-sectional
+structural characteristics. The theory behind it has been explained
+by Hodges [48]; for a more detailed insight, refer to some of the
+numerous publications with and about VABS [2,14,20—23]. VABS
+can nowadays be seen as the standard in both industry and academia
+for conducting cross-sectional analysis of composite structures. Studies
+in this work were conducted with VABS version 3.4 [21].
+
+2.5.2. ANBA4
+
+At present, ANBA4 (i.e., ANBA version 4.0) is less common com-
+pared to VABS. This section, therefore, provides a brief overview of
+the fundamental mathematics that ANBA4 is based on. More detailed
+information is given by Morandini et al. [25] as well as Zhu and
+Morandini [49]. The starting point of ANBA4 is the weak form of
+the linear equilibrium equations,
+
+[se:cav =e, (1)
+V
+
+where oe is the virtual variation of the small strain tensor,
+€ = 1/2(grad(u)" + grad(w)),u is the displacement vector, o = E: € is
+the Cauchy stress tensor, FE the elastic tensor, and 6£, is the virtual work
+of the external loads. Assume a prismatic, nontwisted beam to be
+loaded only by forces per unit of surface, f, at its extremities; i.e., the
+start and end radial stations. Integration by parts along the local CBM
+curve, x', of the left-hand side of Eq. (1), leads to
+
+| 5u(op —faa) + | 5u(—6n faa
+(2)
+
+where grad,(u) is the gradient over the cross-section plane of
+u,o6, =o-n is the cross-section stress vector, 65 =o —o-n@®n is the
+stress tensor built with the two in-plane stress vectors, and n follows
+the x axis direction. The right-hand side of Eq. (2) states the equiva-
+lence of the cross-sectional stress vector and of the applied external
+loads at the beam extremities. The left-hand side states the equilibrium
+equations along the beam. Thus, the beam is in equilibrium if
+
+ 
+
+06,
+/ | ou - on + dgrad,(u) : osdAds =
+L JA Oxy
+
+OGn
+| Ou - on + dgrad,(u) : osdAds = O (3)
+A Ox;
+
+is satisfied along the beam. The key point behind ANBA4’s formulation
+is to recognize that Eq. (3) has a Hamiltonian structure, which is char-
+acterized by 12 independent polynomial solutions along the xj axis,
+that characterize the unknown displacements field, u. The first six are
+simply the rigid body motions, while the remaining six are the solutions
+for traction (linear axial displacement relative to xt and constant warp-
+ing), torsion (linear torsional rotation relative to xj; and constant warp-
+ing), bending in two independent directions (quadratic transverse
+displacement, linear cross-section rotation, and constant warping),
+and shear-bending (cubic tranverse displacement, quadratic cross-
+section rotation, linear and constant warping). The solution procedure
+is as follows:
+
+e Approximate the unknown displacement field, u, with a finite ele-
+ment discretization defined over the cross sections, such that
+
+U (XY, Xp, X3) = ZN n(%3 5X3) (21) (4)
+
+where N;(x5,x3) are the finite element interpolating functions, and
+u(x}) are the nodal displacements as a function of xj. This, from a
+practical point of view, requires defining a mesh over the cross sec-
+tion and to choose the element polynomial interpolating order.
+SONATA, by default, passes a linear order to ANBA4.
+
+e Assemble the matrices obtained by applying the finite element
+approximation to Eq. (3). In order to actually compute the inte-
+grals, it is necessary to specify the different materials, their consti-
+tutive laws, and the material coordinate system; see Fig. 5. Because
+Eq. (3) involves the first derivative of the normal stress vector,
+0o,/Ox;, three matrices are obtained, and the discretized version
+of Eq. (3) is
+
+On Ou
+—_— H——~— Fa =
+Moe H axe au —0 (5)
+
+Eq. (5) is a second-order homogeneous differential equation. It is
+characterized by 12 null eigenvalues and organized into 4 indepen-
+dent Jordan chains. The ensuing polynomial solutions are the rigid
+body motions and the 6 already-described polynomial deformation
+modes.
+
+e By knowing the polynomial solution up to order k, with
+u(xt) = Yi itt, it is possible to compute the polynomial solution
+of order k + 1 by solving the linear system
+
+Eity.. = Mix, — Hit; (6)
+
+Six linear systems need to be solved in order to compute the corre-
+sponding polynomial deformation modes.
+
+Once the polynomial solutions are known, the Timoshenko stiffness
+matrix can be computed by stating the equivalence of the beam
+internal virtual work per unit of length of the polynomial solutions
+and the virtual work from the reaction forces and moments of the
+beam model.
+R. Feil et al.
+
+Because matrix E is four times singular, particular care needs to be
+taken while solving the linear system of Eq. (6). Its nullspace is known
+analytically and is equal to the three rigid body motions of the beam
+and its constant rotation around x{. To solve the system, it is thus nec-
+essary to either constrain the nullspace by means of Lagrange multipli-
+ers or resort to an iterative solver and continuously deflate the
+nullspace from the solution. Furthermore, in order to correctly com-
+pute the cubic solution, one needs to deflate the traction and torsion
+of the deformable modes from the two constant-bending parabolic
+solutions.
+
+The current implementation of ANBA4 [50] leverages Dolfin
+[51,52], a library of the FEniCS project [53,54]. One needs to specify
+the mesh, material properties, and orientation angles, according to the
+convention of Fig. 5 and the polynomial degree of the cross-section
+finite element approximation. After that, one can compute, with a sin-
+gle function call, the six polynomial solutions, the cross-sectional iner-
+tia, and stiffness matrices. Finally, knowing the six polynomial
+solutions, it is possible—for any set of applied loads—to recover the
+3D stress and strain states, either in the global or in the material refer-
+ence frame.
+
+2.6. Postprocessing
+
+A powerful feature of SONATA consists of the results evaluation
+and plotting functionalities. By using the CAD-Kernel OpenCascade
+pythonOCC, lofted 3D geometries and 2D meshes can be generated
+and extracted. The cross-sectional outputs include the Timoshenko
+stiffness matrix, inertia matrix, center of mass, elastic center, and shear
+center, as well as the stress, strain, and displacement vectors of each
+finite element. Plotting functionalities address those outputs on a 2D
+and 3D level. Besides directly evaluating the results through extraction
+and plotting of results, the resulting 1D structural properties can be
+directly coupled to aeroelastic analysis models. Such coupling can be
+wrapped in an OpenMDAO [44] framework to conduct structural
+blade design optimization.
+
+3. Box beam numerical analysis
+
+Only a few known means of validation exist for the theory behind
+anisotropic beams. Stiffness results can be compared using results from
+3D finite element models that have a very high degree of accuracy and
+potentially millions of degrees of freedom, or precisely conducted
+experiments that are detailed enough to also account for the small
+terms. Such validation is beyond the scope of this work and should
+be accounted for in future research. In the following, results from
+SONATA, using both VABS and ANBA4, are compared to other well-
+investigated approaches from literature based on VABS and NABSA
+data for the very same test cases. Current verification objectives are
+to demonstrate the accuracy of the parametric processing, topology,
+and meshing features within SONATA, and its interfaces to VABS
+and ANBA4. While VABS is a commercial off-the-shelf solution, the fol-
+lowing comparisons of ANBA4 results with both current VABS results
+and previous studies from literature serve to gain confidence in using
+the current version of ANBA4 as a valuable open-source option. All the
+examples make use of linear triangular elements.
+
+Table 1
+
+Box beam geometrical properties.
+Description Parameter Value, m
+Width a 0.0242
+Height b 0.0136
+Length L 0.764
+Ply thickness tply 1.27 E-04
+Wall thickness (6 plies) t 7.62 E-04
+
+Composite Structures 253 (2020) 112755
+
+Table 2
+AS4/3501-6 graphite/epoxy composite material properties.
+Parameter Property
+
+E| 142.0 GPa
+E, 9.79 GPa
+Git 6.0 GPa
+Gin 4.8 GPa
+Vit 0.42
+Vin 0.34
+
+Consider a composite box beam in three different CUS layup config-
+urations, [0°|,,[—15°],, and [—30°,0°],. The fiber-orientation angles
+denoted in this work are in accordance with the coordinate system
+shown in Fig. 5. Box beam geometry properties are shown in Table 1
+and material properties in Table 2. In terms of the material properties,
+layup [—15°]|, has a different Poisson’s ratio of vy, = 0.3. The order of
+the given stiffness is: 1 — extension; 2, 3 — shear; 4 — torsion; and 5,
+6 — bending. The box beams (see Fig. 10) were analyzed using 200
+equidistant points along the outer shape, resulting in a total of 1,481
+nodes and 2,536 mesh elements.
+
+Eq. (7) shows the relations between the Timoshenko stiffness
+matrix, S, resulting strains, ¢, as well as elastic twist and curvatures,
+x, when being loaded to sectional forces, F, and moments, M. The indi-
+vidual S; components follow the L-coordinate system conventions; see
+Fig. 3.
+
+Fy Si Siz Siz) S14 Sis Si6 é1 é1
+Fy Si2 S22 S23 S24 Sa5 ‘S26 E2 E2
+Fy _ Siz S23 S33 S34 S35 S36 | 63 _¢s. E3 (7)
+M, S14 S2q S34 Sag Sys S46 K K
+Me Sis S25 S35 S45 S55 S56 Ke K2
+Ms Sie S26 S36 S4e Sse See K3 K3
+
+Table 3 shows the results with a [0°], layup. Off-diagonal terms
+were negligible for this simple example. The first two columns show
+literature [22] results using NABSA and VABS, while the latter two
+
+Stacking
+sequence
+
+ 
+
+a
+
+Fig. 10. Box beam cross-sectional geometry, topology, and discretized mesh.
+
+Table 3
+
+Stiffness of a prismatic box beam with a [0°], layup.
+Stiffness NABSA [22]| VABS [22] SONATA/VABS SONATA/ANBA4
+S11, N 7.8765 E+06 # £7.8765 E+06 7.8603 E+ 06 7.8603 E+06
+Soo, N 1.9758 E+05 1.9803 E+05 1.9764 E+05 1.9764 E+05
+S33, N 8.4550 E+04 48.4995 E+04 8.4745 E+ 04 8.4745 E+04
+S44, Nm2 2.3400 E+01 2.3500 E+01 2.3471 E+01 2.3471 E+01
+Sss, Nm2 2.4900 E+02 2.4900 E+02 2.4951 E+08 2.4951 E+02
+Soo; Nm2 6.1700 E+02 6.1700 E+02 6.1619 E+08 6.1619 E+02
+R. Feil et al.
+
+Table 4
+
+Stiffness of a Prismatic Box Beam with a |—15°], Layup
+
+Stiffness
+
+Si, N
+Si4, Nm
+S22, N
+Sos, Nm
+S33, N
+S36, N
+S44, N
+Sss, N
+Soo, N
+
+2
+
+2
+
+ 
+
+ 
+
+2
+
+BB SB Ss
+
+Table 5
+
+NABSA [57,14]
+
+6.3947 E+ 06
+1.2139 E+ 04
+4.0157 E+05
+—5.8787 E+ 03
+1.7533 E+05
+— 6.3692 E+ 03
+4.8200 E+01
+1.9000 E+ 02
+4.9500 E+ 02
+
+Stiffness of a Prismatic Box Beam with a [—30°, 0°], Layup
+
+Stiffness
+
+Siu, N
+Si4, Nm
+S22, N
+Sos, Nm
+S33, N
+S36, N
+S44, N
+Ss5, N
+See, N
+
+2
+
+2
+
+2
+
+ 
+
+ 
+
+BB SB Ss
+
+Si, N
+
+NABSA [22]| SONATA/VABS SONATA/ANBA4
+5.5625 E+06 5.5400 E+ 06 5.5400 E+06
+5.8889 E+03 5.8832 E+03 5.8832 E+03
+4.3655 E+05 4.3695 E+05 4.3695 E+05
+
+— 2.9840 E+03 — 2.9803 E+03 — 2.9803 E+03
+1.8868 E+05 1.8898 E+05 1.8898 E+05
+— 3.1422 E+03 — 3.1432 E+03 — 3.1432 E+03
+5.0800 E+01 5.0867 E+01 5.0867 E+01
+1.7600 E+02 1.7622 E+02 1.7622 E+02
+4.3600 E+02 4.3584 E+02 4.3584 E+02
+1e10 le7 0 le7
+0 1
+r/R r/R r/R
+1e9
+< 5
+vy
+0
+0 1
+r/R r/R
+leg
+< 5
+v4
+0
+0
+--- VABSp»
+vanes ANBA4
+
+VABS [14] SONATA/VABS
+6.3947 E+ 06 6.3636 E+06
+1.2139 E+ 04 1.2030 E+ 04
+4.0170 E+05 3.9458 E+05
+
+—5.8787 E+03 —5.8417 E+03
+1.7546 E+ 05 1.7543 E+05
+— 6.3692 E+03 — 6.3106 E+03
+4.8200 E+01 4.8412 E+01
+1.9000 E+ 02 1.9426 E+02
+4.9500 E+ 02 4.9453 E+02
+
+ 
+
+ 
+
+Composite Structures 253 (2020) 112755
+
+SONATA/ANBA4
+
+6.3636 E+06
+1.2030 E+ 04
+3.9458 E+05
+— 5.8417 E+ 03
+1.7543 E+05
+— 6.3106 E+ 03
+4.8412 E+01
+1.9426 E+02
+4.9453 E+02
+
+columns show the results from SONATA, using either VABS or ANBA4
+as a structural solver. Table 3 shows that the stiffness values derived
+through SONATA between VABS and ANBA4 are identical, and the
+comparison of those to NABSA and VABS from previous work success-
+fully verifies the accuracy of the SONATA framework. Minor differ-
+ences were insignificant and can at least in part be attributed to the
+parametric topology and mesh generation in SONATA. One interesting
+finding was that the SONATA results between VABS and ANBA4 are
+identical, and minor differences can be seen between NABSA and
+VABS from literature. However, it eludes the authors’ knowledge
+about potential meshing or other differences between those data from
+
+literature.
+
+1e8s
+
+le9
+
+Sia, Nm
+°o N
+H
+©
+r
+Sis, Nm
+o uw
+Sie, Nm
+o ul
+
+oO
+|
+o
+
+r/R r/R
+1e8
+
+oO
+
+r/R r/R
+
+°o
+
+S34, Nm
+I
+ui °
+°
+pa
+S35, Nm
+|
+Ne)
+S36, Nm
+|
+hb oO
+pa
+o
+Cc
+a
+SN
+
+H
+oO
+H
+
+r/R r/R
+le7
+
+Sag, Nm?
+° e
+oO e
+@
+ray
+pay
+e
+Sas, Nm?
+I
+uO
+T
+
+°o
+
+r/R r/R
+
+Sss, Nm?
+° H
+e
+a
+e
+|
+
+°o
+a
+za
+
+H
+oO
+
+a
+
+ZD
+e
+
+S25, Nm
+I °
+S26, Nm
+Lb 6
+=)
+o
+|
+
+HH
+oO
+e
+
+a
+D
+
+Sae, Nm?
+° N
+e
+a
+0
+
+h
+Oo
+a
+
+Ss6, Nm?
+oO ul
+e
+oO
+©
+2
+al
+
+}
+oO
+
+a
+
+wD
+e
+
+See, Nm?
+
+oO hb
+bh
+a
+bh
+=)
+
+oO
+a2
+D
+
+pa
+
+Fig. 11. Timoshenko stiffness matrix verification between VABS, VABSp (excludes effects from initial twist and curvature), and ANBA4 along the nondimensional
+blade span, r/R, for the 15-MW reference wind turbine blade.
+R. Feil et al.
+
+Table 4 shows results with all plies being identically oriented in a
+[—15°], layup and Table 5 in a [—30°, 0°], layup. Both examples result
+in additional extension-torsion, S,,, and shear-bending, S25 and S36,
+coupling terms. The SONATA/VABS and SONATA/ANBA4 results
+were again identical and both showed excellent agreement with the lit-
+erature. Even though VABS results from literature for the [—30°, 0°],
+layup are available [22], they were excluded for this work because
+they were computed using an older version of VABS. Since VABS ver-
+sion 3.2, the energy transformation equations into the generalized
+Timoshenko stiffness matrix were redefined, thereby solving two pre-
+vious inconsistencies that impacted the predicted generalized
+Timoshenko stiffness matrix. Those changes can measurably impact
+stiffness results, such as in a box beam layup with nonzero material
+orientation angles. This was explained in detail by Ho et al. [55].
+
+4. Wind turbine blade analysis
+
+This section analyzes the recently published 15-MW reference wind
+turbine blade [56]. The example demonstrates the capabilities of
+SONATA and was appraised suitably to further verify the usage of
+ANBA4 in comparison to VABS. The blade is 117 m long and has a root
+diameter of 5.2 m, a maximum chord of 5.77 m at r/R = 0.272, anda
+mass of approximately 65 tons. The blade 3D geometry and six exem-
+plary cross sections were previously illustrated in Fig. 1. Its internal
+structure consists of unidirectional and triaxial glass-composite mate-
+rials, carbon-composite spar caps, and additional layers of foam and
+
+ 
+
+le-1l
+0.0
+Eas
+€
+*<
+—5.0
+0.0 0.5 1.0 0.0 0.5 1.0 0.0
+r/R r/R
+1e4 le2 le-2
+1.0
+¥ 0.5 ww Pat
+- a 0.5 of
+0.0 0.0 o +4
+0.0 0.5 1.0 0.0 0.5 1.0 0.0
+
+r/R r/R
+
+Composite Structures 253 (2020) 112755
+
+gelcoat. Fig. 11 shows the fully resolved symmetrical Timoshenko stiff-
+ness matrix of the blade structural characteristics. Fig. 12 furthermore
+presents the inertia properties, including the section mass, y, the mass
+moment of inertia, i22, about the x2 axis, the mass moment of inertia,
+i33, about the x3 axis, and the product of inertia, i23, as well as the mass
+center, x,,, the tension center, x,, and the shear center, x,, locations.
+Results were computed at 21 equidistant radial station cross sections.
+The shear center, or so-called elastic axis, is the point in a cross section
+where the application of loads does not cause elastic twisting, and the
+tension center, or so-called neutral axis, is the point in a cross section
+that encounters zero longitudinal stresses or strains (i.e., zero axial
+force) when being applied with bending moments.
+
+VABSpr data represent the reduced form of the VABS results,
+neglecting effects from initial twist and curvature. Hence, it accounts
+for the same features and is, therefore, well suited for a code-to-code
+comparison with ANBA4. Within the assumption of neglecting initial
+twist and curvature, results in Figs. 11 and 12 show that—besides
+being verified through box beam examples (see Section 3)—the verifi-
+cation of ANBA4 was again successful when applied to a fully resolved
+wind turbine blade. ANBA4 can, therefore, be seen as an applicable
+and open-source solver within SONATA for the analysis of slender
+composite structures such as blades.
+
+The wind turbine blade incorporates axial-bend, S,; and Sj., and
+bend-bend, Ss,, coupling terms. Because of the plies being entirely ori-
+ented in an axial direction, bend-twist coupling (S45 and S4¢) originates
+solely from initial twist and curvature; see VABS results in Fig. 11.
+
+ 
+
+le-1 le-1
+2
+0
+€ &
+ql 9
+x x 0
+—2
+0.5 1.0 0.0 0.5 1.0 0.0 0.5 1.0
+r/R r/R r/R
+le-2
+£2
+x
+o+f
+0.5 1.0 0.0 0.5 1.0 0.0 0.5 1.0
+r/R r/R r/R
+
+Fig. 12. Verification of inertia-matrix properties and axes locations between VABS, VABSp (excludes effects from initial twist and curvature), and ANBA4 along
+the nondimensional blade span, r/R, for the 15-MW reference wind-turbine blade.
+
+ 
+
+@ SC: Generalized Shear Center
+
+ 
+
+@ CG: Mass Center 0.00100
+
+@ NA: Neutral Axes
+0.00075
+
+0.00050
+
+0.00025
+
+0.00000
+
+Strain, m/m
+
+—0.00025
+
+—0.00050
+
+—0.00075
+
+—0.00100
+
+Fig. 13. Recovered strains in material-fiber direction at r/R = 0.325 of the wind turbine blade. Applied cross-sectional loads were determined through coupling
+
+with BeamDyn.
+R. Feil et al.
+
+SONATA determines the initial state inputs automatically, based on
+the outer geometry of the blade. Note that this feature is yet to be
+added for ANBA4. Small discontinuities in the VABS results (e.g., S24
+or X,3) are based on the initial twist and curvature states in a cross sec-
+tion and may, at least in part, originate from slightly inaccurate outer
+shape definitions of the blade model. The shear-center location is a
+function of the shear-torsion coupling terms, x. =/f(S34) and
+X33 =f (S24). Therefore, x,; shows similar fluctuating characteristics
+as So4. Detailed sensitivity studies and potential impacts from initial
+states on the blades’ aeroelastic behavior will be investigated in future
+work.
+
+Fig. 13 shows recovered strains (see also Eq. 7) of one blade cross
+section at about 1/3 span. The results shown were determined using
+ANBA4 but are identical with VABS. Applied cross-sectional loads
+were determined using BeamDyn within OpenFAST at an above-
+rated steady wind speed of 12 m/s, which incorporated the fully
+resolved mass and stiffness matrices (see Fig. 11) from SONATA.
+BeamDyn uses the geometrically exact beam theory [18] for 1D beams,
+based on the Legendre spectral finite element method. Resulting
+strains were dominated by flapwise moments. Conducting such recov-
+ery analysis results in stresses, strains, and deformations in any direc-
+tion. Those are important to analyze and optimize blades based on
+material safety constraints. Fig. 13 furthermore shows the resulting
+mass center, neutral axes, and shear center that were again success-
+fully verified between VABS and ANBA4; see Fig. 12.
+
+5. Conclusions
+
+This work presents the methodology of SONATA, an efficient para-
+metric design framework to investigate slender composite structures.
+SONATA’s parametrization, cross-sectional topology generation, and
+mesh discretization approaches, as well as the structural solvers (VABS
+and ANBA4) for determining the stiffness characteristics are presented
+and verified. The tool features coupling to aeroelastic analysis and
+enables structural composite-blade design analysis and optimization.
+The following specific conclusions can be drawn:
+
+e Using ANBA4 instead of VABS extends the SONATA framework to
+being a fully open-source available cross-sectional structural analy-
+sis and optimization environment that can be applied to either
+rotorcraft, wind turbine blades, or other slender composite struc-
+tures of arbitrary cross sections.
+
+e SONATA’s parametric preprocessing, topology generation, mesh
+discretization, and solver integration of both VABS and ANBA4
+were successfully verified through a comparison with literature
+results of composite box beams derived through VABS and NABSA.
+
+e Embedded in SONATA, both VABS and ANBA4 proved to be well
+suited to analyze complex slender composite structures, such as
+modern large and highly flexible wind turbine blades, including
+stress and strain recovery as well as bend-twist coupling effects.
+
+e The SONATA framework effectively enables 3D blade design in
+connection with 1D beam finite element models. This allows a tight
+connection between aeroelastic analysis simulation and the
+blade-structural design, thereby offering a systematic development
+process for high-fidelity and multidisciplinary blade optimization.
+
+e To enhance the confidence of modern rotorcraft or wind turbine
+blade designs and better address cost and safety requirements,
+SONATA allows to incorporate material failure criteria, manufac-
+turing constraints, and material and manufacturing uncertainties.
+Material failure criteria can be accounted for in the design process
+by recovering stresses and strains with strong connection to aeroe-
+lastic simulations.
+
+The parametric modeling approach to investigate slender compos-
+ite structures with a high-fidelity structural accuracy provides an effec-
+
+10
+
+Composite Structures 253 (2020) 112755
+
+tive analysis and optimization framework. It will further be used for
+multidisciplinary blade optimization tasks with both helicopter and
+wind turbine blade applications to account for the entire rotor system
+with respect to target objectives such as performance, mean and vibra-
+tory loads, blade deflections, aeroelastic stability, and structural integ-
+rity. Future work will extend ANBA4 to also account for initial twist
+and curvature effects, and further verification studies will include
+comparisons to 3D finite element models.
+
+6. Data availability
+
+The raw/processed data, i.e. the SONATA git repository, including
+examples required to reproduce these findings, are available at
+https://gitlab.Irz.de/HTMWTUM/SONATA.
+
+Declaration of Competing Interest
+
+The authors declare that they have no known competing financial
+interests or personal relationships that could have appeared to influ-
+ence the work reported in this paper.
+
+Acknowledgements
+
+This work was authored in part by the National Renewable Energy
+Laboratory, operated by Alliance for Sustainable Energy, LLC, for the
+U.S. Department of Energy (DOE) under Contract No. DE-AC36-
+08GO28308. Funding was provided by the U.S. Department of Energy
+Office of Energy Efficiency and Renewable Energy Wind Energy Tech-
+nologies Office. The views expressed herein do not necessarily repre-
+sent the views of the DOE or the U.S. Government. The U.S.
+Government retains and the publisher, by accepting the article for pub-
+lication, acknowledges that the U.S. Government retains a nonexclu-
+sive, paid-up, irrevocable, worldwide license to publish or reproduce
+the published form of this work, or allow others to do so, for U.S.
+Government purposes.
+
+In addition, the work from the Technical University of Munich was
+funded by the German Federal Ministry for Economic Affairs and
+Energy through the German Aviation Research Program LuFo V-2
+within the project VARI-SPEED.
+
+References
+
+[1] Adelman HM, Mantay WR. Integrated multidisciplinary optimization of rotorcraft:
+A plan for development. Tech. rep. NASA Langley Research Center 1989:
+TM-101617.
+
+Rohl P.J., Kumar D., Dorman P., Sutton M., Cesnik C.E.S., A composite rotor blade
+structural design environment for aeromechanical assessments in conceptual and
+preliminary design. In: American helicopter society 68th annual forum. American
+Helicopter Society, Fort Worth, TX, May 1-3, 2012.
+
+Johnson W. A history of rotorcraft comprehensive analyses. In: American
+helicopter society 60th annual forum, Baltimore, MD, June 7-10, 2013.
+
+Bauchau OA, Bottasso C, Nikishkov Y. Modeling rotorcraft dynamics with finite
+element multi-body procedures. J Math Comput Model 2001;33(10-11):1113-37.
+https://doi.org/10.1016/S0895-7177(00)00303-4.
+
+Masarati P, Morandini M, Mantegazza P. An efficient formulation for general-
+purpose multibody/multiphysics analysis. J Comput Nonlinear Dyn 2014;9(4).
+https://doi.org/10.1115/1.4025628. 041001.
+
+[6] Wang Q, Sprague MA, Jonkman JM, Johnson N, Jonkman B. BeamDyn: a high-
+fidelity wind turbine blade solver in the FAST modular framework. J Wind Energy
+2017;20(8):1-24. https://doi.org/10.1002/we.2101.
+
+Jonkman JM, Buhl Jr ML. FAST User’s Guide. National Renewable Energy
+Laboratory 2005.
+
+Sprague M.A., Jonkman J.M., Jonkman B.J. FAST modular framework for wind
+turbine simulation: New algorithms and numerical examples. In: AIAA SciTech,
+33rd wind energy symposium, Kissimmee, FL, January 5-9, 2015.
+
+Datta A, Johnson W. Three-dimensional finite element formulation and scalable
+domain decomposition for high-fidelity rotor dynamic analysis. J Am Helicopt Soc
+2011;56(2):22003. https://doi.org/10.4050/JAHS.56.022003.
+
+Yeo H., Truong K., Ormiston R.A. Assessment of 1-D versus 3-D methods for
+modeling rotor blade structural dynamics. In: 51st AIAA/ASME/ASCE/AHS/ASC
+structures, structural dynamics, and materials conference, Orlando, FL, April
+12-15, 2010. doi:10.2514/6.2010-3044.
+
+[2]
+
+[3]
+
+[4]
+
+[5]
+
+ 
+
+ 
+
+[7]
+
+[8]
+
+[9]
+
+[10]
+R. Feil et al.
+
+[11]
+
+[12]
+
+[13]
+
+[14]
+
+[15]
+
+[16]
+
+[17]
+
+[18]
+
+[19]
+
+[20]
+
+[21]
+
+[22]
+
+[23]
+
+[24]
+
+[25]
+
+[26]
+
+[27]
+
+[28]
+
+[29]
+
+[30]
+
+[31]
+
+[32]
+
+[33]
+
+[34]
+
+Rohl P., Dorman P., Sutton M., Kumar D., Cesnik C.E.S. A multidisciplinary design
+environment for composite rotor blades. In: 53rd AIAA/ASME/ASCE/AHS/ASC
+structures, structural dynamics and materials conference, Honolulu, HI, April
+23-26, 2012, pp. 1-15.
+
+Li L. Structural design of composite rotor blades with consideration of
+manufacturability, durability, and manufacturing uncertainties. Ph.D. thesis,
+Georgia Institute of Technology; 2008.
+
+Giavotto V, Borri M, Mantegazza P, Ghiringhelli G, Carmaschi V, Maffioli G.
+Anisotropic beam theory and applications. J Comput Struct 1983;16(1—4):403-13.
+https://doi.org/10.1016/0045-7949(83)90179-7.
+
+Yu W, Hodges DH, Ho JC. Variational asymptotic beam sectional analysis — an
+updated version. J Eng Sci 2012;59:40-64. https://doi.org/10.1016/j.
+
+ijengsci.2012.03.006.
+Blasques JP. Multi-material topology optimization of laminated composite beams
+
+with eigenfrequency constraints. J Compos Struct 2014;111:44-55. https://doi.
+org/10.1016/j.compstruct.2013.12.021.
+
+Blasques JP, Stolpe M. Multi-material topology optimization of laminated
+composite beam cross sections. J Compos Struct 2012;94:3278-89. https://doi.
+org/10.1016/j.compstruct.2012.05.002.
+
+Cesnik C.E.S., Hodges D.H. VABS: A new concept for composite rotor blade cross-
+sectional modeling. In: American helicopter society 51st annual forum, Fort
+Worth, TX, May 9-11, 1995.
+
+Hodges DH. A mixed variational formulation based on exact intrinsic equations for
+dynamics of moving beams. J Solids Struct 1990;26(11):1253-73. https://doi.org/
+10.1016/0020-7683(90)90060-9.
+
+Berdichevsky VL. Variational-asymptotic method of constructing a theory of shells.
+J Appl Math Mech 1979;43(4):664-87. https://doi.org/10.1016/0021-8928(79)
+90157-6.
+
+Hodges DH. Geometrically Exact, Intrinsic Theory for Dynamics of Curved and
+Twisted Anisotropic Beams. AIAA J 2003;41(6). https://doi.org/10.2514/2.2054,
+Yu W. Vabs manual for users, Tech. rep., Utah State University Technology
+Commercialization Office and Georgia Institute of Technology Research
+Cooperation; 2011.
+
+Popescu P, Hodges DH. On asymptotically correct Timoshenko-like anisotropic
+beam theory. J Solids Struct 2000;37:535-58. https://doi.org/10.1016/S0020-
+7683(99)00020-7.
+
+Cesnik C.E.S., Mok J., Parikh A., Shin S. Optimum design framework for integrally
+twisted helicopter blades. In: 45th AIAA/ASME/ASCE/AHS/ASC structures,
+structural dynamics and materials conference, Palm Springs, CA, April 19-22,
+2004. doi:10.2514/6.2004-1761.
+
+Feil R. Aeromechanics analysis of counter-rotating coaxial rotor systems. Ph.D.
+thesis, Technical University of Munich; 2019. ISBN 978-3-8439-4086-3.
+Morandini M, Chierichetti M, Mantegazza P. Characteristic behavior of prismatic
+anisotropic beam via generalized eigenvectors. Int J Solids Struct 2010;47
+(10):1327-37. https://doi.org/10.1016/j.ijsolstr.2010.01.017.
+
+Han S, Bauchau OA. On saint-venant’s problem for helicoidal beams. J Appl Mech
+2015;83(2). https://doi.org/10.1115/1.4031935.
+
+Heath CM, Gray JS. OpenMDAO: Framework for flexible multidisciplinary design,
+analysis and optimization methods. AIAA J 2013;51:2380-94. https://doi.org/
+10.2514/6.2012-1673.
+
+Silva C, Johnson W. Multidisciplinary conceptual design for reduced-emission
+rotorcraft. In: AHS specialists conference on aeromechanics design for
+transformative vertical flight, AHS, San Francisco, CA, January 16-18, 2018.
+
+Li L. Structural design of composite rotor blades with consideration of
+manufacturability, durability, and manufacturing uncertainties. Ph.D. thesis,
+Georgia Institute of Technology; 2008.
+
+Ghiringhelli GL, Masarati P, Morandini M, Muffo D. Integrated aeroservoelastic
+analysis of induced strain rotor blades. Mech Adv Mater Struct 2008;15
+(3-4):291-306. https://doi.org/10.1080/15376490801907822.
+
+Lim J, Shin S, Kee Y. Optimization of rotor structural design in compound
+rotorcraft with lift offset. J Am Helicopt Soc 2016;61(1):1-14. https://doi.org/
+10.4050/JAHS.61.012005.
+
+Kumar D, Cesnik C.E.S. Optimization framework for the dynamic analysis and
+design of active twist rotors. In: American helicopter society 68th annual forum,
+Forth Worth, TX, May 1-3, 2012.
+
+Kumar D, Cesnik CES. New optimization strategy for design of active twist rotors.
+AIAA J 2015;53(2):436—48. https://doi.org/10.2514/1.J053195.
+
+Meyn L.L. Rotorcraft optimization tools: Incorporating design codes into multi-
+disciplinary design, analysis and optimization. In: AHS specialists meeting on
+
+ 
+
+ 
+
+ 
+
+ 
+
+ 
+
+11
+
+[35]
+
+[36]
+
+[37]
+
+[38]
+
+[39]
+
+[40]
+
+[41]
+
+[42]
+
+[43]
+
+[44]
+
+[45]
+
+[46]
+
+[47]
+
+[48]
+
+[49]
+
+[50]
+
+[51]
+
+[52]
+
+[53]
+
+[54]
+
+[55]
+
+[56]
+
+[57]
+
+Composite Structures 253 (2020) 112755
+
+aeromechanics design for transformative vertical lift, San Francisco, CA, January
+16-18, 2018.
+
+Glaz B., Friedmann P.P., Liu L., Kumar D., Cesnik C.E.S. The AVINOR aeroelastic
+simulation code and its application to reduced vibration composite rotor blade
+design. In: 50th AIAA/ASME/ASCE/AHS/ASC structures, structural dynamics, and
+materials conference, Palm Springs, CA, 4-7 May, 2009. doi:10.2514/6.2009-
+2601.
+
+Glaz B, Friedmann PP, Liu L. Helicopter vibration reduction throughout the entire
+flight envelope using surrogate-based optimization. J Am Helicopt Soc 2009;54
+(1):12007. https://doi.org/10.4050/JAHS.54.012007.
+
+Hui C, Yu W, Capellaro M. A critical assessment of computer tools for calculating
+composite wind turbine blade properties. J Wind Energy 2009;13(6):497-516.
+https://doi.org/10.1002/we.372.
+
+Bir G. Computerized method for preliminary structural design of composite wind
+turbine blades. J Solar Energy Eng 2001;124(4):372-81. https://doi.org/10.1115/
+1.1413217.
+
+Philippidis T, Vassilopoulos A, Katopis K, Voutsinas S. THIN/PROBEAM: a
+software for fatigue design and analysis of composite rotor blades. J Wind Eng
+1996;20(5):349-62. https://www.jstor.org/stable/437 49625.
+
+Lindenburg C. STABLAD-stability analysis tool for anisotropic rotor blade
+panels. Tech. Rep. ECN-CX-99-031, Energy Research Center of the Netherlands
+2008.
+
+Friedmann PP. Helicopter vibration reduction using structural optimization with
+aeroelastic/multidisciplinary constraints — a survey. J Aircraft 1990;28(1):8-21.
+https://doi.org/10.2514/3.45987.
+
+Weller W.H., Davis M.W. Wind tunnel tests of helicopter blade designs optimized
+for minimum vibration. In: American helicopter society 44th annual forum,
+Washington, D.C., June 16-18, 1988..
+
+Paviot T. pythonocc, 3D CAD/CAE/PLM development framework for the Python
+programming language, PythonOCC — 3D CAD Python. http://www.pythonocc.
+org/ (accessed April 24, 2020).
+
+Gray JS, Hwang JT, Martins JR, Moore KT, Naylor BA. OpenMDAO: An open-
+source framework for multidisciplinary design, analysis, and optimization. J Struct
+Multidisip Opt 2019;59(4):1075-104. https://doi.org/10.1007/s00158-019-
+02211-z.
+
+Pflumm T, Garre W, Hajek M. A preprocessor for parametric composite rotor blade
+cross-sections 2018;18—21 September.
+
+Pflumm T., Garre W., Hajek M. Propagation of material and manufacturing
+uncertainties in composite helicopter rotor blades. In: 45th European rotorcraft
+forum, Warsaw, Poland, September 17-20, 2019.
+
+Shewchuk JR. Triangle: Engineering a 2D quality mesh generator and delaunay
+triangulator. In: Lin MC, Manocha D, editors. Applied computational geometry:
+towards geometric engineering, vol. 1148. Springer-Verlag; 1996. p. 203-22.
+Hodges DH. Nonlinear composite beam theory for engineers. AIAA; 2006.
+
+Zhu W, Morandini M. Multiphysics cross-section analysis of smart beams. Mech
+Adv Mater Struct 2020:1-18. https://doi.org/10.1080/15376494.2020.1731886,
+Anba4, commit 28cOdbb, Accessed on May 11th, 2020 (May 2020). URL https://
+bitbucket.org/anba_code/anba_v4.
+
+Logg A, Wells GN. DOLFIN: Automated finite element computing. ACM Trans Math
+Softw 2010;37(2):1—28. https://doi.org/10.1145/1731022.1731030.
+
+Logg A, Wells GN, Hake J. DOLFIN: a C++/python finite element
+library. Springer; 2012. Ch. 10.
+
+Alnzs MS, Blechta J, Hake J, Johansson A, Kehlet B, Logg A, Richardson C, Ring J,
+Rognes ME, Wells GN. The FEniCS project version 1.5. Arch Numer Softw 2015;3
+
+(100):9-23. https://doi.org/10.11588/ans.2015.100.20553.
+Logg A, Mardal KA, Wells GN. Automated solution of differential equations by the
+
+finite element method. Springer 2012. https://doi.org/10.1007/978-3-642-
+23099-8.
+
+Ho J, Yu W, Hodges D. Energy transformation to generalized Timoshenko form by
+the variational asymptotic beam sectional analysis. In: 51st AIAA/ASME/ASCE/
+AHS/ASC structures, structural dynamics, and materials conference, Orlando,
+Florida, 2010. doi:10.2514/6.2010-3017.
+
+Gaertner E., Rinker J., Sethuraman L., Zahle F., Anderson B., Barter G., Abbas N.,
+Meng F., Bortolotti P., Skrzypinski W., Scott G., Feil R., Bredmose H., Dykes K.,
+Sheilds M., Allen C., Viselli A. Definition of the IEA 15 MW offshore reference wind
+turbine. Tech. Rep. NREL/TP-75698, International Energy Agency; 2020.
+
+Yu W, Hodges DH, Volovoi V, Cesnik C. On Timoshenko-like modeling of initially
+curved and twisted composite beams. J Solids Struct 2002;39:5101-21. https://
+
+doi.org/10.1016/S0020-7683(02)00399-2.

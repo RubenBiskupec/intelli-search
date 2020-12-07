@@ -1,0 +1,1214 @@
+Annals of Mathematics and Artificial Intelligence (2020) 88:1155-1173
+https://doi.org/10.1007/s10472-019-09666-2
+
+®
+
+Data-driven Koopman operator approach Check for
+for computational neuroscience updates
+
+Natasza Marrouch! © . Joanna Slawinska2 - Dimitrios Giannakis? - Heather L. Read*
+
+Published online: 11 November 2019
+© The Author(s) 2019
+
+Abstract
+
+This article presents a novel, nonlinear, data-driven signal processing method, which can
+help neuroscience researchers visualize and understand complex dynamical patterns in both
+time and space. Specifically, we present applications of a Koopman operator approach
+for eigendecomposition of electrophysiological signals into orthogonal, coherent compo-
+nents and examine their associated spatiotemporal dynamics. This approach thus provides
+enhanced capabilities over conventional computational neuroscience tools restricted to ana-
+lyzing signals in either the time or space domains. This is achieved via machine learning
+and kernel methods for data-driven approximation of skew-product dynamical systems. The
+approximations successfully converge to theoretical values in the limit of long embedding
+windows. First, we describe the method, then using electrocorticographic (ECoG) data from
+a mismatch negativity experiment, we extract time-separable frequencies without band-
+pass filtering or prior selection of wavelet features. Finally, we discuss in detail two of the
+extracted components, Beta (~ 13 Hz) and high Gamma (~ 50 Hz) frequencies, and explore
+the spatiotemporal dynamics of high- and low- frequency components.
+
+Keywords Koopman operator - Spectral decomposition - Nonlinear - Spatiotemporal
+dynamics - ECoG - Brain - Mismatch negativity
+
+Mathematics Subject Classification (2010) 37M10 - 37M25 - 58C40 - 30C40 - 37N25 -
+47A35 - 92C55
+
+This article is an expanded version of research presented at the 2018 International Joint Conference on
+Neural Networks in Rio de Janeiro, Brazil. N. M. acknowledges support from the CT Institute for the
+Brain and Cognitive Sciences Graduate Summer Fellowship and the University of Connecticut
+Department of Psychological Sciences’ Maurice L. Farber Endowment. J. S. acknowledges support
+from NSF grants 1551489 and 1842538. D. G. acknowledges support from ONR YIP grant
+NO00014-16-1-2649, NSF grant DMS-1521775, and DARPA grant HROO11-16-C-0116. H. R.
+acknowledges support from NSF grant 1355065, NIH DC015138 01, and the University of Connecticut
+Brain Computer Interface Core.
+
+>] Natasza Marrouch
+natasza.marrouch @uconn.edu
+
+Extended author information available on the last page of the article.
+
+g) Springer
+1156 N. Marrouch et al.
+
+1 Introduction
+
+Mammalian brains exhibit different oscillations of electrical current. These oscillations are
+commonly divided into 5—8 bands based on their frequency. The oscillations vary from
+slow, e.g., Delta (1-4 Hz) and Theta (4-8 Hz), to medium like Alpha (8—12 Hz), to quickly
+oscillating modes such as Beta (12—30 Hz) and Gamma (30-80 Hz). Electrophysiologic
+recordings, which allow researchers to capture distinct oscillations, are one of the most
+affordable and readily-accessible sources of data on brain activation patterns. Such record-
+ings from multi-channel electrode arrays capture data with temporal resolution exceeding
+that of functional magnetic resonance imaging (f{MRI) data [13]. The utility of this data
+stems from the study of activation changes following the introduction of sensory stimuli,
+which can enable researchers to search for quantitative means to correctly classify mental
+disorders. However, although EEG (electroencephalography) and ECoG (electrocorticogra-
+phy) have been available since the XIX century [9], researchers still face many challenges
+when analyzing the data despite its richness and high temporal resolution.
+
+One challenge stems from the complexity of brain activity patterns and the different
+frequencies characterizing these patterns. Most common methods of analysis rely on pre-
+defined parameters: e.g., the width of the band in bandpass filtering, the wavelets shape in
+wavelet analysis, or the linear operators in principal component analysis. Once necessary
+parameters are selected, data are projected onto them, and the output — a subset of data
+that fits our parameters — is examined to capture spatial and temporal dependencies within
+the brain’s activity [6]. In other words, most available approaches require the researcher to
+impose conditions extrinsic to the dynamical system governing the data, and as a result, risk
+inaccurate representations of the states of that system.
+
+The risks entailed in relying on bandpass filtering to separate various frequencies have
+been well documented [3]. Nonetheless, most analyses of EEG and ECoG data begin with
+filtering available datasets, a process that inevitably leads to some degree of departure from
+the original signal. As a result, the use of different filter parameters may result in very
+different outcomes [63].
+
+Following the filtering process, eigenfunctions of linear operators are commonly used
+for performing dimension reduction to explore brain activity across channels or time. One
+example of such — principal component analysis (PCA) — employs eigenvectors of the
+empirical signal covariance matrix to recover independent patterns. The dynamical process
+underlying the observed data does not constrain the operators and can lead to the extrac-
+tion of patterns with limited ties to the underlying physical mechanisms. For example, it has
+been established that PCA has limited ability to recover distinct frequencies from broad-
+band signals, an especially important shortcoming in the presence of components that can
+account for a large portion of observed variance [4]. Moreover, by their construction, PCA
+patterns are linear functions of the input data, which constrain the generality of patterns
+that the method can recover, particularly when the observations do not provide access to all
+states of the system (typically the case in neuroscience applications).
+
+Another class of techniques takes advantage of various wavelets (e.g., Hilbert-Huang,
+Morlet wavelets) to transform the signal into frequency domain (e.g., [11]) and select dom-
+inant modes. This approach allows researchers to move beyond the assumption that the
+signal is a sine wave. Yet, this too requires a prior choice of the wavelet transformation.
+Furthermore, additional tools are needed to allow for predictions regarding the behavior of
+the selected frequencies.
+
+g) Springer
+Data-driven Koopman operator approach for computational neuroscience 1157
+
+Another shortcoming of the above approaches is related to the character of electrophys-
+iological data. While EEG and ECoG records patterns that evolve in space and time, most
+available computational methods study temporal and spatial changes separately [6].
+
+Despite their shortcomings, these approaches have been widely used to study one of the
+central questions of contemporary neuroscience: What mechanisms underlie spatial and
+temporal coordination of neural activities across various brain areas and during different
+steps of cognitive processing? And while several models of spatiotemporal coordination
+were successfully developed [37], there is an urgent need for computational methods that
+overcome the shortcomings of standard analytical methods [6].
+
+Recent years have seen increased interest in analysis techniques treating the data as
+“observables” — functions of the state of the underlying dynamical system [49]. This allows
+researchers to combine ideas from the spectral theory of dynamical systems with modern
+machine learning approaches to construct algorithms for signal decomposition that make
+minimal ad hoc assumptions of the input data. They target dynamically intrinsic quantities,
+making minimal assumptions on the structure of the data.
+
+In this work, we introduce the applications of a data-driven approach that can success-
+fully remedy the above limitations. Specifically, we focus on a Koopman operator approach
+that: (1) is data-driven, and the extracted components are intrinsic to the underlying dynami-
+cal system; (2) does not require bandpass filtering; (3) captures high-dimensional data across
+both spatial and temporal domains; (4) provides means to visualize the spatial and tempo-
+ral coordination of neural activity; (5) decomposes complex dynamics into a hierarchy of
+periodic and quasi-periodic patterns even if the underlying dynamics is highly non-periodic.
+
+The plan of this paper is as follows: Section 2 begins with a description of Koopman oper-
+ator formalism and the rationale behind data-driven approximation of the eigenfunctions
+of Koopman operators using kernel methods for machine learning (Sections 2.2 and 2.3).
+Section 2.4 provides algorithms applied to reconstruct the spatiotemporal patterns of the
+Koopman eigenfunctions. Section 3 applies the Koopman operator approach to ECoG data
+and provides a description of the neural data (from a marmoset monkey) and the experimen-
+tal design. Section 4 lists the parameters used in the analyses (number of nearest neighbors,
+number of examined samples, kernel’s density distribution, etc.) and discusses the results
+for two of the decomposed patterns with frequency bands matching Beta and Gamma. This
+section also discusses potential limitations. Section 5 provides a short summary and briefly
+describes an extension of the current approach called vector-valued spectral analysis.
+
+2 Data-driven approach to computational neuroscience
+
+We apply a recently developed framework [15, 23, 24, 32] inspired from the operator-
+theoretic formulation of ergodic theory that addresses many of the limitations of PCA and
+related approaches outlined above. Instead of estimating a covariance operator, our approach
+is based on data-driven approximations of the Koopman operator: the fundamental operator
+governing the evolution of observables (functions of the state) of a dynamical system.
+
+It is aremarkable fact, realized in the work of Koopman in the 1930s [43], that the action
+of a general nonlinear dynamical system can be characterized without approximation by
+intrinsically linear operators acting on vector spaces of observables. These operators pro-
+vide a natural and theoretically rigorous framework for spectral decomposition and statisti-
+cal prediction in complex systems. In particular, the eigenfunctions of Koopman operators
+factor the dynamics, which may be chaotic, into periodic or quasi-periodic modes. These
+
+g) Springer
+1158 N. Marrouch et al.
+
+modes can be thought of as analogs of Fourier modes tailored to the dynamical system
+generating the data.
+
+While this operator-theoretic framework has long been known, it has only fairly recently
+been employed in data-driven approaches [16, 49]. A special feature of the techniques
+employed here is the use of kernel methods for machine learning [5, 10, 27] to approximate
+the eigenvalues and eigenfunctions of the Koopman operator with rigorous convergence
+properties and minimal assumptions on the system and measurement modality.
+
+Elsewhere [30, 59], we have applied this approach to identify a multi-scale hierarchy
+of modes of variability from sea surface temperature data in the Earth’s climate system,
+spanning months to decades. There are several important similarities between spatiotem-
+poral climatic data and multi-channel ECoG recording of brain potentials, including a
+two-dimensional surface for sampling the system, as well as meaningful signals that vary on
+multiple spatial and temporal scales. Here, we apply this approach and describe two of the
+extracted modes, previously shown to characterize neural responses to surprising sensory
+events [47, 48].
+
+2.1 Koopman operators formalism
+
+We approach the problem of extracting spatiotemporal patterns of neuronal dynamics from
+the point of view of the operator-theoretic formulation of ergodic theory [19]. In particular,
+we treat electrophysiologic data as observables of a skew-product dynamical system. By
+that, we mean that there is a dynamical system, with state space X and flow map ®! : X >
+X,t € R, driving another dynamical system on a state space Y. Here, (X, ©’) describes
+the evolution of the external stimuli, and Y is the state space for the brain. The dynamics of
+the latter are modeled via a map W' : X x Y + Y such that y, = W’(x, y) corresponds
+to the state of the brain at time f, given that at time 0 the external stimulus had the state
+x € X, and the brain the state y € Y. Note that in this representation the brain dynamics
+are manifestly non-autonomous since y; depends on both y and the state x of the driving
+system. On the other hand, the product dynamical system on M = X x Y is autonomous,
+and can be described by the evolution map 92' : M +> M, where
+
+Q" (x,y) = (B'(x), W(x, y)).
+
+The dynamical system (M, 92‘) is said to have a skew-product structure as component X
+affects the dynamical evolution of component Y, but Y does not influence X. In this descrip-
+tion, the ECoG signal h € R?@ recorded at d sensors on the marmoset cerebral cortex when
+the brain state is y € Y can be described via an observation function F : Y #% R?, such
+thath = F(y).
+
+Under mild assumptions on the state spaces X and Y, and the evolution maps ©’ and
+W', the product dynamical system (M, 2’) will possess ergodic invariant measures. That
+is, given a dynamical trajectory (x,, y,), where
+
+(Xn» Yn) = $2"* (x0, Yo) (1)
+
+is the state in M reached at time t, = nt for a fixed sampling interval t > O and initial
+conditions (x9, yo) € M, there exists a probability measure jz on M, invariant under the
+flow map 92’, such that for every jz-integrable function f : M + C, the time average fy =
+N7! yD f (Xn, Yn) converges almost surely to the expectation value f = f u J du. Note
+that the system can have multiple ergodic components, but data collected from a given
+experiment sample a specific ergodic component of the system.
+
+g) Springer
+Data-driven Koopman operator approach for computational neuroscience 1159
+
+Associated with the triplet (M, 2‘, jz) is a Hilbert space H = L?(M, 1) of square-
+integrable observables with respect to yz and a group of unitary Koopman operators U' :
+H +> H governing the evolution of observables under 2‘. That is, given f € H, g =
+U' f is defined as the observable satisfying g(x, y) = f(2'(x, y)) for j-almost every
+(x, y) € M. For our purposes, the space H will be the space of admissible temporal patterns
+generated by the marmoset neuronal dynamics. In particular, for every f € H, the mapping
+t +» U' f(x, y) defines a temporal pattern associated with a sampling along the dynamical
+trajectory starting at (x, y) € M. Our approach is to identify dynamically intrinsic temporal
+patterns through approximate eigenfunctions of the Koopman operator. This will lead to a
+decomposition of the observation map F into a corresponding set of spatiotemporal ECoG
+patterns.
+
+2.2 Koopman eigenfunctions
+
+Significant temporal modulation frequencies can be identified by computing the Koopman
+eigenfunctions of a dynamical system and this can provide a better representation of the sys-
+tem than standard approaches such as discrete Fourier transform and PCA. In the setting of
+interest here, an observable z; ¢ H is a Koopman eigenfunction if it satisfies the eigenvalue
+equation
+
+for all t € R. In the above, w; is a real-valued frequency associated with eigenfunc-
+tion z;. In particular, w; is real due to the fact the dynamics £2’ preserves the measure
+jt. A key property of Koopman eigenfunctions of measure-preserving systems is that,
+along a given dynamical orbit, they vary according to a multiplication by a periodic phase
+factor. Specifically, it is a direct consequence of (2) that for -a.e. point (x, y) € M,
+U'zj(x, y= zj(2" (x, y) = eli" z (x, y). This means that, whenever they exist, Koop-
+man eigenfunctions give rise to temporal patterns with a highly coherent and predictable
+temporal evolution, each recovering a timescale 27 /w; intrinsic to the dynamical system.
+This behavior is markedly different from that of the eigenfunctions of covariance operators
+approximated by PCA, which in general have no direct connection to the spectral properties
+of the dynamical system. In addition, compared to spectral estimation techniques based on
+the discrete Fourier transform, which require identification of the “true” frequency peaks
+from a set of candidate frequencies, an advantage of pattern extraction via (2) is that an esti-
+mate of the eigenfrequencies wj; is a direct output of the method. It can further be shown
+that (1) Koopman eigenfunctions corresponding to distinct eigenfrequencies are orthogonal
+on H (that is, (zi, Zj;)H = tu z;zj du = 6;;, where (-, -)7 denotes the Hilbert space inner
+product); (2) every Koopman eigenspace is one-dimensional; and (3) the spectrum {w;} of
+Koopman eigenfrequencies is countable.
+
+The closed span of all Koopman eigenfunctions identifies a subspace D = span{z;} ©
+H, invariant under U’, leading to an associated orthogonal decomposition H = D @ D+.
+Observables lying in D have an associated Koopman eigenfunction expansion, which can be
+thought of as a generalization of the Fourier transform of time-periodic signals. Specifically,
+every f € D admits the decomposition f = >° j fiz j» where f j = (z;, f)H are complex-
+valued expansion coefficients. Moreover, the dynamical evolution of f can be computed in
+closed form via
+
+U'f =o fjeliz;. (3)
+
+J
+
+g) Springer
+1160 N. Marrouch et al.
+
+It should be noted that the evolution of observables in the orthogonal subspace D+ cannot be
+determined on the basis of a countable set of eigenfrequencies as in (3). Instead, the action
+of Koopman operators on such observables can be determined via an expansion involving
+its continuous spectrum [49]. In general, systems encountered in real-world applications
+are of the mixed spectrum type, meaning that they exhibit both eigenvalues and continuous
+spectrum (i.e., D contains nontrivial observables, but it is a strict subspace of H). Due to
+their desirable temporal coherence and predictability properties, Koopman eigenfunctions
+and their corresponding eigenfrequencies are natural objects to identify for the purpose of
+analyzing complex systems.
+
+2.3 Data-driven approximations
+
+In order to compute solutions to the Koopman eigenvalue problem in (2), we first construct
+a data-driven basis of H using a class of kernel algorithms, called nonlinear Laplacian
+spectral analysis (NLSA), operating on delay-embedded data [26-28]. Selecting an integer
+parameter Q (the number of delays), we first define the augmented observation map Fg :
+M + R22, where
+
+Fo(x.y) = (FO), FW yee FOP y)), (4)
+
+and then define a kernel function kg : M x M +> R,, which provides a pairwise measure
+of similarity of points in M, based on the observation function Fg. For the purposes of this
+discussion, we consider a radial Gaussian kernel,
+
+| Fo(x, y) — Fo(x’, mr)
+€ 9
+
+ko((x, y), (x', y’)) = €xp (- (5)
+
+as a concrete example, but in practice we work with anisotropic Gaussian kernels [22,
+26-28] that also take into account time tendencies of the data. In the above, ¢€ is a
+positive bandwidth parameter controlling the rate of decay of the kernel, and ||-|| the
+canonical Euclidean norm on RY“. Given a finite dataset consisting of N + Q snapshots
+h_g+i,...,hn—1, with hy, = F (ay) taken at the dynamical states a, = (Xn, yn) from (1),
+the kernel values kg(am, dy) with m,n € {0,..., N — 1} can be empirically computed by
+first forming the delay-embedded data vectors hy,g = (hn, hn-1,.--,Mn—Q4i) € R22,
+
+and then evaluating kg(am, 4n) = en Wom—honll?/e, Using these pairwise kernel values, we
+then compute the Markov kernel
+
+Kko(am, Gn)
+lo,.n(4m)rQ,N (Gn)
+introduced in the diffusion maps algorithm [10], where rg,y and /g,y are normalization
+functions given by
+
+(6)
+
+Po,N(amn; an) =
+
+aie aia ko(am, An)
+ro,N(am) = y kg(@m,4n), lo,n(@n) = y olan) y
+n=0 n=0 n
+
+Note that pg,n has the Markov property, yD PO,N(4m,4n) = 1, by construction.
+We then form the N x N ergodic Markov matrix P9,v = [Po,n (Gm, Gn)], and compute its
+eigenvalues and eigenvectors,
+
+Po,nbj = Aj9j- (7)
+For po,n defined as in (6), the eigenvalues of Pg yn are real and thus lie in the inter-
+val [—1, 1] by Markovianity. By convention, we order the eigenvalues in decreasing order,
+
+g) Springer
+Data-driven Koopman operator approach for computational neuroscience 1161
+
+1 =p > Ay = Ad = ---. The eigenvector ¢p has all components equal to | by standard
+properties of Markov matrices. As is standard practice, we take advantage of the expo-
+nential decay of the Gaussian kernel to sparsify the matrix Pg y, retaining approximately
+knn < N nonzero entries per row based on the k-nearest neighborhood of the correspond-
+ing data point. This step significantly increases the scalability of the approach to large N,
+since apart from data with special structure, it would be difficult to carry out using kernels
+without a localizing behavior (e.g., covariance and polynomial kernels).
+
+Each eigenvector ¢; = ($0;,..., on-1,j)' e R% can be thought of as sampling a
+continuous function g; on M, such that 9; (Xn, Yn) = @nj. It can be shown that in the limit
+of large data, N — ov, these functions converge to eigenfunctions of a Markov operator
+Po: H +> H, where
+
+Pof = [ Pols (x, y)) Ff, y) du, y), (8)
+
+and pg is a Markov kernel defined analogously to pg,w in (6) [15]. Importantly, as Q
+increases, every eigenspace of Pg corresponding to nonzero eigenvalue converges to a
+finite union of Koopman spaces [15, 23]. This property makes the eigenfunctions produced
+by NLSA a highly efficient basis for solving the Koopman eigenvalue problem. Note that
+the ability of NLSA to approximate Koopman eigenspaces in the Q — oo limit does not
+depend on the kernel being Gaussian; it is, rather, a consequence of delay embedding that
+would also hold for other kernels, including covariance kernels constructed from delay-
+embedded data as in singular spectrum analysis (SSA) algorithms [34]. An advantage of
+the nonlinear Gaussian kernels over linear covariance kernels is that, in the former case, the
+subspace spanned by eigenfunctions corresponding to nonzero eigenvalues (which amounts
+to the subspace that can be consistently approximated from data) is infinite-dimensional,
+irrespective of Q being finite or infinite. On the other hand, in the latter case, the subspace
+is finite—dimensional (in effect, the Gaussian kernel can be viewed as an “infinite-degree”
+polynomial kernel). For our purposes, this means that Gaussian kernels can provide a richer
+set of basis functions to approximate the Koopman operator than covariance kernels.
+
+Following [15, 23, 32], we employ the data-driven basis {¢;} from NLSA to compute
+approximations Z; € CY’, and & j € C to the Koopman eigenfunctions z; and the corre-
+sponding eigenfrequencies w;, respectively, using a Galerkin method. See [25, Table 3] for
+pseudocode. In all cases, we order Koopman eigenfunctions in order of increasing Dirichlet
+energy: a non-negative quantity that intuitively measures their “roughness” as functions on
+M. The rationale for this ordering (which does not necessarily correspond to ordering with
+respect to frequency) is that the functions with low Dirichlet energy are more amenable to
+robust approximation from finite datasets, reducing the risk of sampling errors. Details on
+the Koopman Galerkin framework can be found in the references just cited. By virtue of the
+spectral convergence results on the (A;, ;) stated above, the solutions of this data-driven
+Galerkin method can be shown to converge to eigenfunctions of an approximate Koopman
+operator, with a small amount of diffusion added to render the Koopman spectrum discrete.
+An aspect of the present analysis, which has not been discussed in earlier introductions of
+the method (e.g., [23]), is that we consider a skew-product dynamical system appropriate for
+non-autonomous neuronal dynamics. The source code used here is available for download
+at the third author’s personal website (http://cims.nyu.edu/~dimitris), while pseudocode can
+be found in [23].
+
+g) Springer
+1162 N. Marrouch et al.
+
+2.4 Spatial and temporal reconstruction
+
+We now describe how the Koopman eigenfunctions z; can be used to decompose the
+observed ECoG signal hy, into coherent spatiotemporal patterns. The reconstruction method
+is similar to the procedure used in SSA [34] and NLSA [25-28].
+
+First, we compute the time-lagged projections of the observable F onto the Koopman
+eigenfunctions z;, given by
+
+N’-1
+
+1
+AWD) = a7 DL Znjhntas (9)
+n=0
+
+where N’ = min{N, N + q}, and Zn; is the n-th component of eigenvector z;. That is,
+A j(q) is an ECoG pattern in R? approximating the projection of F, shifted by g sampling
+time intervals, onto Koopman eigenfunction z;. In the Koopman operator literature, A ; (0)
+is referred to as the Koopman mode associated with the observable F' [7, 49], though note
+that here we will use A ;(q) with several values of g to perform reconstruction. In partic-
+ular, following [25—28, 34], we define the spatiotemporal pattern associated with the pair
+(z;, A;) as the function Fj : M t> IR? such that
+
+Q-1
+1
+Fj (an) = O > A j(—Q)in+q,j- (10)
+q=0
+
+For eigenfunctions forming complex-conjugate pairs (z;, z;) (which is is usually the case),
+we compute the sum F; + Fj. The latter is real since the observation map F is real.
+
+3 Extracting time-seperable patterns from ECoG data
+3.1 Mismatch negativity
+
+Mismatch negativity (MMN) is a drop in the recorded potential observed when a change
+in the external environment takes place. Some examples of such changes are the duration
+of, or time between, sounds in the surroundings [21, 51, 52]. To better explain the external
+conditions, let us consider an example of an animal listening to short tones occurring every
+40 seconds. In this example, we would expect to observe MMN in the case when the tone
+unexpectedly appears after only 20 seconds. MMN is characterized by a strengthening of
+the negative peak following the deviation from the preceding sequence [1]. Depending on
+the animal, following the deviant stimuli, the wave of MMN peaks anywhere between 30
+ms (e.g., in rodents [54]) to 250 ms (in humans) [1, 14, 39, 42, 62].
+
+While MMN is one of the best described neural markers of unexpected stimuli and changes
+in the environment [35], explanations for the mechanisms driving it can differ drastically
+[46, 62]. This lack of agreement might be driven by the variety of brain areas contributing
+to MMN, among them the auditory cortex (AUD) [1, 50], the frontal cortex [1, 45], and the
+dorsolateral prefrontal cortex [2, 45]. Furthermore, numerous studies suggest a significant
+temporal breadth of MMN sub-components that appear in different stages of MMN [1, 33].
+Though MMN measures can indicate normal attentional states, there is growing apprecia-
+tion for the use of MMN to identify endophenotypes for neurological disorders, including
+psychiatric conditions [53, 56]. For example, MMN anomalies have been observed among
+individuals with schizophrenia [40, 41, 56], as well as sleep-deprived individuals [36].
+
+g) Springer
+Data-driven Koopman operator approach for computational neuroscience 1163
+
+Fig.1 Locations of 32
+endocortical electrodes mapped
+onto the left hemisphere of a
+template marmoset brain. The
+figure is a reconstruction of
+ECoG electrode positions
+described in [42]
+
+ 
+
+3.2 Data description
+
+To test the applicability of the Koopman operator approach described in Section 2 for neu-
+ral data, we used a subset of ECoG data from an experiment designed to evoke MMN in
+marmoset monkeys through changes in the frequency of sound waves. Data were obtained
+from http://neurotycho.org/. This open-source database contains recordings from a study
+designed and conducted by Komatsu, Takaura, and Fujii [42] for one of two subjects in
+the experiment. Along with ECoG recordings, the authors provide sound stimulus param-
+eters, and other necessary information to replicate their analysis (we refer readers to [42]
+for a more detailed description of the study’s design and data acquisition protocol). ECoG
+data consist of recordings from 32 electrodes placed across the monkey’s left hemisphere
+(Fig. 1) with a sampling rate of 1000 Hz. The total duration of the experiment was 15 min-
+utes. During this period, the subject was passively listening to trains of tones. Each tone
+lasted for 64 ms. The time between tones was constant (439 ms), so each interval lasted
+for 503 ms. In total, the subject was exposed to 240 sound trains. Each train consisted of
+repetitions of the same tone. The trains differed in tones’ frequency (from 250 Hz to 6727
+Hz) and the number of times the tone was repeated (3, 5, or 11). Consistent with [42], we
+considered the first tone “deviant” and the last tone “standard”. To validate the Koopman
+operator framework, we replicated and described findings presented by Komatsu and col-
+leagues [42] in [47]. In this paper, consistent with past research highlighting the importance
+of both Beta and Gamma frequency oscillations in response to unexpected auditory stimuli
+[37], we extend our earlier work [47] describing two of the extracted modes that fall in the
+Beta and Gamma frequency range.
+
+4 Results
+
+4.1 Default setup and robustness of results
+
+Here, we examine 45,266 samples (f9 = 147,359 ms to t) = 192,625 ms) that include 13
+trains with a sampling rate of 500 Hz. This dataset contains a total of 89 tones with tonal
+frequency ranging form 250 Hz to 4000 Hz. Similarly to [47], this selection is arbitrary but
+
+allows us to obtain a balance between a sufficient number of samples and computational
+cost related to subsequent analysis.
+
+g) Springer
+1164 N. Marrouch et al.
+
+We computed Koopman eigenfunctions as described in Section 2 using the anisotropic
+Gaussian kernels introduced in NLSA and the family of cone kernels introduced in [22].
+Ultimately, we found our results to be robust against the type of kernel employed. However,
+we Selected the NLSA kernel as our primary focus here to evaluate faster (1.e., corresponding
+to MMN duration) dynamics. The choice of the NLSA kernel bandwidth parameter was
+€ = 25, and the k-nearest neighborhood for each data point has a size of kpp = 5000. The
+specific value of € is rather large versus other applications [30, 59], and the possible reason
+is the more intermittent character of the ECoG signal as compared to fluid flows. These,
+in turn, can be related to under-sampling of the MMN signal over the analyzed period of
+the experiment. The same logic applies to a small number of nearest neighbors. For large-
+enough € and small-enough kpn, however, the results presented here seem to sample the
+local neighborhood robustly and sufficiently when it comes to extraction of modes needed
+to capture response to deviant sound.
+
+A range of tests led us to conclude that 250 time-steps (equal to 500 ms) is an appropriate
+choice for the embedding window given the short timescale of the modes of interest (tens of
+milliseconds). An insufficiently large embedding window does not allow clear separation
+of different frequencies, as expected theoretically, while an overly long embedding window
+introduces low-frequency modes (not of interest here, thus not displayed). Long embedding
+windows also split high-frequency modes, introducing redundancy (given the purpose of
+our study). As such, we show that a theoretically meaningful response to “deviant” sounds
+appears robust within a suitable range of the embedding window (see Figs. 2 and 3).
+
+4.2 Temporal coordinates
+
+Figure 2 displays three representative Koopman eigenfunctions and their corresponding fre-
+quency spectra. These modes emerge among the dominant ones (in the sense of having
+small Dirichlet energy; see Section 2.3) in the hierarchy of modes retrieved by Koopman
+analysis; specifically, they correspond to the complex—conjugate pairs {zs5, z6}, {z9, Z1o},
+and {z13, z14} (henceforth abbreviated z5 6, Z9,10, and z13,14, respectively). These response
+frequencies correspond to the Beta band in several primate species including the marmoset
+[8, 37, 61]. Our result thus confirms prior studies that find a change in Beta frequency asso-
+ciated with sound deviants or natural dynamically modulated sounds [8, 37]. However, here
+
+Temporal patterns Frequency spectrum
+
+2
+
+9|
+
+O | HHH
+
+-2 |
+
+5 10°
+soni sia
+
+2p 10°
+ty t :
+
+ 
+ 
+
+i | Po
+" ! | Y43
+
+      
+  
+
+| a ‘ iy va I
+|
+
+il
+|
+
+ 
+   
+
+  
+
+Amplitude [pVolts]
+Power spectral density [arbitrary units]
+
+10! 10
+Time [ms] v [Hz]
+
+Fig.2 Real part (left) and its frequency spectrum (right) for Koopman eigenfunctions z5 6 (blue), z9,10 (red),
+and Z12,13 (green)
+
+g) Springer
+Data-driven Koopman operator approach for computational neuroscience 1165
+
+we identify multiple peaks within the Beta range without having to select an arbitrarily
+defined range of modulation frequencies. Among the pairs z5 6, Z9,10, and z12,13 examined
+here, eigenfunction pair zs5,6 is the most periodic in nature, exhibiting a prominent 13 Hz
+(77 rad/s) spectral peak. Eigenfunctions z9,19 and z12,13 have frequency peaks at 10 Hz and
+16 Hz, respectively. Their temporal patterns are more irregular and have a less prominent
+low-frequency envelope. Such decomposition of complex signals into periodic and irregu-
+lar patterns has been observed in the case of other dynamical systems [57-59], but it can be
+achieved with sufficiently long embedding windows (this is also true for traditional methods
+such as SSA).
+
+In [42], the differences between evoked-response potentials following the last and first
+tone of each train were averaged across all trains for each electrode, and the differences
+in averages were tested for statistical significance. Figure 3 depicts reconstructed patterns
+attained via the Koopman operator approach, aligned similarly for electrode 25 that cor-
+responds to the primary auditory cortex, Al, according to [42]. The extracted pattern was
+averaged for 13 consecutive onsets of deviant tones and 13 preceding standard tones. The
+figure shows the reconstructed signal for electrode 25 obtained via the procedure described
+in Section 2.4 using eigenfunctions Z5 6, Z9,10, and z13,14. To extract an average response
+to deviant sound, the reconstructions are averaged over the 13 response trials analyzed
+here. The average corresponds to the more periodic conjugate pair of the temporal pattern
+z5,6 after subtracting the overlap with the more chaotic z9,19 and z12,13. It is worth noting
+that this projection captures amplification of the signal shortly after the appearance of the
+“deviant” sound. In particular, a large positive peak is observed at approximately 10 ms
+followed by a large negative peak at 25-50 ms. A second large negative peak is observed
+around 125 ms after the “deviant” sound, and a third follows at approximately 200 ms. The
+
+100 477
+
+T
+
+a) emb = 400 ms |
+
+   
+
+Amplitude [pVolts]
+oO
+I
+
+ 
+
+ 
+
+Ay Nh Ca Abia! AC 1B) erb\=,50b/ims' |
+
+{|
+
+-600 -400 -200 0 200 400 600 800
+
+Time preceeding the onset of deviant sound [ms] Onset of Deviant Sound Time following the onset of deviant sound [ms]
+
+Fig.3 High-amplitude, short-latency oscillations following onset of the deviant sound in the auditory cortex
+for two embedding (emb) time windows. Composite of response to three consecutive sound onsets recon-
+structed for a single electrode in the auditory cortex (number 25) using selected Koopman eigenfunctions
+extracted with 400 ms (a) and 500 ms (b) embedding windows. Dashed lines depict responses to repeated
+trials of deviant sound presentation (NV = 13), and the solid black line depicts the mean response over all 13
+trials. Horizontal axis: zero corresponds to the time of deviant sound onset (marked with solid blue vertical
+line). Solid grey vertical lines depict the time for sound onsets prior to the deviant (—503 ms) and after the
+deviant (503 ms). Vertical axis: amplitude of the signal in jzvolts
+
+g) Springer
+1166 N. Marrouch et al.
+
+ 
+
+Fig. 4 Spatiotemporal composite of response to “deviant” signal reconstructed using selected Koopman
+eigenfunctions extracted with a 500 ms embedding window. a At 10 ms, positive valence peaks in the auditory
+(Aud) and parietal (Par) cortices follow the deviant sound onset. b At 28 ms, there is subsequent develop-
+ment of negative valence peaks in the auditory cortex near electrode 24 and in the frontal (Fr) cortex near
+electrode 14. c At 30 ms, the negative valence signal strengthens and expands in the core and surrounding
+auditory cortex (electrodes 22-29), and the negative signal travels towards the parietal cortex (electrode 1).
+d At 50 ms, the negative valence signal in the parietal cortex is enhanced and propagates from electrode 1| to
+the rest of the brain. e Then at 92 ms, a second pair of high-amplitude, positive valence peaks appears in about
+the same positions as seen for 10 ms. f A second negative valence peak follows at approximately 130 ms
+
+temporal dynamic of the mode suggests distinct onset and terminating responses follow-
+ing deviant sound onset that matches well with the dynamics observed in core or primary
+auditory cortices in other studies [20, 38, 44, 55]. The reader should also notice that all
+signs, amplitudes, and time relative to the signal onset of the deviant match well with those
+depicted in Fig. 2 of [42]. Subsequent negative and positive events are followed by the
+particular signal weakening (with slight strengthening observed at t = 503 ms), which
+corresponds to the standard tone occurrence (Fig. 3, grey line, 503 ms).
+
+To summarize, we observe that spatiotemporal reduction of a multidimensional signal
+into three coordinates derived from approximate Koopman eigenfunctions permits recon-
+struction of an intermittent neural response and its temporal emergence following the
+deviant signal (Fig. 4).
+
+4.3 Statistical tests
+
+We tested statistical significance for 12 electrodes identified by the authors of the exper-
+iment [42] following the guidelines for the extracted mode. Specifically, we tested the
+average difference between ERPs of the standard and deviant stimuli following the onset of
+the tone, adjusting p-values with the false discovery rate (FDR) and using Wilcox ranked
+sum tests. The results replicate the findings presented in Fig. 3a of [42]. Notably, the p-
+values presented in Table | are smaller than the p-values in [42]. This reduction in the
+probability of type I error is most likely driven by the reduction in the error term when
+comparing amplitude differences of a single decomposed frequency.
+
+g) Springer
+Data-driven Koopman operator approach for computational neuroscience 1167
+
+Table 1 Wilcox rank sum test: p-values
+
+Cortex Area Komatsu et al., 2015 [42] Current Results
+
+Frontal <.1;<.l 1.1 x 1077; .01
+
+Temporal < .05; < .05; < .05; < .05 1.3 x 10713: 2.2 x 107! 7.7 x 10719: 8.5 x 107}3
+Parietal <.1l3<.1;<.1 6.4 x 1078: 1 x 10719: 34
+
+Occipital < 05; < 1; <.1 2.2 x 10716: 2.2 x 107!6: 9.5 x 1079
+
+As mentioned above, another challenge in analyzing EEG and ECoG data is the limita-
+tion faced by variance-based approaches (e.g., PCA) when capturing low-amplitude signals.
+These approaches often fail to adequately collect such low-amplitude components in the
+presence of a strong signal that accounts for a large amount of variance in the observed
+data [4]. This limitation is particularly problematic when studying high-frequency, low-
+amplitude oscillations, such as Gamma signals. We previously found that the data-driven
+Koopman operator approach is a robust tool for identifying low-amplitude events that are
+masked by larger-amplitude events [27, 48]. Here, to further evaluate the usefulness of this
+approach for analysis of neural data, we examine sound evoked activity in the Gamma
+frequency band, which typically has low amplitude.
+
+It has been established that Gamma is another frequency band that oscillates in response
+to an unexpected auditory stimulus [18, 37]. Synchronous cortical activity in higher-
+frequency bands like Gamma can be driven by a single sensory modality and are restricted
+spatially to a single cortical area and temporally to short periods of time [60]. These prop-
+erties make it difficult to localize Gamma related activity. In contrast, synchronous cortical
+activity within slower frequency bands can be driven by multiple sensory modalities, is
+observed over a large spatial area (1.e., multiple cortical fields) and lasts for a longer period
+of time [18, 60].
+
+Here, we illustrate the time evolution of a Koopman eigenfunction pair Z141,142 and its
+frequency spectrum (Fig. 5). Note that this mode has a higher frequency (50 Hz) than the
+Beta band activity associated with the lower-frequency Beta modes (Fig. 2, 25.6, Z9,10, and
+213,14).
+
+As per [61], we expected the spatiotemporal dynamics of the reconstructed signal for
+Z141,142 to be localized. That is, a plot of the signal displayed over the electrodes matrix
+should exhibit more diversity in space than slower frequencies (e.g., Beta shown in Fig. 4).
+Indeed, as shown in Fig. 6, the reconstructed signal often exhibits positive amplitudes in
+some areas of the cortex while exhibiting negative amplitudes in others. Additionally, the
+low amplitude of the signal aligns our results with the predictions based on the existing
+body of scientific literature.
+
+In this work we did not cross-validate the approach with PCA or wavelet analysis meth-
+ods as applied in neuroscience [17]. A more extensive exploration of the Koopman operator
+approach to ECoG data could benefit from cross-validating the results with other methods
+(e.g. wavelet analysis) and larger datasets. We thus recommend caution when approaching
+the results of the statistical tests summarized in Table |. Here we have applied the method
+to data collected from a single marmoset over a subset of trials. And while the significance
+testing (Table 1) confirms that reported in [42] over a larger number of trials for the same
+subject, a dataset from a single subject carries a higher risk of false positives and limitations
+to external validity of the findings.
+
+g) Springer
+1168 N. Marrouch et al.
+
+Temporal patterns
+
+ 
+
+T r T r T r r T
+
+Amplitude [pVolts]
+
+ 
+
+ 
+
+1 4 4 4 4 1 4 1 4 1 1
+ty Time [ms] t,
+Frequency spectrum
+
+ 
+
+ 
+
+ 
+
+ 
+
+Power spectral density [arbitrary units]
+
+v [Hz]
+
+Fig.5 Real part (top) and its frequency spectrum for Koopman eigenfunction z141,142
+
+ 
+
+Fig.6 Spatiotemporal response to “deviant” signal reconstructed using Koopman eigenfunction pair z141, 142
+extracted with a 500 ms embedding window. (a) At 10 ms, positive valence is apparent in the parietal (Par)
+and frontal (Fr) cortices following the deviant sound onset while a negative jitter peaks in the occipital area
+(electrode 21) and propagates toward the lower parts of the temporal lobe. (b) At 28 ms, the positively
+valenced component emerges in the temporal lobe, as the frontal cortex maintains the positive amplitude
+while the parietal lobe switches its amplitude sign. (c) At 30 ms, both positive and negative valence signals
+strengthen and expand, but a negative wave propagates to encompass the parietal cortex. (d) At 40 ms, we
+can see a further anterior shift of the negative valence signal and a strengthening of its amplitude in the
+parietal cortex, but not the auditory cortex. Here, we observe a positive jitter that peaks in the lower area of
+the occipital cortex. (e) At 92 ms, the signal’s directions switch: the parietal and frontal lobes exhibit positive
+amplitude while the auditory and occipital cortices exhibit negative amplitudes. (f) Strong positive (parietal
+area) and negative (frontal and parietal areas) peaks follow at approximately 130 ms
+
+g) Springer
+Data-driven Koopman operator approach for computational neuroscience 1169
+
+5 Summary
+
+In this paper, we have demonstrated the feasibility of using a data-driven Koopman operator
+approach, implemented with kernel methods from machine learning (NLSA), in neuro-
+science to quantify spatial and temporal changes in cortical potentials in response to
+time-and-tone varying oddball sound sequences. Our study replicates results reported pre-
+viously for the same cortical recordings [42] and uses the same traditional method of
+evoked potential averaging and significance testing to cross-validate sound-evoked effects
+on frequency bands isolated with NLSA and the Koopman operator.
+
+Our results suggest that MMN can be captured by a reduced number of coordinates (tem-
+poral modes) derived from the eigenfunctions of an operator governing the evolution of
+observables under neuronal dynamics. These patterns describe brain dynamic shifts between
+quasiperiodic and nonperiodic regimes operating over a wide range of the frequency spec-
+trum and can be operationally employed for predictive purposes [57]. Such intermittent
+dynamics are known to be poorly captured by Fourier methods and are better handled with
+wavelet transforms [11, 12]. It is worth highlighting that the current approach can separate
+temporally coherent, and dynamically meaningful, frequency components with complex
+wave forms (also of potentially low mean amplitude) from high-dimensional time series.
+A recent extension of the method, called vector-valued spectral analysis [29, 31, 58], does
+not impose any spatiotemporal separability, which could allow for further refinement of the
+current approach.
+
+In conclusion, the consistency between the current results and past research shows the
+capability of the data-driven Koopman operator approach to analyze neuroscientific data. In
+particular, the successful signal decomposition demonstrated here can help address several
+questions related to the underlying nonlinear dynamics and the puzzling statistics associ-
+ated with them (asymmetry and skewness of dominant modes [30]). For example, using
+the remaining variance after subtracting the overlap with the more chaotic Koopman eigen-
+functions z9,19, and z13,14, we may now extract orthogonal modes that may be a part of an
+overarching dynamics, even if their frequency spectra lie in very close proximity. Further-
+more, the results suggest new biological dynamics associated with MMN response in two
+frequency bands.
+
+Acknowledgements The authors would like to thank Ian Stevenson, Stephen Herzog, and the journal edi-
+torial team and reviewers for their helpful comments. Misako Komatsu, Kana Takura, and Naotaka Fujii from
+the RIKEN Brain Science Institute generously provided the open-access data used in this article. HLR has
+ownership interest in Elemind Technologies, Inc.
+
+Open Access This article is distributed under the terms of the Creative Commons Attribution 4.0 Inter-
+national License (http://creativecommons.org/licenses/by/4.0/), which permits unrestricted use, distribution,
+and reproduction in any medium, provided you give appropriate credit to the original author(s) and the source,
+provide a link to the Creative Commons license, and indicate if changes were made.
+
+References
+
+1. Alho, K.: Cerebral generators of mismatch negativity (MMN) and its magnetic counterpart (MMNm)
+elicited by sound changes. Ear Hear. 16(1), 38-51 (1995)
+
+2. Alho, K., Woods, D.L., Algazi, A., Knight, R.T., Naatanen, R.: Lesions of frontal cortex diminish the
+auditory mismatch negativity. Electroencephalogr. Clin. Neurophysiol. 91(5), 353-362 (1994). https://
+doi.org/10.1016/0013-4694(94)00173-1
+
+g) Springer
+1170 N. Marrouch et al.
+
+10.
+
+11.
+
+12.
+
+13.
+
+14.
+
+15.
+
+16.
+
+17.
+18.
+
+19.
+
+20.
+
+21.
+
+22.
+
+23.
+
+24.
+
+25.
+
+. Aru, J., Aru, J., Priesemann, V., Wibral, M., Lana, L., Pipa, G., Singer, W., Vicente, R.: Untangling cross-
+
+frequency coupling in neuroscience. Curr. Opin. Neurobiol. 31, 51-61 (2015). https://doi.org/10.1016/
+j.conb.2014.08.002
+
+. Aubry, N., Guyonnet, R., Lima, R.: Spatiotemporal analysis of complex signals: Theory and applica-
+
+tions. J. Stat. Phys. 64, 683-739 (1991). https://doi.org/10.1007/bf010483 12
+
+. Belkin, M., Niyogi, P.: Laplacian Eigenmaps for dimensionality reduction and data representation.
+
+Neural Comput. 15, 1373-1396 (2003). https://doi.org/10.1162/08997660332 1780317
+
+. Brunton, B.W., Johnson, L.A., Ojemann, J.G., Kutz, J.N.: Extracting spatial-temporal coherent patterns
+
+in large-scale neural recordings using dynamic mode decomposition. J. Neurosci. Methods 258, 1—15
+(2016). https://doi.org/10.1016/j.jneumeth.2015.10.010
+
+. Budisi¢é, M., Mohr, R., Mezi¢, I.: Applied Koopmanism. Chaos 22, 047510 (2012). https://doi.org/
+
+10.1063/1.4772195
+
+. Chandrasekaran, C., Turesson, H.K., Brown, C.H., Ghazanfar, A.A.: The Influence of Natural Scene
+
+Dynamics on Auditory Cortical Activity. J. Neurosci. 30(42), 13919-13931 (2010). https://doi.org/
+10.1523/JNEUROSCI.3174-10.2010
+
+. Coenen, A., Fine, E., Zayachkivska, O.A.: Beck: A forgotten pioneer in electroencephalography. Journal
+
+of the History of the Neurosciences: Basic and Clinical Perspectives 23(3), 276-286 (2014)
+
+Coifman, R.R., Lafon, S.: Diffusion maps. Appl. Comput. Harmon. Anal. 21, 5—30 (2006). https://doi.org/
+10.1016/j.acha.2006.04.006
+
+Cong, F., Kalyakin, I., Li, H., Huttunen-Scott, T., Huang, Y., Lyytinen, H., Ristaniemi, T.: Answering
+six questions in extracting children’s mismatch negativity through combining wavelet decomposition
+and independent component analysis. Cogn. Neurodyn. 5(4), 343-359 (2011). https://doi.org/10.1007/
+s11571-011-9161-1
+
+Cong, F.,, Sipola, T., Huttunen-Scott, T., Xu, X., Ristaniemi, T., Lyytinen, H.: Hilbert-Huang versus
+Morlet wavelet transformation on mismatch negativity of children in uninterrupted sound paradigm.
+Nonlinear Biomedical Physics 3(1) (2009). https://doi.org/10.1186/1753-463 1-3-1
+
+Corlett, P.R., Marrouch, N.: Social cognitive neuroscience of attitudes and beliefs. In: Albarracin, D.,
+Johnson, B.T. (eds.) Handbook of Attitudes and Attitude Change, vol. 1, pp. 480-519. Taylor & Francis,
+New York (2018)
+
+Csépe, V., Karmos, G., Molnar, M.: Evoked potential correlates of stimulus deviance during wakefulness
+and sleep in cat — animal model of mismatch negativity. Electroencephalogr. Clin. Neurophysiol. 66,
+571-578 (1987). https://doi.org/10.1016/0013-4694(87)90103-9
+
+Das, S., Giannakis, D.: Delay-coordinate maps and the spectra of Koopman operators. J. Stati. Phy.
+14(6), 1107-1145 (2019). https://doi.org/10.1007/s10955-019-02272-w
+
+Dellnitz, M., Junge, O.: On the Approximation of Complicated Dynamical Behavior. SIAM J. Numer.
+Anal. 36, 491 (1999). https://doi.org/10.1137/S00361429963 13002
+
+van Drongelen, W.: Signal processing for neuroscientists. Elsevier, Amsterdam (2007)
+
+Durschmid, S., Edwards, E., Reichert, C., Dewar, C., Hinrichs, H., Heinze, H.-J., Kirsch, H.E., Dalal,
+S.S., Deouell, L.Y., Knight, R.T.: Hierarchy of prediction errors for auditory events in human tem-
+poral and frontal cortex. Proc. Natl. Acad. Sci. 113, 6755-6760 (2016). https://doi.org/10.1073/pnas.
+1525030113
+
+Eisner, T., Farkas, B., Haase, M., Nagel, R.: Operator Theoretic Aspects of Ergodic Theory. Graduate
+Texts in Mathematics, vol. 272. Springer, Berlin (2015)
+
+Escabi, M.A., Read, H.L., Viventi, J., Kim, D.-H., Higgins, N.C., Storace, D.A., Liu, A.S.K., Gifford,
+A.M., Burke, J.A., Campisi, M., Kim, Y.-S., Avrin, A.E., Van der Spiegel, J., Huang, Y., Li, M., Wu, J.,
+Rogers, J.A., Litt, B., Cohen, Y.E.: A high-density, high-channel count, multiplexed jZECoG array for
+auditory cortex. J Neurophysiol 112, 1566-1583 (2014). https://doi.org/10.1152/jn.00179.2013
+
+Ford, J.M., Hillpard, S.A.: Event—related potentials (ERPs) to Interruptions of a Steady Rhythm.
+Psychophysiology 18(3), 322-330 (1981). https://doi.org/10.1111/j.1469-8986.198 1 .tb03043.x
+Giannakis, D.: Dynamics-adapted cone kernels. SIAM J. Appl. Dyn. Sys. 14(2), 556-608 (2015).
+https://do1.org/10.1137/140954544
+
+Giannakis, D.: Data-driven spectral decomposition and forecasting of ergodic dynamical systems. Appl.
+Comut. Harmon. Anal 47(2), 338-396 (2019). https://doi.org/10.1016/j.acha.2017.09.001
+
+Giannakis, D., Das, S.: Extraction and prediction of coherent patterns in incompressible flows through
+space-time Koopman analysis. Phys. D. In revision. arXiv:1706.06450 (2017)
+
+Giannakis, D., Kolchinskaya, A., Krasnov, D., Schumacher, J.: Koopman analysis of the long-term
+evolution in a turbulent convection cell. J. Fluid Mech. 847, 735-767 (2018). https://doi.org/10.1017/
+jfm.2018.297
+
+ 
+
+g) Springer
+Data-driven Koopman operator approach for computational neuroscience 1171
+
+26.
+
+27.
+
+28.
+
+29.
+
+30.
+
+31.
+
+32.
+
+33.
+
+34.
+
+35.
+
+36.
+
+37.
+
+38.
+
+39.
+
+40.
+
+4].
+
+42.
+
+43.
+
+44.
+
+45.
+
+46.
+
+Giannakis, D., Majda, A.J.: Time series reconstruction via machine learning: Revealing Decadal vari-
+ability and intermittency in the North Pacific sector of a coupled climate model. In: Conference on
+Intelligent Data Understanding Proceedings, Mountain View, California (2011)
+
+Giannakis, D., Majda, A.J.: Nonlinear Laplacian Spectral Analysis for Time Series with Intermit-
+tency and Low-Frequency Variability. Proc. Natl. Acad. Sci. 109(7), 2222-2227 (2012). https://doi.org/
+10.1073/pnas.1118984109
+
+Giannakis, D., Majda, A.J.: Nonlinear laplacian spectral analysis: capturing intermittent and low-
+frequency spatiotemporal patterns in high-dimensional data. Stat. Anal. Data Min. 6(3), 180-194 (2013).
+https://doi.org/10.1002/sam.11171
+
+Giannakis, D., Ourmazd, A., Slawinska, J., Zhao, Z.: Spatiotemporal pattern extraction by spec-
+tral analysis of vector-valued observables. J. Nonlinear Sci., 1-61 (2019). https://doi.org/10.1007/
+s00332-019-09548-1
+
+Giannakis, D., Slawinska, J.: Indo-pacific variability on seasonal to multidecadal time scales. Part II:
+Multiscale Atmosphere-Ocean Linkages. J. Climate 31, 693-725 (2018). https://doi.org/JCLI-D-17-
+0031.1
+
+Giannakis, D., Slawinska, J., Ourmazd, A., Zhao, Z.: Vector-valued spectral analysis of space-time data.
+In: Proceedings of the Time Series Workshop, Neural Information Processing Systems Conference, Long
+Beach, California (2017)
+
+Giannakis, D., Slawinska, J., Zhao, Z.: Spatiotemporal feature extraction with data-driven Koopman
+operators. J. Mach. Learn. Res. Proceedings 44, 103-115 (2015)
+
+Giard, M.H., Perrin, F., Pernier, J., Bouchet, P.: Brain generators implicated in the processing of audi-
+tory stimulus deviance: A topographic event-related potential study. Psychophysiology 27(6), 627-640
+(1990). https://doi.org/10.1111/).1469-8986.1990.tb03184.x
+
+Ghil, M., et al.: Advanced spectral methods for climatic time series. Rev. Geophys. 40(1), 1003 (2002).
+https://doi.org/10.1029/2000RG000092
+
+Grimm, S., Escera, C., Nelken, I.: Early indices of deviance detection in humans and animal models.
+Biol. Psychol. 116, 23-27 (2016). https://doi.org/10.1016/j.biopsycho.2015.11.017
+
+Gumenyuk, V., Roth, T., Korzyukov, O., Jefferson, C., Kick, A., Spear, L., Tepley, N., Drake, C.L.: Shift
+work sleep disorder is associated with an attenuated brain response of sensory memory and an increased
+brain response to novelty: An ERP study. Sleep 33(5), 703-713 (2010)
+
+Haenschel, C., Baldeweg, T., Croft, R.J., Whittington, M., Gruzelier, J.: Gamma and beta frequency
+oscillations in response to novel auditory stimuli: A comparison of human electroencephalogram (EEG)
+data with in vitro models. Proc. Natl. Acad. Sci. 97(13), 7645—7650 (2000). https://doi.org/10.1073/
+pnas.120162397
+
+Hamilton, L.S., Edwards, E., Chang, E.F.: Parallel streams define the temporal dynamics of speech
+processing across human auditory cortex. bioRxiv 097485 (2017). https://doi.org/10.1101/097485
+Harms, L., Michie, P.T., Naatanen, R.: Criteria for determining whether mismatch responses exist in
+animal models: Focus on rodents. Biol. Psychol. 116, 28-35 (2016). https://doi.org/10.1016/j.biopsycho.
+2015.07.006
+
+Javitt, D.C.: Intracortical Mechanisms of Mismatch Negativity Dysfunction in Schizophrenia. Audiol.
+Neurotol. 5, 207-215 (2000). https://doi.org/10.1159/000013882
+
+Javitt, D.C., Grochowski, S., Shelley, A.M., Ritter, W.: Impaired mismatch negativity (MMN) generation
+in schizophrenia as a function of stimulus deviance, probability, and interstimulus/interdeviant inter-
+val. Electroencephalogr. Clin. Neurophysiol. 108(2), 143-153 (1998). https://doi.org/10.1016/s0168-
+5597(97)00073-7
+
+Komatsu, M., Takaura, K., Fujii, N.: Mismatch negativity in common marmosets: Whole-cortical
+recordings with multi-channel electrocorticograms. Sci. Rep. 5, 1005 (2017). https://doi.org/10.1038/
+srep15006
+
+Koopman, B.O.: Hamiltonian systems and transformation in Hilbert space. Proc. Natl. Acad. Sci. 17(5),
+315-318 (1931)
+
+Lee, C.M., Osman, A.F., Volgushev, M., Escabi, M.A., Read, H.L.: Neural spike-timing patterns vary
+with sound shape and periodicity in three auditory cortical fields. J Neurophysiol 115, 1886-1904 (2016).
+https://doi.org/10.1152/jn.00784.2015
+
+MacLean, S.E., Ward, L.M.: Temporo-frontal phase synchronization supports hierarchical network for
+mismatch negativity. Clin. Neurophysiol. 125(8), 1604-1617 (2014). https://doi.org/10.1016/j.clinph.
+2013.12.109
+
+May, PJ.C., Tiitinen, H.: Mismatch negativity (MMN): The deviance-elicited auditory deflection
+explained. Psychophysiology 47(1), 66-122 (2010). https://doi.org/10.1111/).1469-8986.2009.00856.x
+
+g) Springer
+1172 N. Marrouch et al.
+
+47.
+
+48.
+
+49,
+
+50.
+
+51.
+
+52.
+
+53.
+
+54.
+
+55.
+
+56.
+
+57.
+
+58.
+
+59.
+
+60.
+
+61.
+
+62.
+
+63.
+
+Marrouch, N., Read, H.L., Slawinska, J., Giannakis, D.: Data-driven spectral decomposition of ECoG
+signal from an auditory oddball experiment in a marmoset monkey: implications for EEG data in humans.
+International Joint Conference on Neural Networks, 2161-4407 (2018)
+
+Meindertsma, T., Kloosterman, N.A., Engel, A.K., Wagenmakers, E.J., Donner, T.H.: Surprise About
+Sensory Event Timing Drives Cortical Transients in the Beta Frequency Band. J. Neurosci. 38(35), 7600—
+7610 (2018). https://doi.org/10.1523/JNEUROSCI.0307-18.2018
+
+Mezi¢, I.: Spectral properties of dynamical systems, model reduction and decompositions. Nonlinear
+Dyn. 41, 309-325 (2005). https://doi.org/10.1007/s11071-005-2824-x
+
+Michie, P.T., Malmierca, M.S., Harms, L., Todd, J.: Understanding the neurobiology of MMN and
+its reduction in schizophrenia. Biol. Psychol. 116, 1-3 (2016). https://doi.org/10.1016/j.biopsycho.
+2016.02.005
+
+Naatanen, R., Paavilainen, P., Alho, K., Reinikainen, K., Sams, M.: The mismatch negativity to intensity
+changes in an auditory stimulus sequence. Electroencephalogr. Clin. Neurophysiol. Suppl. 40, 125-131
+(1987)
+
+Naatanen, R., Paavilainen, P., Reinikainen, K.: Do event-related potentials to infrequent decrements in
+duration of auditory stimuli demonstrate a memory trace in man? Neurosci. Lett. 107(1-3), 347-352
+(1989). https://doi.org/10.1016/0304-3940(89)90844-6
+
+Naatanen, R., Todd, J., Schall, U.: Mismatch negativity (MMN) as biomarker predicting psychosis
+in clinically at-risk individuals. Biol. Psychol. 116, 36-40 (2016). https://doi.org/10.1016/j.biopsycho.
+2015.10.010
+
+Rodgers, C.C., DeWeese, M.R.: Neural correlates of task switching in prefrontal cortex and pri-
+mary auditory cortex in a novel stimulus selection task for rodents. Neuron 82(5), 1157-1170 (2014).
+https://doi.org/10.1016/j.neuron.2014.04.031
+
+Ross, B., Schneider, B., Snyder, J.S., Alain, C.: Biological markers of auditory gap detection in young
+middle-aged and older adults. PLoS ONE 5(4), e10101 (2010). https://doi.org/10.1371/journal.pone.
+0010101
+
+Schall, U.: Is it time to move mismatch negativity into the clinic? Biol. Psychol. 116, 41-46 (2016).
+https://doi.org/10.1016/j.biopsycho.2015.09.001
+
+Slawinska, J., Ourmazd, A., Giannakis, D.: A quantum mechanical approach for data assimilation in
+climate dynamics. In: Workshop on “Climate Change: How can AI help?’”, 36th International Con-
+ference on Machine Learning (ICML), Long Beach, California (2019). https://www.climatechange.ai/
+CameraReady/30/CameraReadySubmission/manuscript.pdf
+
+Slawinska, J., Ourmazd, A., Giannakis, D.: A new approach to signal processing of spatiotemporal
+data. In: 2018 IEEE statistical signal processing workshop (SSP), pp. 338-342. https://doi.org/10.1109/
+SSP.2018.8450704 (2018)
+
+Slawinska, J., Giannakis, D.: Indo-pacific variability on seasonal to multidecadal time scales. Part I:
+Intrinsic SST Modes in Models and Observations. J. Climate 30(14), 5265-5294 (2017). https://doi.org/
+10.1175/jcli-d-16-0176.1
+
+von Stein, A., Rappelsberger, P., Sarnthein, J., Petsche, H.: Synchronization between temporal and pari-
+etal cortex during multimodal object processing in man. Cereb. Cortex 9, 137—150 (1999). https://
+doi.org/10.1093/cercor/9.2.137
+
+Tia, B., Takemi, M., Kosugi, A., Castagnola, E., Ansaldo, A., Nakamura, T., Ricci, D., Ushiba, J., Fadiga,
+L., Iriki, A.: Cortical control of object-specific grasp relies on adjustments of both activity and effective
+connectivity: A common marmoset study. J. Physiol. 595(6), 7203-7221 (2017). https://doi.org/10.1113/
+JP274629
+
+Wacongne, C.: A predictive coding account of MMN reduction in schizophrenia. Biol. Psychol. 116,
+68-74 (2016). https://doi.org/10.1016/j.biopsycho.2015.10.011
+
+Widmann, A., Schroger, E.: Filter effects and filter artifacts in the analysis of electrophysiological data.
+Frontiers in psychology 3, 233 (2012). https://doi.org/10.3389/fpsyg.2012.00233
+
+Publisher’s note Springer Nature remains neutral with regard to jurisdictional claims in published maps
+and institutional affiliations.
+
+g) Springer
+Data-driven Koopman operator approach for computational neuroscience 1173
+
+Affiliations
+
+Natasza Marrouch! ® - Joanna Slawinska2 - Dimitrios Giannakis? - Heather L. Read*
+
+Joanna Slawinska
+slawinsk @uwm.edu
+
+Dimitrios Giannakis
+dimitris@cims.nyu.edu
+
+Heather L. Read
+heather.read @ uconn.edu
+
+Department of Psychological Sciences, University of Connecticut, Storrs, CT, USA
+Department of Physics, University of Wisconsin-Milwaukee, Milwaukee, WI, USA
+3 Courant Institute of Mathematical Sciences, New York University, New York, NY, USA
+
+Department of Psychological Sciences/Department of Biomedical Engineering,
+University of Connecticut, Storrs, CT, USA
+
+g) Springer

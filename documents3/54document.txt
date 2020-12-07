@@ -1,0 +1,4214 @@
+Yen and Hioka EURASIP Journal on Audio, Speech, and Music
+Processing (2020) 2020:13
+
+https://doi.org/10.1186/s13636-020-00181-5
+
+RESEARCH Open Access
+
+Noise power spectral density scaled SNR
+response estimation with restricted range
+
+EURASIP Journal on Audio,
+Speech, and Music Processing
+
+Check for
+updates
+
+ 
+
+search for sound source localisation using
+unmanned aerial vehicles
+
+Benjamin Yen. © and Yusuke Hioka
+
+Abstract
+
+A method to locate sound sources using an audio recording system mounted on an unmanned aerial vehicle (UAV) is
+proposed. The method introduces extension algorithms to apply on top of a baseline approach, which performs
+localisation by estimating the peak signal-to-noise ratio (SNR) response in the time-frequency and angular spectra
+with the time difference of arrival information. The proposed extensions include a noise reduction and a
+post-processing algorithm to address the challenges in a UAV setting. The noise reduction algorithm reduces
+influences of UAV rotor noise on localisation performance, by scaling the SNR response using power spectral density
+of the UAV rotor noise, estimated using a denoising autoencoder. For the source tracking problem, an angular
+spectral range restricted peak search and link post-processing algorithm is also proposed to filter out incorrect
+location estimates along the localisation path. Experimental results show the proposed extensions yielded
+improvements in locating the target sound source correctly, with a 0.0064-0.175 decrease in mean haversine distance
+error across various UAV operating scenarios. The proposed method also shows a reduction in unexpected location
+estimations, with a 0.0037-0.185 decrease in the 0.75 quartile haversine distance error.
+
+Keywords: Microphone array, Unmanned aerial vehicle, Rotor noise, Source localisation, Denoising autoencoder,
+Power spectral density, Restricted peak search
+
+1 Introduction
+
+Unmanned aerial vehicles (UAVs) have recently gained
+huge popularity over a wide range of applications, such as
+filming [2], search and rescue [3], or security and surveil-
+lance [4]. One of the significant advantages of UAVs is
+its flexibility in manoeuvrability, allowing ease of naviga-
+tion through environments that are difficult or dangerous
+for human access. In the application of search and rescue,
+there are already several reports of successful rescue mis-
+sions where victims were found stranded in environments
+
+ 
+
+*Correspondence: benjamin.yen@ieee.org
+
+This study is based on a contribution to the 2019 IEEE Signal Processing Cup
+(SPCup): Audio-Based Search and Rescue with a Drone [1].
+
+Acoustics Research Centre, Department of Mechanical Engineering, University
+of Auckland, 20 Symonds Street, Auckland, 1010, New Zealand
+
+o) Springer Open
+
+ 
+
+that are difficult to navigate through [5-7]. The key to
+its success is the use of localisation technologies to track
+down the whereabouts of the stranded victims effectively.
+To this day, various sensing technologies were utilised for
+search and rescue purposes such as high-resolution cam-
+eras or thermal imaging. While such sensing technologies
+are well-proven and highly effective under many types of
+environments, information from sound is also one that
+should not be overlooked, for it is common to encounter
+scenarios where the environment renders visual informa-
+tion as unusable. For example, for a UAV hovering over a
+mountain range, where vegetation could hinder the visi-
+bility of a rescue target, the target could be detected and
+located by sound. With localisation being the key objec-
+tive to perform the search and rescue task properly, it
+
+© The Author(s). 2020 Open Access This article is licensed under a Creative Commons Attribution 4.0 International License, which
+permits use, sharing, adaptation, distribution and reproduction in any medium or format, as long as you give appropriate credit
+to the original author(s) and the source, provide a link to the Creative Commons licence, and indicate if changes were made. The
+
+images or other third party material in this article are included in the article’s Creative Commons licence, unless indicated
+otherwise in a credit line to the material. If material is not included in the article’s Creative Commons licence and your intended
+use is not permitted by statutory regulation or exceeds the permitted use, you will need to obtain permission directly from the
+copyright holder. To view a copy of this licence, visit http://creativecommons.org/licenses/by/4.0/.
+Yen and Hioka EURAS/P Journal on Audio, Speech, and Music Processing
+
+is vital that the utilised sensing technologies are effec-
+tive under a wide range of environments [8], including
+adverse environments such as those where visual infor-
+mation is severely impaired. In turn, when one method is
+rendered unusable, others still remain effective. However,
+audio recording using UAVs has shown to be challenging
+due to the high noise levels radiated from the UAV rotors.
+This significantly affects the quality of the audio signals
+to aid not only with search and rescue, but also with any
+applications [9-12].
+
+In recent years, numerous studies attempt to perform
+localisation of sound sources using UAVs. Many achieve
+this by utilising signal processing techniques that revolve
+around the usage of an array of microphones [13]. With
+the significant contamination of recordings caused by
+rotor noise being a problem, numerous studies attempt
+to eliminate the effects of rotor noise itself. Examples
+include denoising the input signals by forming a reference
+rotor noise profile based on its tonal components [14],
+or capturing the noise correlation matrix in a supervised
+manner [15]. Other approaches include spatial filtering of
+the rotor noise, such as the study carried out in [16], given
+that the rotor positions are fixed relative to the micro-
+phones. While rotor noise is nearly omnidirectional along
+the rotor plane, there are sweet-spots above or below the
+rotors where radiation could be less intensive. Authors
+from [17] exploit this by placing microphones above the
+UAV rotors and employ a spatial likelihood function based
+on the direction of the arrival of the target sound source.
+The study has shown promising results when the tar-
+get sound is located in the direction where rotor noise
+radiation is least apparent. However, such an approach
+is only effective in locations where such conditions can
+be met.
+
+Many studies also set to address the challenges via
+further developing existing localisation techniques. For
+example, authors in [15, 18, 19] extended the multiple
+signal classification (MUSIC) method [13], namely mod-
+ifying the noise correlation matrix to combat the chal-
+lenges encountered with the high levels of rotor noise.
+However, these were carried out under a fixed UAV with
+a fixed target sound source position. Works from [20]
+carried the extended MUSIC approach for a flying UAV.
+However, the target sound source was limited to whistle
+sounds, which would be unrealistic in many practical sce-
+narios. Approaches based on the steered response power
+with phase transform (SRP-PHAT) were used by [21]
+with Doppler shift for a fixed-wing UAV. This was also
+extended in [22] by detecting and localising chirp signals
+emitted from nearby UAVs to avoid potential collisions
+between each other. However, in both studies, the target
+sound was limited to narrowband signals with a known
+frequency. Optimising microphone placements has also
+shown improvement in localisation performance [23-25].
+
+(2020) 2020:13 Page 2 of 26
+
+However, the localisation performance starts to degrade
+when the movement of the UAV increases. Recent stud-
+ies also showed approaches using convolutional neural
+networks (CNNs) for source localisation, such as [26].
+A comprehensive list of related studies can be found
+in [17].
+
+While most of the studies mentioned above were able
+to present improved accuracy and precision using their
+highly responsive algorithms, they usually require cer-
+tain assumptions to be imposed. In particular, most of
+the studies mentioned above assume that the UAV rotor
+noise has good continuity in the time-frequency (T-F)
+spectrum in order to reduce the influence of UAV rotor
+noise effectively [15, 17-19]. An instance includes assum-
+ing the tonal components of the rotor noise do not vary in
+a highly random manner. While this assumption is valid
+for most cases, it depends highly on the placement of the
+microphone array. Often, however, the microphone array
+is restricted to be placed below the rotor plane, of which
+the noise becomes dominated by the flow generated from
+the propeller’s thrust. This presents an additional layer of
+challenge to the already low signal-to-noise ratio (SNR) of
+the audio signals since flow noise is highly random and
+nonlinear, and thus, the correlation between time frames
+is less likely to hold. Coupled with the high responsiveness
+of the methods itself, it could potentially lead to highly
+unstable performance.
+
+Authors in [27] developed the multi-source time differ-
+ence of arrival (TDOA) estimation in reverberant audio
+using angular spectra framework that is more robust to
+the practical challenges addressed. This was the base-
+line method provided in the 2019 IEEE Signal Processing
+Cup (SPCup) [1]. The method aims to perform robust
+sound source localisation even in reverberant environ-
+ments effectively. While the localisation response is not
+as precise as the studies mentioned prior, the perfor-
+mance is consistent and generally stable, even under
+moderate levels of reverberation. Although the study
+was not targeted for a UAV scenario, this aspect can
+be addressed by reducing the influences coming from
+the rotor noise, as demonstrated from the aforemen-
+tioned existing studies. For example, all winning teams
+that participated in the finals of the SPCup utilised the
+method in [27] along with multichannel Wiener post-
+filtering for UAV noise reduction. In addition, various
+approaches were utilised to address the challenges faced in
+the operating UAV scenario [1]. For example, Team AGH
+utilised a Kalman filter to improve continuity of the esti-
+mated source location paths. Meanwhile, Team SHOUT
+COOEE! improved the continuity of the paths using a
+heuristic method inspired by the Viterbi algorithm. On
+the other hand, Team Idea!_SSU estimated the paths via
+a two-step procedure by first estimating a global source
+path, followed by a refined estimation using a restricted
+Yen and Hioka EURASI/P Journal on Audio, Speech, and Music Processing
+
+angular search range around the global estimated
+direction [1].
+
+While noise reduction using T-F masking such as
+Wiener postfiltering is not uncommon, it has shown to
+be useful across many acoustic scenarios. For instance,
+the study from [28] presented and compared various T-
+F masks which most showed localisation performance
+improvement, as well as methods based on CNNs [29].
+T-F masks specific towards noise that has long time-
+dependence/continuation, a property present in UAV
+rotor noise, have also been studied, such as those from
+[30, 31]. A UAV-specific study for source enhancement
+using CNNs was carried out in [32]. Studies from [33] also
+showed that by accurately estimating the power spectral
+densities (PSDs) of the individual sound sources, source
+enhancement and rotor noise denoising could be effec-
+tively carried out via beamforming with Wiener postfil-
+tering. Building on this idea, this study proposes a rotor
+noise reduction algorithm based on accurate estimation
+of the rotor noise PSD, which is incorporated into exist-
+ing robust source localisation techniques. In addition,
+the study also proposes a post-processing algorithm to
+smooth the estimated source location paths. The pro-
+posed method sets to extend the baseline method from
+[27] for the UAV problem. As the method is devel-
+oped for the participation of the SPCup, it is designed
+around the competition dataset, containing audio record-
+ings corresponding to its microphone array mounted UAV
+system.
+
+(2020) 2020:13 Page 3 of 26
+
+The rest of the paper is organised as follows. A descrip-
+tion of the UAV, microphone array, and problem setup
+is given in Section 2, followed by details of the proposed
+method in Section 3. Experimental setup and parame-
+ters are described in Section 4, followed by the perfor-
+mance evaluation of the proposed method in Section 5.
+Finally, the paper is concluded with some remarks in
+Section 6.
+
+2 UAV system and problem setup
+
+As mentioned in Section 1, the baseline method from
+[27] was able to deliver consistent and stable localisation
+performance in a range of levels of reverberation, mak-
+ing it effective in practical scenarios. Hence, this study
+aims to extend the baseline method for the UAV prob-
+lem. This section presents the problem setup, including
+the definition of the sound sources and input signal, before
+discussing constraints specific to the UAV setting.
+
+An overview of the audio recording UAV including
+the microphone array setup used in this study is shown
+in Fig. 1. The problem assumes a UAV system with a
+M-sensor microphone array embedded, receiving a tar-
+get sound source, L interfering spatially coherent noise
+sources (including those generated by UW UAV rotors),
+and ambient spatially incoherent noise. The objective of
+the system is to accurately locate the target sound source
+using the M-channel noisy recordings. The short-time
+Fourier transform (STFT) of the microphone array’s input
+signals is expressed in vector form as:
+
+ 
+
+Coherent interfering noise
+Ng, (w,9,,,t)
+
+Target sound source
+S(w, 9st)
+
+ 
+
+     
+   
+
+Fig. 1 Overview of problem setup for sound source localisation using UAV
+
+k
+| Rotor noise
+Ng, (W, 9.)
+
+Array
+
+ 
+Yen and Hioka EURAS/P Journal on Audio, Speech, and Music Processing
+
+x(a, t) = [| X1(@,f), «+ , Xu(@,t) i
+— a(w, 6s)S(w, 6s, t)
+u > >
++ ¥ alo, On, )N(@, On,» 6)
+u=l1
+L > >
++ S> a(o,6y,,)N(@, On,.t) +V(@,t), (1)
+n=U+1
+5 5 4 4qr
+a(w,6) = 41,9), Le Amo, 6) | (2)
+v(o,t) = [Vi(@, t),--+,Vulo,t))", (3)
+
+where 7 denotes the transpose, X,,(w,t) is the STET
+of the mth microphone’s input signal, ag(@) and v(q, f)
+are the vector of transfer functions between the source
+6 = [Gels Qaz] (where el and az indicate the elevation
+and azimuth directions, respectively) and each micro-
+phone m, and the incoherent noise vector observed by the
+microphone array, respectively. S(a, As, t), N(o, ON, t),
+and N(a, ON, t) are the STFT of the target sound source
+at angle 65, the noise source coming from the uth rotor at
+angle ON, and the uth spatially coherent interfering noise
+source at angle ON, respectively. w and t denote the angu-
+lar frequency (of F frequency bins) and the time frame
+index. As, ON, and On, are expressed as follows for the 3D
+problem in spherical coordinates:
+
+As = [Ose Osaz] (4)
+On, = [An,,,e1° ON,,a2] , (5)
+On, = [ON,,el° ON,,,az | " . (6)
+
+Several assumptions are imposed on the setup. Given
+the difference in characteristics between the sound
+sources, the problem assumes the target sound source and
+rotor noise sources to be mutually uncorrelated. For the
+source localisation task, the main objective is to iden-
+tify the directions of the target sound source. This usu-
+ally requires knowing the transfer function of the audio
+sources with respect to the microphone array, in order
+to capture the true characteristics of a(w, 6) correctly.
+This includes knowing the acoustical characteristics of the
+environment (i.e. impulse response). Unfortunately, such
+information is generally unavailable. As such, we impose
+an assumption that the UAV is operating at some height
+above ground, regardless of the environment beneath, and
+is thus mostly open air. Therefore, the environment is
+approximately of a free field, and that a(a, 6) is assumed
+as the steering vector of a plane wave [33], described as:
+
+. a _.. 4T
+a(w, 0) = Jerens, 77 4e jiu | , (7)
+
+(2020) 2020:13 Page 4 of 26
+
+where Tj m is the time difference of arrival (TDOA) at
+the mth microphone with respect to the reference micro-
+phone typically placed at the origin of the coordinate. It
+should be noted that this assumption is merely made for
+modelling the transfer function between the microphones
+and the sound source. In practice, such as that from the
+database provided by the SPCup (see Section 2), some
+level of reverberation is expected.
+
+The problem, as setup by the SPCup requirements,
+assumes three distinct tasks for the UAV and the target
+sound source:
+
+1. Hovering UAV—In this scenario, the target sound
+source and UAV are assumed as fixed in position
+throughout the audio recording.
+
+2. Flying (i.e. moving) UAV, broadband sound
+source—In this scenario, the target sound source is
+assumed fixed. However, the UAV is assumed to be
+moving relative to the target sound source. The
+target source is a continuous broadband signal.
+
+3. Flying (ie. moving) UAV, speech sound source—Like
+task 2, the target sound source is assumed fixed, and
+the UAV is assumed to be moving relative to the
+target sound source. The target source is speech.
+
+For tasks 2 and 3, the UAV is assumed to be moving grad-
+ually, such that there are no erratic variations in the tonal
+components in the rotor noise build-up. In addition, due
+to the dataset used for the study (see Section 4.1) only
+containing the target sound source and UAV rotor noise,
+it is assumed that no additional coherent interfering noise
+sources exist (ie. L = U), such that the adversity of the
+environment for the audio recording UAV is only based
+on the levels of the UAV rotor noise relative to the target
+source. Finally, the problem is limited to overdetermined
+cases, whereM >L +1.
+
+3 Proposed method
+Figure 2 shows a block diagram of the proposed localisa-
+tion method. The method follows the general structure of
+the SPCup baseline method (see Section 1), as the method
+gave decent results over a range of input noise condi-
+tions in a preliminary study. However, significant perfor-
+mance degradation was found under lower input SNR
+cases, where rotor noise begins to dominate the recorded
+signal. Naturally, like many other studies mentioned in
+Section 1, developing a means of reducing the effects of
+the UAV rotor noise would directly benefit in preventing
+false detection of the target sound source location.
+Different to the methods discussed in Section 1, where
+noise reduction is generally carried out in the noise
+correlation matrix design, this study proposes a PSD-
+based weighting function to reduce the UAV rotor noise
+effects. Given the complex nature of rotor noise, which is
+dominated by the flow coming from the thrust of the
+Yen and Hioka EURASI/P Journal on Audio, Speech, and Music Processing
+
+(2020) 2020:13 Page 5 of 26
+
+ 
+
+ 
+
+ 
+
+ 
+
+ 
+ 
+    
+   
+
+SNR response
+estimation
+
+Rotor noise PSD
+estimation
+
+Fourier Trans.
+
+ 
+
+ 
+
+ 
+
+ 
+
+ 
+
+Noise PSD informed SNR
+response scaling
+
+Frequency spectra summation
+
+ 
+
+Microphone pair summation
+
+| Hovering UAV (Task 1)
+
+! y'(r) 5
+
+ 
+
+wee ee ee Be ee ee Be eB ee ee ee eB ee ee ee ee ee ee ee
+
+   
+ 
+
+A
+>
+
+ 
+   
+
+ 
+
+Time frame aggregation
+
+ 
+
+   
+
+I
+
+0, icht t a Segment A
+
+ms ' wise time " 1
+
+, \ restricted 95 sign (t) fi 0; flight (tight ) 1
+Peak search rame
+
+I
+
+ 
+
+peak search aggregation
+and lin. (rian At s Ate ont !
+l
+
+W tiioht (t,7)
+
+ 
+
+ 
+
+ 
+
+UAV’s propellers, a machine learning approach is pro-
+posed. The approach sets to estimate the rotor noise
+PSD using the PSDs of the microphone input signals,
+removing any irrelevant sources present (i.e. target sound
+source), before using this information to design a noise
+filter specifically removing UAV rotor noise.
+
+In the case of a flying UAV (ie. tasks 2 and 3), due to
+the constant change in location between the UAV and the
+target sound source, localisation has to be carried out in
+shorter time periods. This results in less input informa-
+tion available to accurately estimate the source direction,
+which also becomes a factor in performance degradation.
+However, given (as mentioned in Section 2) that the UAV
+is assumed to move gradually, estimated locations in each
+time period should not vary erratically. Therefore, a post-
+processing algorithm designed explicitly for tasks 2 and 3
+is also proposed. The algorithm takes into account of the
+assumption as mentioned earlier and filters out location
+estimates deemed erratic, from which in-depth location
+search at these problematic estimates is carried out to
+improve continuity if the overall estimated location path.
+
+This section first introduces the baseline method from
+[27] in Section 3.1, followed by the extensions and mod-
+ifications made to the baseline method, as shown by the
+blue boxes in Fig. 2. These extensions are the UAV rotor
+noise PSD estimation algorithm used to reduce the rotor
+noise effects (see Section 3.2), and the post-processing
+algorithm (see Section 3.3) for tasks 2 and 3, respectively.
+
+3.1 Multi-source TDOA estimation in reverberant audio
+using angular spectra
+
+This section outlines the baseline method [27] that is
+utilised in this study. Although the method is capable of
+localising multiple sources, for this study, the problem is
+limited to the single target sound source (i.e. N(a, ON, t)
+is not considered in this study). The method is simi-
+lar to the SRP technique, where SNR is calculated in
+the angular (TDOA) and T-F spectrum using pairs of
+microphones within the array, giving K = jjC2 unique
+spectrum. For this study, this will be referred as the SNR
+response. An overall SNR response in terms of 6 (i.e. an
+angular spectrum) is then obtained by aggregating the K
+
+Fig. 2 Block diagram of the proposed method. Blue boxes indicate modifications to [27] introduced by the proposed method. Processes in the
+boxes with red dashed line are selected based on the scenario (i.e. hovering or flying UAV)
+
+ 
+
+individual SNR responses together. Details of the aggrega-
+tion process are given later in this section. Many conven-
+tional localisation techniques such as generalised cross-
+correlation-phase transform (GCC-PHAT) [34], delay-
+and-sum (DS) [35], and minimum variance distortionless
+response (MVDR) [36] beamforming, or even MUSIC, can
+be utilised to calculate the SNR response. The study [27]
+also developed the diffuse noise model (DNM), a modified
+MVDR approach, which uses a noise model to improve
+robustness against ambient noise, assuming the noise is
+diffuse in nature.
+
+Prior to calculation of the SNR response, a grid of
+TDOAs t covering the relevant range of 6 in the eleva-
+tion and azimuth plane (i.e. the angular spectra), where
+the target sound source is assumed to be located for each
+kth microphone pair, is established as follows:
+
+k Sin (x (Bel, Faz))
+Tel, az) = Ph MOA Wel Pat! (8)
+CO
+dz (Oc], Oaz) - A
+ak Gel, Oz) = cos} (SGarted OPK) , (9)
+
+where dx is the directional vector associated with angle
+6 and co is the speed of sound. Ap, is the separation
+between the kth pair of microphones in Cartesian coordi-
+nates, and p; is the magnitude of the separating distance.
+This is used to map the TDOAs coming from the angular
+range of interest t towards their respective angles 0 (i.e.
+the basis of the angular spectra).
+
+The baseline method from [27] provides several locali-
+sation techniques to calculate the SNR response for local-
+isation. For instance, the SNR response for DS [37] and
+MVDR beamforming is calculated as:
+
+alt (t,)Ryx Ka(Th)
+
+8 ATK KAT (10)
+tr (Rext) — all (1, )Ryx a(t)
+
+We? (TK) =
+
+We? (TK) =
+A —1
+(a4 (x RZ,a(tx))
+
+tr (Rexe) — (acre acn)) (11)
+Yen and Hioka EURAS/P Journal on Audio, Speech, and Music Processing
+
+respectively, where Ryxk (t,@) is the empirical covariance
+matrix [27] of the input signals in all T-F bins from the Ath
+microphone pair, and * denotes an estimate.
+
+On the other hand, the SNR response for the GCC-
+PHAT approach is calculated as:
+
+R t
+we (t, Ww, TK) =I ee ~1OTK ’ (12)
+
+            
+
+where Ryo elt, w) is the cross-correlation between micro-
+phone input channels 1 and 2 from the kth microphone
+pair, and R(-) denotes the real part of a complex number.
+
+Note that ¢ and @ in Ryxk (t, w) of (10) and (11) are omit-
+ted for brevity. In addition, Os.) and Osa, of Tt are also
+omitted for brevity in (10)—(12) as well as the rest of this
+paper unless otherwise specified. A nonlinear extension of
+GCC-PHAT (GCC-NONLIN) proposed in [38], as well as
+DNM, is also provided by the SPCup baseline, and their
+respective SNR response calculation (Yeo NONTIN and
+we) can be found in [27].
+
+Following the calculation of w ,(t,@,t%), the SNR
+responses are aggregated together across the frequency
+bins, time frames, and microphone pairs, to deliver
+the overall angular spectrum. Subsequently, the peak
+response is identified as the sound source location. Aggre-
+gation across the frequency bins and the microphone pairs
+is carried out via summing while time frames can be
+summed or taken the maximum as shown respectively in
+(13) and (14):
+
+Thover K
+yen) = Yo Se ale 0, Tk); (13)
+t=1 k=1o=1
+Thover
+ye"(o) = max S s W(t, @, Tk). (14)
+k=1 @=1
+In task 1 (ie. hovering UAV), the relative location
+
+between the microphone array and the target sound
+source remains fixed. Therefore, all Tyover time frames are
+aggregated to give a single location estimate. For tasks
+2 and 3 (ie. flying UAV), aggregation cannot be carried
+out across all time frames and is thus instead carried out
+in segments of the input audio. This results in a smaller
+group of time frames Tfight used for localising the tar-
+get sound source during each audio segment. These are
+calculated as:
+
+Thight K
+
+Wien Gt) = > >- s Wa (t ©, Tr), (15)
+t=1 k=1o=1
+
+Wie (t,0) = mae S Wilt, ©, Th) (16)
+
+k=1 w=1
+
+(2020) 2020:13 Page 6 of 26
+
+The estimated target sound source TDOA Ts corre-
+sponds to the TDOA tT that gives the maximum overall
+SNR response from w’(t). These are obtained as:
+
+ts = arg max (w’(t)), (17)
+és.night (©) = arg max (Wpighe(ts7)) (18)
+
+As mentioned earlier, the grid or spectra of TDOAs Tt
+directly map towards the angular spectra 6. This mapping
+relationship does not change even after the aggregation
+process. Therefore, the source location in terms of angle
+
+for tasks 1, 2 (6s), and 3 (8s flight (flight)) is obtained using
+the angular spectra derived from (8) and (9).
+
+3.2 Noise PSD informed SNR response scaling
+
+This section introduces the UAV rotor noise PSD-based
+weighting envelope to scale and denoise the SNR response
+w (t,@,T). We refer to this process as SNR response scaling.
+
+Given the relatively structured and time-continuous
+nature of UAV rotor noise PSDs, conventional neural net-
+work (NN) architectures such as multilayer perception,
+or other supervised NNs could be an adequate mapping
+function to model the noise PSDs under different input
+conditions [10], given sufficient training data is provided.
+However, in this study, the rotor noise data available for
+training is limited (see Section 4.2), and therefore, conven-
+tional NNs would not suit this condition.
+
+On the other hand, denoising autoencoders (DAEs)
+learn a compressed representation of the uncorrupted
+input, rather than a full mapping of the training data in
+an unsupervised manner, and thus can be used for fea-
+ture extraction and denoising [39]. This could help relax
+the requirement for a large number of hard-coded labels
+and simply let the DAE act as a denoising tool. There-
+fore, we propose a DAE to produce the required PSD data
+for the localisation task. DAE is an extension to the clas-
+sical AE, where it attempts to clean the noisy input such
+that only the target output signal remains [39]. Since the
+objective of this algorithm is to create a PSD-based enve-
+lope to scale and denoise the SNR response y(t, @,T),
+the target output signal of the DAE is the rotor noise
+PSD @n,,(@) with the inputs being the PSDs ¢,,(t¢, w) from
+the microphone recordings. Therefore, different from the
+conventional use of a DAE, this process achieves a “de-
+targeting” effect, through recognising the target sound
+source as the equivalent “noise corruption” to remove.
+
+The input audio PSD @¢,,(¢, @) is calculated by using the
+Welch method [40] given by $y (t,@) = Adx(t — 1,@) +
+(1 — A)|¥(t,)|?, where A is the forgetting factor, and ¥
+represents an arbitrary signal. This is achieved by first
+feeding the input audio PSDs ¢,,(t,@) to map towards
+the hidden representations z, forming the encoder com-
+ponent of the DAE. Subsequently, the rotor noise PSD
+Yen and Hioka EURASI/P Journal on Audio, Speech, and Music Processing
+
+(2020) 2020:13 Page 7 of 26
+
+ 
+
+?,
+
+Input: microphone signal PSD ¢,, Size: (1024,1)
+
+Zero padding 1D Size: 3
+
+1D Convolution No. of filters: 48, Kernel size: 8, Strides: 2, Padding: valid
+
+Activation function: LeakyReLU (alpha=0.1)
+Batch normalisation
+
+Zero padding 1D: Size: 3
+
+1D Convolution No. of filters: 24, Kernel size: 8, Strides: 2, Padding: valid
+Activation function: LeakyReLU (alpha=0.1)
+Batch normalisation
+
+Zero padding 1D: Size: 3
+
+Encoder
+
+1D Convolution No. of filters: 12, Kernel size: 8, Strides: 2, Padding: valid
+Activation function: LeakyReLU (alpha=0.1)
+Batch normalisation
+Zero padding 1D: Size: 3
+1D Convolution No. of filters: 6, Kernel size: 8, Strides: 2, Padding: valid
+Activation function: LeakyReLU (alpha=0.1)
+Batch normalisation
+
+Zero padding 1D: Size: 3
+
+Z
+
+Fig. 3 DAE architecture of the SNR response scaling algorithm
+
+ 
+
+X
+
+on, (w) is reconstructed from z, which forms the decoder
+component of the DAE.
+
+Since the task is to perform denoising of the origi-
+nal input audio PSD (i.e. “de-targeting” the target sound
+source), it is essentially a regression task. The size of
+the input audio PSD data is Tpar x F, where Tpar =
+1 corresponds to the number of PSD frames taken per
+observation. For the regression task, the decoder of the
+DAE uses the rectified linear units (ReLU) activation func-
+tion. Given that the DAE consists of several layers overall,
+the encoder of the DAE uses the leaky ReLU (LeakyReLU)
+[41] activation function, as a means of preventing pos-
+sibilities of vanishing gradients, which has found in this
+study to slightly reduce training loss over ReLU. The DAE
+architecture is shown in Fig. 3.
+
+The DAE is optimised with respect to the mean square
+error (MSE) between the output PSD on, (t,w) and the
+true rotor noise PSD @y, (t, w). To optimise MSE loss, the
+Adam optimiser is used [42]. The DAE is trained for each
+m microphone channels, giving a total of MM DAEs for
+producing the SNR response scaling weighting envelope.
+However, since the task is to perform localisation, there is
+no requirement to achieve pinpoint accuracy in the PSD
+estimation for each k microphone pair, which is usually
+required for, for example, source enhancement [10, 33].
+Furthermore, given the microphones used in this study are
+of identical build and omnidirectional, it is assumed that
+the estimated PSDs would not change drastically across
+microphones. Therefore, the estimated PSD with the most
+prominent amplitude response out of the M microphones
+for each frequency bin w is selected and applied to scale
+the SNR responses for all K microphone pairs, with the
+
+ 
+
+No. of filters: 12, Kernel size: 8,
+Strides: 2, Padding: same
+
+1D Transpose Convolution
+
+Activation function: ReLU
+
+No. of filters: 24, Kernel size: 8,
+
+1D Transpose Convolution SCCM eC elieneene
+
+Activation function: ReLU
+
+Decoder
+
+No. of filters: 48, Kernel size: 8,
+
+1D Transpose Convolution SC CoMeM enemies
+
+Activation function: ReLU
+
+No. of filters: 1, Kernel size: 8,
+
+1D Transpose Convolution Sa Cone lntereat
+
+Activation function: ReLU
+
+ 
+
+Output Size: (1024,1)
+
+Pym
+
+ 
+
+prospect of maximising effectiveness in noise removal. In
+addition, the estimated PSD frames are grouped and aver-
+aged to match the time frames for the localisation process
+(see Table 1).
+
+Finally, the rotor noise PSD scaled SNR response is
+obtained as:
+
+W(t, w, T)
+
+, , (19)
+On, (t, @)
+
+Wet, W, T) =
+
+After scaling the SNR response with the UAV rotor
+noise PSD weighting envelope, to obtain the final angu-
+lar spectrum of the sound source, the aggregation process
+previously mentioned in Section 3.1 ((13)—(16)) is applied
+
+on Wet, w,T), before obtaining Ts leading to Os using (8)
+and (9).
+
+Table 1 Experimental problem setup specifications
+
+ 
+
+ 
+
+UAV scenario Hovering Flying
+
+No. of recordings 300 36
+
+Duration (s) ~3 4
+
+Sampling rate (kHz) 44.1 44.1
+
+Target sound types Speech Speech and broadband
+STFT time frames T ~ 128 45 (0.0833 s intervals)
+
+STFT time frames post (13)-(16) 1 15 (0.25 s intervals)
+
+ 
+
+For the flying UAV scenario (i.e. tasks 2 and 3), azimuth and elevation angles of the
+source are taken as a mean value within a 500-ms window centred on each of its
+given time-stamps
+Yen and Hioka EURAS/P Journal on Audio, Speech, and Music Processing
+
+3.3. Angular spectral range restricted peak search and link
+As discussed in Section 3.1, for tasks 2 and 3, the shorter
+audio signal length for each location estimate means time
+frame aggregation is carried out in smaller groups of
+frames Tight, which potentially causes a loss in angular
+spectral resolution. In addition, higher speed variations
+in the individual UAV rotors would also increase the
+complexity of the PSD for the DAE to estimate, poten-
+tially leading to further performance degradation. This
+section introduces an angular spectral range restricted
+peak search and link post-processing algorithm, for which
+we refer to as the restricted peak search and link (RPSL).
+The algorithm is applied towards the localisation output
+
+Os fight (t) before time frame aggregation is carried out (see
+Fig. 2), as a mean to compensate this problem.
+
+The flowchart describing the algorithm is shown in
+Fig. 4. The algorithm makes use of several iterations of
+SNR response peak searching in the angular spectrum
+to obtain the correct sound source travel path, which
+generally follows these main processes:
+
+1. Using localisation output Os sight (t) as the reference
+path of locations, for each time frame t, check the
+
+degree of separation AO. pt between the
+corresponding location with respect to the location
+of the preceding and succeeding time frames ¢ + 1.
+
+2. Perform restricted peak search using (18) with the
+SNR response Wo, ent (f T) (see Fig. 2) and Ores (C, te)
+(see Fig. 4) around time frames giving unexpected
+locations (i.e. exceeding the nominal degree of
+separation A bres); and obtaining the correct locations.
+
+3. The above steps are repeated until valid locations can
+no longer be found, or if the start/end of the
+localisation path has been reached (i.e.
+te+1 €[ tetarts tenq]). This forms a “chain” of
+locations, or a local path (denoted as the cth chain in
+Fig. 4), to later to be compared against when forming
+the final global path of locations.
+
+4, After obtaining all C chains of local paths, a final
+
+path of locations A a; ent (2) is formed by finding
+locations that appear most frequently amongst the C
+chains at the given time frame. Ideally, this would
+improve the consistency and smoothness compared
+
+to the original Os, fight (t).
+
+Finally, the Tgight time frames in Os sight (£) are agere-
+
+gated together to obtain ay fioht (flight) (see Fig. 2). Details
+of this process are discussed later in Section 4.1.
+
+The selection of the search range parameter AGres is
+heuristically tuned based on whether the estimated path
+of locations was the most sensible overall (i.e. no aggres-
+sive jumps or unnatural changes in direction).
+
+(2020) 2020:13 Page 8 of 26
+
+To enable online-processing capabilities to the RPSL
+post-processing algorithm, this process is carried out in
+
+batches of frames of As sight (t) that corresponds to 2 sec-
+ond blocks of audio, with the exception of the last batch,
+which would depend on the number of frames remain-
+ing. Such an approach is not uncommon, where online-
+processing is done via blocks of time frames, rather than
+individual frames alone [43].
+
+Restricting the angular range for peak search reduces
+the risk of picking up disturbances with SNR angular
+spectral response more prominent than that of the target
+sound source (since they are excluded from the restricted
+search range). However, this assumes the original locali-
+
+sation path Os fight (t) is correct in a reasonable portion of
+the time frames. Conceptually, the method presented here
+is somewhat similar to the two-step flight path approach
+from Team Idea!_SSU [1].
+
+Measures are also developed if a particular local path
+fails to find a peak with high enough SNR response to link
+towards. For example, the algorithm skips time frames
+(and proceeds to the next) where the restricted peak
+search fails to obtain a valid location until one with a valid
+location is found. Following this, the skipped locations in-
+between the two valid time frames are obtained via inter-
+polation. Figure 5 shows an example of the improvement
+in localisation path with each stage (SNR response scal-
+ing and RPSL post-processing) of the proposed algorithm
+applied.
+
+4 Experiments
+
+As a team participating in the SPCup, the performance
+of the proposed method is evaluated against the compe-
+tition dataset provided by the organiser of the SPCup [1].
+Therefore, the proposed algorithm is tuned towards the
+UAV and microphone array system to develop the dataset.
+This section presents the details of the experimental setup
+of the given dataset, including the description of the UAV
+system, and various constraints found in the dataset. This
+is followed by an overview of the experimental parameters
+and additional information used for the proposed method,
+such as details of the training dataset for the UAV rotor
+noise PSD estimation process.
+
+4.1 Experimental setup
+
+The proposed method is evaluated using the DREGON
+database from [44], which makes use of the UAV sys-
+tem shown in Fig. 6. Details of the microphone array and
+rotor positions are shown in Fig. 7. The UAV is from
+MicroKopter@®), utilising the 8 Sounds USB and Many Ears
+audio processing framework [45]. The UAV system utilises
+an array of 8 omnidirectional electret condenser micro-
+phones, located directly below the centre of the UAV,
+as shown in Fig. 7. All positions shown in Fig. 7 are in
+reference to the microphone array’s baricenter.
+Yen and Hioka EURASIP Journal on Audio, Speech, and Music Processing (2020) 2020:13 Page 9 of 26
+
+ 
+
+Initialte empty grid of 9% isn (C3)
+
+size: CxT x2
+
+eee ES EES
+
+For each ¢ in 6” 5, »,(C.t) |
+t, =t (start chain c)
+
+n
+
+O sets (c, t.) = 9s stein (2, )
+
+ 
+
+Calculate difference with neighbouring |
+
+a (4 a
+AGS sight = on (c, t. ) — Os sight (1, +1
+
+res
+
+Egn. (18) > I nightres (c t )
+
+9 c,res
+
+Restricted peak search w/@.,,, (c,t, )
+
+   
+
+     
+    
+  
+  
+
+Interpolation
+~ 95. sian (¢: t= D)
+FS sitar (c. Ce.res ) — Vy, (Os (c, t. )
+
+EO... (c,t,)
+
+res
+
+  
+
++s sient (4, + )
+p=l....,P
+
+t.tle
+
+  
+
+san >tena |?
+‘i No
+penpals) Saba yaeaag =~
+Vrases Col mode 8% ogy (6st) |
+6... (C.t,) = % sim (Cot) $A, |-==F—-—--=
+
+A
+=>
+’
+
+S, flight (1 )
+
+Fig. 4 Flowchart of the angular spectral range restricted peak search and link algorithm. The steps highlighted correspond to the steps described in
+Section 3.3
+
+ 
+
+ 
+
+ 
+Yen and Hioka EURASIP Journal on Audio, Speech, and Music Processing
+
+Elevation [deg]
+KR
+©
+
+-100
+Azimuth [deg]
+
+UAV broadband sound source (task 2) case 11 [1])
+
+ 
+
+ 
+
+Fig. 5 Example of localisation performance with SNR response scaling (Section 3.2) and RPSL post-processing (Section 3.3) applied. (SPCup flying
+
+(2020) 2020:13 Page 10 of 26
+
+MVDR [sum] + SNR resp. scaling
+
+——t+— MVDR [sum] + SNR resp. scaling + RPSL
+MVDR [sum] + SNR resp. scaling + RPSL
+
++ time frame aggregation
+
+~ ~~~ Restricted peak search chains
+
+Time [s]
+
+ 
+
+ 
+
+Table 1 shows the specifications of the evaluation
+dataset used for this study. As mentioned in Sections 2
+and 3, the proposed method in this study is evaluated
+against the three tasks. Task 1 contains 300 individ-
+ual cases; each consists of a ~ 3-s microphone array
+recording for estimating a single location of the target
+sound source. On the other hand, tasks 2 and 3 consist
+
+of 20 cases with broadband sound source and 16 cases
+with speech sound source used as the target sound source.
+Each case in tasks 2 and 3 consists of 15 location points
+to be estimated in 0.25-s intervals along the duration of
+the 4-s microphone array recording. Therefore, the time
+frames from the STFT of the recordings are grouped into
+sections of 6 frames centering around each time-stamp
+
+ 
+
+ 
+
+ 
+
+Fig. 6 Audio recording UAV overview. Image provided by SPCup syllabus [1]
+
+ 
+
+ 
+Yen and Hioka EURASI/P Journal on Audio, Speech, and Music Processing
+
+(2020) 2020:13 Page 11 of 26
+
+ 
+
+Y [m] 0.2
+
+ 
+
+ 
+
+-0.2
+
+Fig. 7 Microphone array (0-7) and rotor (A-D) geometry overview. Figure provided by SPCup syllabus [1]
+
+= _—
+_—~< 0
+
+-0.1
+
+X [m]
+
+ 
+
+ 
+
+(i.e. fight =[0.25s, 0.5s, ...,3.75s]), with aggregation per-
+formed on each of these groups of time frames. Further
+information regarding the evaluation dataset can be found
+in Table 1.
+
+4.2 Noise PSD informed SNR response scaling:
+experimental parameters
+
+To obtain the training and validation dataset required
+for the DAE from the SNR response scaling algorithm,
+labelled data containing rotor noise with and without
+the target source signal is required. Given the dataset
+is constrained to what was available in the DREGON
+database, data augmentation had to be performed in
+order to obtain a sufficient amount of data for train-
+ing and validation. Initially, individual rotor recordings
+from the development dataset were used to provide the
+rotor noise data. However, due to the limited speed
+range coverage, extracts of rotor noise-only sections from
+the microphone recordings in the competition dataset
+were also used as part of the training process. This is
+achieved by manually editing out sections of the compe-
+tition audio recordings containing traces of target sound
+source signals. The rotor noises are then mixed with a
+corpus of speech recordings to form the input obser-
+vations, as part of the data augmentation process. For
+the corpus, the REpeated HArvard Sentence Prompts
+(REHASP) corpus [46] was used. The sentences were
+randomly selected with a balanced mixture of male and
+female speech. Since the individual cases contained in
+
+the competition dataset are normalised with respect to
+its signal amplitude, the rotor noise present in each case
+would have varying loudness depending on the input SNR.
+Therefore, one cannot simply train a mapping function
+by assuming rotor noise is consistent in power, mean-
+ing that the training dataset would contain repetitions
+of the rotor noise audio extracts with different ampli-
+tude scaling to compensate for this variation. For broad-
+band sound source, since its acoustical characteristics are
+unknown, the only obtainable labels were from the devel-
+opment dataset. Thus, these recordings are mixed with
+the collected UAV rotor noise dataset and included for
+training.
+
+Table 2 outlines the dataset specifications. To provide
+generalisation towards the DAE with the available data,
+the entire training dataset described in Table 2 is used to
+train a single DAE for each microphone. Given the lack
+of unique UAV rotor noise data, only 4% of the data from
+the training dataset described in Table 2 is used to obtain
+the validation dataset, to preserve as many training data
+as possible. The observations in the dataset are randomly
+shuffled prior to the split. For testing, the competition
+dataset described in Table 1 was used, giving a total of
+45,338 observations.
+
+It should be noted that the data constraint workaround
+described in this study was driven by the limited time and
+resources in the time of the competition. Ideally, rotor
+noise recordings would be obtained via independent noise
+recordings by using the exact UAV system per described in
+Yen and Hioka EURAS/P Journal on Audio, Speech, and Music Processing
+
+(2020) 2020:13 Page 12 of 26
+
+Table 2 Specifications and parameters for the rotor noise PSD estimation DAE and RPSL post-processing algorithm
+
+ 
+
+STFT length (overlap shift)
+Forgetting factor i
+
+Dimension of each frame
+
+2048 [46.4 ms] (1024 [23.2 ms])
+0.3
+1x 1024 (Tone x F)
+
+ 
+
+Training dataset
+Total no. of frames (from hovering UAV dataset)
+
+Total no. of frames (from flying UAV dataset, broadband)
+
+ 
+
+Total no. of frames (from flying UAV dataset, speech)
+Learning rate
+
+No. of epochs
+
+Testing dataset
+Total no. of frames (from hovering UAV dataset)
+
+Total no. of frames (from flying UAV dataset, broadband)
+
+ 
+
+Total no. of frames (from flying UAV dataset, speech)
+
+RPSL parameters
+Ares (deg)
+
+417,180 [9687 s]
+4675 [108.6 s]
+9435 [219.1 s]
+5x10
+
+2000
+
+39,182 [920.1 s]
+3420 [80 s]
+2736 [64 5]
+
+50 (task 2), 35 (task 3)
+
+ 
+
+the SPCup syllabus [1], for which a DAE with much higher
+performance is expected.
+
+4.3 Evaluation metric
+
+The performance of the proposed method is evaluated
+against the baseline method [27], with GCC-PHAT, GCC-
+NONLIN, MVDR, DS, and DNM as the localisation tech-
+niques (as provided by the SPCup), using both sum and
+max aggregation (i.e. (13)—(16)). This results in 10 base-
+line methods to compare against the proposed method.
+For tasks 2 and 3, due to the proposed method containing
+two distinct components (SNR response scaling and RPSL
+post-processing), results with both components applied,
+as well as those with only one of the components applied,
+are presented for comparison.
+
+Since the true locations for each test case are unique
+regardless of the chosen task, instead of directly compar-
+ing the estimated locations against the ground truth, the
+error between the estimated locations and the true loca-
+tions is calculated and used as the evaluation metric. For
+the 3D problem presented in this study, the accuracy of the
+localisation performance is measured by comparing the
+haversine distance error D [47] (for which will be referred
+
+as distance error) between the estimated location As and
+the true location 65, assuming a unit sphere (ie. r = 1,
+such that 0 < D < zr). This is obtained as follows:
+
+y= sin2 Os 01 — Os el
+2
+
+. Os a, — 0
++ cos (4s.e1) COs (95,1) sin? (ae) ; (20)
+
+2
+D= 2rsin | /y. (21)
+
+Using the haversine distance error measure instead of
+
+directly comparing the difference between As and As alle-
+viates the varying sensitivity of 4s ,, to the same amount of
+error at different As el (e.g. same amount of angular error
+in 8s el results in significantly different position errors
+between 65 a, = 0 deg, and 65 a, = +90 deg).
+
+After obtaining the distance error D, its mean, root
+mean square error (RMSE), maximum, minimum, and
+quartile measures are compared between the methods.
+Statistical analysis using the paired sample ¢ test was con-
+ducted to evaluate and verify the difference of mean and
+median errors between the proposed method and each
+baseline method, respectively. To avoid erroneous infer-
+ences caused by multiple comparison, Bonferroni's cor-
+rection was applied [48], i.e. for each test, the null hypoth-
+esis was rejected by p < 0.005 (= 0.05/10, given the
+performance is evaluated against the 10 baseline meth-
+ods), using the best-performing combination from the
+proposed method as the benchmark for comparison.
+
+5 Results and discussion
+
+This section presents the experimental results for evaluat-
+ing the performance of the proposed method against the
+baseline method as outlined in Section 4.3.
+
+5.1 Task 1: Hovering UAV scenario
+
+Figure 8 shows the distance errors of different localisa-
+tion methods from task 1, with details of the statistical
+test results shown in Table 3. As shown, with all baseline
+techniques using max aggregation, the addition of SNR
+response scaling delivered improvements with respect to
+its unscaled baseline. In particular, the MVDR method
+Yen and Hioka EURASI/P Journal on Audio, Speech, and Music Processing
+
+(2020) 2020:13 Page 13 of 26
+
+ 
+
+ 
+
+ 
+
+ 
+
+ 
+
+ 
+
+ 
+
+ 
+
+ 
+
+ 
+
+ 
+
+ 
+
+ 
+
+ 
+
+ 
+
+ 
+
+ 
+
+ 
+
+ 
+
+ 
+
+ 
+
+ 
+
+ 
+
+ 
+
+ 
+
+ 
+
+ 
+
+ 
+
+ 
+
+ 
+
+ 
+
+ 
+
+ 
+
+ 
+
+ 
+
+ 
+
+ 
+
+ 
+
+ 
+
+ 
+
+ 
+
+ 
+
+ 
+
+ 
+
+ 
+
+ 
+
+ 
+
+ 
+
+ 
+
+ 
+
+ 
+
+ 
+
+ 
+
+ 
+
+ 
+
+ 
+
+ 
+
+ 
+
+ 
+
+ 
+
+ 
+
+ 
+
+ 
+
+ 
+
+ 
+
+ 
+
+ 
+
+ 
+
+ 
+
+ 
+
+ 
+
+ 
+
+ 
+
+ 
+
+ 
+
+ 
+
+ 
+
+ 
+
+ 
+
+ 
+
+ 
+
+ 
+
+ 
+
+ 
+
+ 
+
+ 
+
+ 
+
+ 
+
+ 
+
+ 
+
+ 
+
+ 
+
+ 
+
+ 
+
+ 
+
+ 
+
+ 
+
+ 
+
+ 
+
+ 
+
+ 
+
+ 
+
+ 
+
+ 
+
+ 
+
+ 
+
+ 
+
+ 
+
+ 
+
+ 
+
+ 
+
+ 
+
+ 
+
+ 
+
+ 
+
+ 
+
+ 
+
+ 
+
+ 
+
+ 
+
+ 
+
+ 
+
+ 
+
+ 
+
+ 
+
+ 
+
+ 
+
+ 
+
+ 
+
+ 
+
+ 
+
+ 
+
+ 
+
+ 
+
+ 
+
+ 
+
+ 
+
+ 
+
+ 
+
+ 
+
+ 
+
+ 
+
+ 
+
+ 
+
+ 
+
+ 
+
+ 
+
+ 
+
+ 
+
+ 
+
+ 
+
+ 
+
+ 
+
+ 
+
+ 
+
+ 
+
+ 
+
+ 
+
+ 
+
+ 
+
+ 
+
+ 
+
+ 
+
+ 
+
+ 
+
+ 
+
+ 
+
+ 
+
+ 
+
+ 
+
+ 
+
+ 
+
+ 
+
+ 
+
+ 
+
+ 
+
+ 
+
+ 
+
+ 
+
+ 
+
+ 
+
+ 
+
+ 
+
+ 
+
+ 
+
+ 
+
+ 
+
+ 
+
+ 
+
+ 
+
+ 
+
+ 
+
+ 
+
+ 
+
+ 
+
+indicate the 95% upper and lower confidence limits
+
+ 
+
+XX
+
+with max aggregation and SNR response scaling is the
+best-performing combination. The method outperformed
+the baseline methods by delivering the lowest mean, max-
+imum, and RMSE distance error measures. Results of the
+paired sample ¢ test also indicate that the difference of the
+mean distance error being significantly different against
+the baseline methods, except GCC-NONLIN using max
+aggregation. The most apparent improvement is the sig-
+nificant reduction in outlier predictions, which can be
+seen in Fig. 8, as well as the reduction in the maximum
+and 0.75 quartile distance errors. This shows that SNR
+response scaling cleans up the rotor noise effects well,
+making the SNR response of the target sound source
+more apparent. Figure 9a, b shows an example of the
+SNR angular spectral response improvements brought
+upon using SNR response scaling. Here, influences from
+the UAV rotor noise are greatly reduced, revealing the
+peak response of the target sound source. As a result,
+it brought the estimated location closer to the ground
+truth. There are still a few cases (cases #59, 61, 70, 159,
+160, 178, and 229 in the dataset [1]), which have very
+low input SNRs, and all methods evaluated (including the
+proposed method) are not able to give an accurate esti-
+mate. Nonetheless, the proposed method has shown a
+significant improvement in localising accuracy.
+
+3F es rT DS
++ +
+_ +t T
+2.5- + 7 + +
+o + + + t *
+a +
+t + + + T 4
+4 + + 1
+OL OF + + # ¥ 7 $+ +
+. +
+Oo it + + |
+= = + 4 Fy
++ + LO
+@ F + + #+ To o£ + f + TF | TF F +
+@ + 4 + + + a +
+9 T + + ee ee 4 +
+1.57 { v * : | + 7
+& + + tot 4 + < +
+2 + + + + + | + +
+elit. 2 id Pig ty d dg!
+2 t + Pt +4 t+! ! + + +
+— x - ~o4 +
+H 1}+ t t z + 7 $F + 7 + + +
+ae + Tv |
+oO T + | + +
+> L + * + , + | +4
+= ¥ + #4 + + ¥
+_ + + 4. + + 4
+LL + + + 1 +
+0.5 1 + + 4 + = F + aL
+= t + + £ 4
+= T + = + Prt + r
+EM J Je deve ! Lie
+oles ad ce MX 2 os Go) bd co be et A fo 2 fd Hoo ob i
+XSERC ER ER ERE REF R EFR ESC E RR ERE RC ER ER ER ERE
+oO oO oO oO oO oO oO oO oO oO oO oO oO
+EZBEBZREBEBAEBAZEBABEBAEBREBAREBAREBREBEBEBREBRE DBD
+EeE Za2Z2aeternns BSB DDToo»oo»oo#»o»o»oo»oo»ov.od mn DOD D
+<2 556 GR 4FERARESAEAEAREAERBELELC ESE:
+zz ne oT © © G© GC GC GBC @
+5358652 SSS EB EFEBBPBPEPEEE YE GE BBY 8 8 B
+ZZ kFkEeE E Z22Cf £& HW Se
+99 6 G <<<e<fFgGgGKgaKgzeEeERg aR ag ge gs
+SF F868 ~ Fe EZ2Z222 go e eg eg ee eee
+oS 6 r FoF OOF eeoeoeoneoce
+Q9 Q2Q9 9 2 2 Z2222222
+9°22 266 DRRHRGHGHG
+OO 8 8 6 Oo  }}©—)—h—hmhm6m6m6hmrSmhmhmS mS SL LOL NLL
+6 6 = 5 5 22323 82 8
+EFEZZ2Z2nanoHNHn DN
+<<52444428
+ris3s 55 o0
+7270028
+8.8% 3
+oO oO
+Oo 66 6
+6 6
+
+Localisation Method
+
+Fig. 8 Hovering UAV (task 1)—haversine distance error distribution. Red line indicates the median, upper and lower edges of the blue box indicate
+the 75% and 25% quartiles, upper and lower black bars indicate the maximum and minimum, and upper and lower corners of the trapezoidal
+
+ 
+
+ 
+
+Apart from GCC-NONLIN, DNM method with max
+ageregation and SNR response scaling also delivered com-
+parable results. The method delivered lower median and
+quartile distance error measures, with ¢ test results show-
+ing that it is not significantly different to that of the
+MVDR method using max aggregation and SNR response
+scaling. However, due to the lower mean and RMSE
+distance errors, the MVDR method is considered the
+best- performing combination.
+
+Since the SNR response scaling approach is essentially a
+T-F mask for filtering out effects of the UAV rotor noise,
+we compare its performance against other state-of-the-art
+T-F masks specialised for noisy and reverberant envi-
+ronments, using the study from [28] and [30]. Like SNR
+response scaling, the T-F mask from [28] is applied to the
+baseline method. However, given the method is designed
+for GCC-PHAT, results were only generated under this
+localisation method. As shown in Fig. 8 and Table 3,
+the T-F mask from [28] improved the localisation per-
+formance overall, reducing the distance error measures
+with respect to its corresponding baseline. Under the
+same GCC-PHAT localisation technique, the proposed
+SNR response scaling method overall outperformed [28]
+slightly, delivering lower mean, quartile, and RMSE dis-
+tance error measures. However, with max aggregation,
+Yen and Hioka EURAS/P Journal on Audio, Speech, and Music Processing
+
+(2020) 2020:13
+
+Table 3 Haversine distance error performance comparison (task 1—hovering UAV)
+
+Page 14 of 26
+
+ 
+
+Haversine distance error D (rad)
+
+ 
+
+p value: paired sample t test (ref.
+best case)
+
+ 
+
+ 
+
+ 
+
+ 
+
+ 
+
+Mean Median Min Max 0.25 quartile 0.75 quartile RMSE
+Baseline
+GCC-PHAT (max) 0.1541 0.04908 0 2.674 0.01745 0.0849 0.4384 686x107+
+GCC-PHAT (sum) 0.4637 0.07804 O 2.347 0.03491 0.7808 0.8073 342x107?!
+GCC-NONLIN (max) 0.1305 0.03903 0 2.736 0.01745 0.0752 0.3887 ns.
+GCC-NONLIN (sum) 0.4528 0.07376 0 2.347 0.02468 0.7160 0.8010 208x107?
+MVDR (max) 0.1774 0.03903 0 2.947 0.02369 0.1047 0.4471 = 1.18x107°
+MVDR (sum) 0.3738 0.05794 0 2.222 0.02314 0.2934 0.7081 3.91x107'”
+DS (max) 0.1976 0.03801 0 2.793 0.01745 0.1196 0.5143 481x107°
+DS (sum) 0.2935 0.04637 0 2.722 0.01745 0.1795 0.6218 471x107!
+DNM (max) 0.2535 0.03491 0 3.018 0.01745 0.0837 0.6435 3.141077
+DNM (sum) 0.3811 0.05456 0 2.806 0.01745 0.1988 0.8074 187x107!
+wW/ [28] T-F mask
+GCC-PHAT (max) 0.1356 0.03903 0 2.818 0.01745 0.0837 0.4064 ns.
+GCC-PHAT (sum) 0.5164 0.08382 0 2.742 0.03654 1.0378 0.8776 148x107?
+w/ [30] T-F mask
+GCC-PHAT (max) 0.2155 0.05236 0 2.605 0.01745 0.1018 0.4933. 1.10x 1077
+GCC-PHAT (sum) 0.4162 0.08372 0 2.347 0.02468 0.7080 0.7424 =1.16x107!9
+GCC-NONLIN (max) 0.2411 0.05236 0 2.605 0.01745 0.1162 0.5308 3.131079
+GCC-NONLIN (sum) 0.3837 0.06981 0 2.347 0.02429 0.5923 0.7012 3.90x107!®
+MVDR (max) 0.1806 0.05504 0 1.941 0.03491 0.1101 0.4154 139x107’
+MVDR (sum) 0.2702 0.05058 0 2.065 0.02427 0.1711 0.5633 444x107!
+DS (max) 0.1897 0.06292 0 2.403 0.02030 0.1589 0.4344 2.111077
+DS (sum) 0.1792 0.03796 0 2.110 0.01745 0.1180 0.4095 164x107’
+DNM (max) 0.2586 0.03504 0 2.986 0.01745 0.1064 0.6273. 2.35x1078
+DNM (sum) 0.2113 0.03810 0 2.657 0.01745 0.1144 0.4941 424x107°
+w/ SNR response scaling
+GCC-PHAT (max) 0.1278 0.03903 0 2.488 0.01745 0.0780 0.3732 ns.
+GCC-PHAT (sum) 0.4997 0.09259 0 3.031 0.03903 0.9861 0.8501 7.02x10~4
+GCC-NONLIN (max) 0.0961 0.03880 0 1.897 0.01745 0.0719 0.2596 ns.
+GCC-NONLIN (sum) 0.4575 0.08899 0 2.756 0.03654 0.6880 0.8133 1.16x107?°
+MVDR (max) (best case) 0.0833 0.03903 0 1.886 0.02424 0.0715 0.2269 N/A
+MVDR (sum) 0.3263 0.05236 0 2.418 0.02468 0.2067 0.6420 1.10x107'4
+DS (max) 0.0975 0.03803 0 1.876 0.01745 0.0719 0.2790 ns.
+DS (sum) 0.3275 0.05504 0 3.031 0.03491 0.2080 0.7017. 2.99x107!2
+DNM (max) 0.1323 0.03491 0 2.409 0.01745 0.0698 0.3893 ns.
+DNM (sum) 0.3515 0.05504 0 3.031 0.02468 0.1896 0.7498 2.16x107!?
+
+ 
+
+Results from the baseline method are first presented, followed by results using the T-F mask from [28] and [30] and the proposed method (SNR response scaling).
+
+Best-performing numericals for each category are highlighted in bold
+
+the performance improvement is slight, as suggested by
+the ¢ test. The T-F mask proposed by [30] is utilised via
+source enhancement using the minimum mean square
+error (MMSE) log-spectral amplitude estimator from [49]
+
+prior to source localisation using [27]. Contrary to the T-
+F mask from [28] and the proposed method, the T-F mask
+from [30] showed mixed performance. While there was
+general improvement in results with max aggregation, the
+Yen and Hioka EURASI/P Journal on Audio, Speech, and Music Processing
+
+(2020) 2020:13 Page 15 of 26
+
+ 
+
+©
+
+nO
+°
+
+Elevataion [degree]
+fon) A
+oO oO
+
+-80
+
+ 
+
+-150
+
+-100 -
+
+oO
+
+Elevataion [degree]
+iN
+oO
+
+location, respectively
+
+ 
+
+44.1
+O
+44.05
+44
+43.95
+43.9
+43.85
+43.8
+PG
+50 0 50 100 150
+
+Azimuth [degree]
+
+(a)
+oO
+PS
+-20
+-60
+-80
+-150 -100 -50 0 50 100 150
+
+Azimuth [degree]
+
+Fig. 9 SNR angular spectral response (dB) from SPCup hovering UAV (task 1) case 297 a w/o SNR response scaling and b w/ SNR response scaling,
+using MVDR with max aggregation. Circle (0) and cross (x) in the diagram represent the ground truth and the algorithm's estimated peak response
+
+ 
+
+(b)
+
+ 
+
+ 
+
+T-F mask performed worse than the baseline with sum
+aggregation, with the exception of DS, where both aggre-
+gation methods improved over the baseline. Since the T-F
+mask from [30] assumes continuity in the noise signals,
+which is a valid assumption, it could have been affected by
+the vast amount of wind/flow noise generated by the UAV
+rotors. With the nature of such noise being stochastic, the
+resultant enhanced signal could have introduced potential
+distortions. As such, the proposed SNR response scaling
+method overall outperformed [30] by a visible margin.
+This indicates that while a diffuse noise-based T-F mask
+is able to remove some aspects of the noise, a dedicated
+noise mask designed for UAV rotor noise would still be the
+desired option.
+
+5.2 Task 2: Flying UAV scenario, broadband sound source
+Figure 10 shows the localisation results for task 2, with
+details of the statistical test results shown in Table 4. Due
+to the lack of relevant UAV rotor noise data in the flying
+UAV cases for effective DAE training, the baseline method
+outperformed the SNR response scaled method under
+all localisation techniques. Observing the SNR response
+angular spectrum of the baseline and SNR response scaled
+method (see Fig. 11a, b), although SNR response scaling
+reduced noise surrounding the target source location, it
+came with a peak response for the target source less sharp
+than the baseline method, as shown in Fig. 11b. This could
+lead to increased variation in the location path estimations
+and thus decreasing overall accuracy. It is believed this is
+Yen and Hioka EURAS/P Journal on Audio, Speech, and Music Processing
+
+(2020) 2020:13 Page 16 of 26
+
+ 
+
+ 
+
+ 
+
+ 
+
+ 
+
+ 
+
+ 
+
+ 
+
+ 
+
+ 
+
+ 
+
+ 
+
+ 
+
+ 
+
+ 
+
+ 
+
+ 
+
+ 
+
+ 
+
+ 
+
+ 
+
+ 
+
+ 
+
+ 
+
+ 
+
+ 
+
+ 
+
+ 
+
+ 
+
+ 
+
+ 
+
+ 
+
+ 
+
+ 
+
+ 
+
+ 
+
+ 
+
+ 
+
+ 
+
+ 
+
+ 
+
+ 
+
+ 
+
+ 
+
+ 
+
+ 
+
+ 
+
+ 
+
+ 
+
+ 
+
+ 
+
+ 
+
+ 
+
+ 
+
+ 
+
+ 
+
+ 
+
+ 
+
+ 
+
+ 
+
+ 
+
+ 
+
+ 
+
+ 
+
+ 
+
+ 
+
+ 
+
+ 
+
+ 
+
+ 
+
+ 
+
+ 
+
+ 
+
+ 
+
+ 
+
+ 
+
+ 
+
+ 
+
+ 
+
+ 
+
+ 
+
+ 
+
+ 
+
+ 
+
+ 
+
+ 
+
+ 
+
+ 
+
+ 
+
+ 
+
+ 
+
+ 
+
+ 
+
+ 
+
+ 
+
+ 
+
+ 
+
+ 
+
+ 
+
+ 
+
+ 
+
+ 
+
+ 
+
+ 
+
+ 
+
+ 
+
+ 
+
+ 
+
+ 
+
+ 
+
+ 
+
+ 
+
+ 
+
+ 
+
+ 
+
+ 
+
+ 
+
+ 
+
+ 
+
+ 
+
+ 
+
+ 
+
+ 
+
+ 
+
+ 
+
+ 
+
+ 
+
+ 
+
+ 
+
+ 
+
+ 
+
+ 
+
+ 
+
+ 
+
+ 
+
+ 
+
+ 
+
+ 
+
+ 
+
+ 
+
+ 
+
+ 
+
+ 
+
+ 
+
+ 
+
+ 
+
+ 
+
+ 
+
+ 
+
+ 
+
+ 
+
+ 
+
+ 
+
+ 
+
+ 
+
+ 
+
+    
+
+ 
+
+ 
+
+ 
+
+ 
+
+ 
+
+ 
+
+ 
+
+ 
+
+ 
+
+ 
+
+ 
+
+ 
+
+ 
+
+ 
+
+ 
+
+ 
+
+ 
+
+ 
+
+ 
+
+ 
+
+ 
+
+ 
+
+ 
+
+ 
+
+ 
+
+ 
+
+ 
+
+ 
+
+ 
+
+ 
+
+ 
+
+of the trapezoidal indicate the 95% upper and lower confidence limits
+
+ 
+
+3H TTT T TT Tt TT tt tT tT tT tT TT tT TT TT TTT TTT TT ToT TT TTT TOT TO TT TT
+J 4 1 + 1 4 1 J
+B25 4 + L + + 4 4+ 4+ | petty +t t 4 7
+© + + r F
+= 4 + + + +
+A + r
+Q 4
+4 tr 7 +
+— }— - } 4
+© ° E + + ¢#$+rt+ + y + + 4
+= r + + r r +
+© F = + y + 4 + = F |
+=F 4 |
+g t t,t 4 *
++4 + t 4 . 4
+& 15> to, 7 a7 4 ty + t + 1
+> ++ + 4 ++" , t " + | L
+5 | - Fo + 7 Ft 4
+L C + 4 + r t 7 Po E
+oO i 7 Fy 7 _ = + = _t
+Sif . + OF +4477 : + +47
+oO = + + = v [ + OF 4 1 .
+a + Et # t+ + t + #F + 4
+® Te 4 Fee -£t¢E°E i+ + #7 +
++ L t x + + r +
+S |, ,tefe8e4 +7 + fate 4,247 t
+os tt 4 i siititigeteet Pt Tssed, : zig 2
++ - = £ + t = =
+rT as +4 3 t ae | = £ tig Tv ty + —
++ tr + | = +f + £T rz rt + +
+¢+i4-.-¢.77 = Daag (] = $z = T + + e+ ~ ch
+eee eu ee egal BEGEE epee deeb bode ed eed dg aRgege
+oO oO Oo oO © oO oO oO © Oo o oO oO oO oO oO © Oo o oO oO © oO
+EZEBEZEZEBEBEBZEZEZBEBZERZREZBEBEBZESZEZBEBESZEZEBEBZERZEBSES
+RE ZZECQQSSRP ESS PPP PPP PPP Pdr AgaAgaEeeSEGaEAAasEsaG
+Iissss 6A OO ee RBBB BBM AAAAAAAAAHRAAAHKRaAAHAoAAaAHaooA
+aaczgczeges SSeepsoeSsgSSS8SSStaerererrerrreererrreerrrererrree
+oo88 FFF FHHGHOHOHHOHGHOHOITZTL TILES eettreteeeeetaceaa
+88 44 peRE aGaddadao odo da FS SSS SEES SoS DDD DDDDOOD
+6oH2RAO TFET TRARARARAHRHAEFEZZOOCHMNSSSASSELCLEELELELEECES
+OO aooaaleS&loe ee eee tO ZZ SS ESB
+°° SoohCCCeeeereraafGss TESTES ISSRRRRBS
+00002222222222.5:900 a a ie
+NDNHDNNNDNNNHDHWOZ2Z tataeaqeogcagcaacagaga
+COOOL LSS SS SSSessE950 TrerrryZVyYRRRKKKYH RH AH HY
+SSS33 353323656588 ~rtELELCLeLrHeogeoe
+ERSZEGRGS2 95 SES Gesseceregs
+aagZeee o0 TORGHVDHDDHDHDHDHDHH
+=> rz => 2 tS Set
+OdZ2 SSS3353 3338
+OOO$¢ EEZZCOnNN
+6H QQ a2556000a88
+88 tTTlZZ22 aa
+OO 7°90028
+O82
+S688
+OO
+
+Localisation Method
+
+Fig. 10 Flying UAV—broadband sound source (task 2) haversine distance error distribution. Red line indicates the median, upper and lower edges
+of the blue box indicate the 75% and 25% quartiles, upper and lower black bars indicate the maximum and minimum, and upper and lower corners
+
+ 
+
+ 
+
+caused by the limited amount of available data from the
+DREGON dataset [44] for training the DAE: a limitation
+at the point of competition.
+
+In contrast, the proposed method with only the
+RPSL post-processing algorithm applied outperformed
+the baseline with most of the localisation techniques,
+showing improvement in distance error measures, except
+being GCC-PHAT and GCC-NONLIN with max aggre-
+gation, where performance is similar. For this task, GCC-
+PHAT using sum aggregation is the best-performing
+combination, as evident in Table 4. In particular, the
+number of outlier cases significantly reduced, as evi-
+dent in Fig. 10. This is also evident with localisation
+techniques other than GCC-PHAT. Since the primary
+function of GCC-PHAT (and GCC-NONLIN, another
+well-performing option) involves calculating the cross-
+correlation between pairs of microphone signals at differ-
+ent TDOAs, it is generally not influenced by spatial alias-
+ing between the microphones and thus, under a certain
+input SNR, delivers consistent performance. However, as
+expected from the drawbacks from SNR response scaling,
+results with both SNR response scaling and RPSL post-
+processing algorithm applied are not the best-performing
+combinations. While the combinations reduced mean dis-
+tance error overall, other metrics such as median and
+
+quartile measures delivered mixed results, compared to
+the baseline method.
+
+An observation that should be noted is the excep-
+tional performance from the baseline method using GCC-
+NONLIN with sum aggregation. While it is not the best-
+performing combination under mean and median dis-
+tance errors, it delivered the lowest RMSE and maximum
+distance errors. From observing Fig. 10 and Table 4, it
+is apparent that GCC-NONLIN with sum aggregation is
+the only combination where there are no significant out-
+liers, while the combination with RPSL post-processing
+has a single outlier. This could be the leading cause of this
+result. However, it should be noted that the RPSL post-
+processed variant presented lower distance error mea-
+sures in the remaining categories, and thus, the benefits of
+RPSL should not be overlooked.
+
+From observing the actual location estimates in Fig. 12,
+while the estimated location path has shown a slightly
+closer correlation with the ground truth, the RPSL post-
+processing method seems to have reduced some unstable
+variations along the location path. Therefore, in some
+respect, the RPSL algorithm seems to achieve a regular-
+isation effect for the estimation of the path of locations,
+while bringing the overall location estimates closer to the
+ground truth. Another one of such example is shown in
+Yen and Hioka EURASIP Journal on Audio, Speech, and Music Processing (2020) 2020:13 Page 17 of 26
+
+Table 4 Haversine distance error performance comparison (task 2—flying UAV, broadband sound source)
+
+ 
+
+Haversine distance error D (rad) p value: paired
+sample t test
+(ref. best case)
+
+ 
+
+ 
+
+ 
+
+ 
+
+ 
+
+ 
+
+ 
+
+Mean Median Min Max 0.25 quartile 0.75 quartile © RMSE
+Baseline
+GCC-PHAT (max) 0.0868 0.07004 0.002181 2.350 0.04567 0.1035 0.1662 ns.
+GCC-PHAT (sum) 0.0810 0.06459 0.004032 2.457 0.04299 0.0918 0.1690 ns.
+GCC-NONLIN (max) 0.0905 0.06951 0.002702 2.350 0.04345 0.1008 0.1746 ns.
+GCC-NONLIN (sum) 0.0811 0.06633 0.004032 0.686 0.04325 0.0936 0.1155 ons.
+MVDR (max) 0.1690 0.08072 0.004032 2.490 0.04379 0.1199 0.3743 7.88x107°
+MVDR (sum) 0.1590 0.07550 0.003670 1.823 0.04377 0.1148 0.3633 5.15x107>°
+DS (max) 0.2293 0.08965 0.004032 2.436 0.05588 0.1365 0.4655 = 1.10 107%
+DS (sum) 0.1648 0.07734 0.002618 2.465 0.04694 0.1169 0.3625 121x107
+DNM (max) 0.2619 0.09346 0.004032 2.436 0.05745 0.1381 0.5411 2.02x 107 '°
+DNM (sum) 0.1563 =—0.07733 0.003670 2.807 0.04490 0.1130 0.3910 2.62x10~4
+w/ [28] T-F mask
+GCC-PHAT (max) 0.1816 0.07557 0.002919 2.029 0.04480 0.1733 0.3429 =1.78x107'!
+GCC-PHAT (sum) 0.1078 0.06546 0.005047 2.490 0.04372 0.1000 0.2203. 5.32x107°
+w/ [30] T-F mask
+GCC-PHAT (max) 0.2472 0.09462 0.002449 2.558 0.05509 0.2263 0.4670 235x10~'4
+GCC-PHAT (sum) 0.1285 0.07141 0.004966 2.492 0.04797 0.1124 0.2464 4.34x107%
+w/ SNR response scaling
+GCC-PHAT (max) 0.1335 = 0.07025 0.005124 2.259 0.03684 0.1176 0.2813 694x107°
+GCC-PHAT (sum) 0.1010 0.06524 0.007256 2.501 0.03983 0.1105 0.1973 148x107°
+GCC-NONLIN (max) 0.1227 0.07184 0.006535 2.254 0.04138 0.1196 0.2403 146x10~*
+GCC-NONLIN (sum) 0.1101 0.06766 0.004056 2.495 0.03898 0.1116 0.2240 654x107~°
+MVDR (max) 0.2669 0.11614 0.002071 2.498 0.05972 0.3117 0.4617 7.10x107!9
+MVDR (sum) 0.2468 0.11260 0.002633 2475 0.05254 0.1940 0.4403 962x107!
+DS (max) 0.2333 0.10711 0.004002 2.501 0.05783 0.1973 0.4350 =1.37x107'4
+DS (sum) 0.1957 0.09952 0.007290 2.501 0.04939 0.1626 0.3760 286x10~'4
+DNM (max) 0.2448 0.10371 0.000610 = 2.219 0.05417 0.1925 0.4523 1.69x10~'4
+DNM (sum) 0.1967 0.09452 0.003334 2.478 0.05081 0.1501 0.3783 = 2.13x107!?
+w/ RPSL post-processing
+GCC-PHAT (max) 0.0922 0.06516 0.003577 1.936 0.04173 0.0930 0.1844 ons.
+GCC-PHAT (sum) (best case) 0.0746 0.05987 0.004076 2.490 0.04177 0.0852 0.1622 N/A
+GCC-NONLIN (max) 0.0965 0.06428 0.003356 1.937 0.03727 0.0962 0.1927 3.34x107°
+GCC-NONLIN (sum) 0.0805 0.06190 0.002988 2.484 0.03913 0.0900 0.1706 ons.
+MVDR (max) 0.1613 0.07477 0.001200 2.466 0.04130 0.1186 0.3334 -7.74x 107°
+MVDR (sum) 0.1244 0.07330 0.003783 2.478 0.04414 0.1089 0.2646 3.56x10~°
+DS (max) 0.1619 0.07810 0.005783 2.481 0.04922 0.1179 0.3559 241x107’
+DS (sum) 0.1689 0.07352 0.002433 2.484 0.04421 0.1159 0.3812  3.06x10~’
+DNM (max) 0.1810 0.07726 0.004760 2.661 0.04732 0.1266 0.4117 286x107’
+DNM (sum) 0.1777 0.07683 0.004642 2.475 0.04434 0.1205 0.4284 1.12x1076
+
+ 
+
+ 
+Yen and Hioka EURAS/P Journal on Audio, Speech, and Music Processing
+
+Table 4 Haversine distance error performance comparison (task 2—flying UAV, broadband sound source) (Continued)
+
+(2020) 2020:13
+
+Page 18 of 26
+
+ 
+
+Haversine distance error D (rad)
+
+ 
+
+p value: paired
+sample t test
+(ref. best case)
+
+ 
+
+ 
+
+ 
+
+Mean Median Min Max 0.25 quartile 0.75 quartile RMSE
+
+w/ [28] T-F mask + RPSL post-processing
+GCC-PHAT (max) 0.0845 0.06388 0.002919 2.490 0.04131 0.0944 0.1750 3.10x 107?
+GCC-PHAT (sum) 0.0743 0.06234 0.005047 2.490 0.04126 0.0851 0.1621 n.s.
+
+w/ [30] T-F mask + RPSL post-processing
+GCC-PHAT (max) 0.1125 0.06586 0.002449 1.905 0.04632 0.1076 0.2055 439x106
+GCC-PHAT (sum) 0.1038 0.06491 0.004966 2.492 0.04532 0.0944 0.2311 1.031077
+
+w/ SNR response scaling + RPSL post-processing
+GCC-PHAT (max) 0.0979 0.06657 0.005124 2.259 0.03562 0.1070 0.2145 n.s.
+GCC-PHAT (sum) 0.0827 0.05976 0.007256 2.501 0.03822 0.1043 0.1704 2.03x 107?
+GCC-NONLIN (max) 0.0954 0.06629 0.006180 2.254 0.03947 0.1096 0.1854 ns.
+GCC-NONLIN (sum) 0.0971 0.06379 0.004056 2.495 0.03823 0.1076 0.2084 1.201077
+MVDR (max) 0.1476 0.09110 0.002071 1.935 0.05083 0.1392 0.2560 2.79x 1071!
+MVDR (sum) 0.1590 0.09449 0.002633 2475 0.04783 0.1377 0.3062 2.02x 107 '°
+DS (max) 0.1321 0.08498 0.004002 2.501 0.04730 0.1347 0.2426 2.21x107'°
+DS (sum) 0.1208 0.08031 0.007290 2.501 0.04661 0.1321 0.2312 2.51x 107°
+DNM (max) 0.1693 0.09204 0.000610 1.948 0.05196 0.1463 0.3022 5.16x 107!
+DNM (sum) 0.1429 0.08071 0.003334 2.478 0.04672 0.1352 0.2823 4.351079
+
+ 
+
+Results from the baseline method are first presented, followed by results using the T-F mask from [28] and [30] and the proposed method (SNR response scaling and RPSL).
+
+Best-performing numericals for each category are highlighted in bold
+
+Fig. 13, the RPSL post-processing algorithm is able to limit
+the amount of fluctuation in location estimates relative to
+the baseline method, giving a more stable path.
+Comparing the performance of GCC-PHAT using the
+proposed method against the T-F mask from [28] showed
+that both methods could not outperform the baseline.
+While SNR response scaling alone outperformed [28],
+when paired with the RPSL post-processing algorithm,
+[28] outperformed SNR response scaling. In fact, GCC-
+PHAT using sum aggregation with the T-F mask from
+[28] and RPSL post-processing is almost arguably the best-
+performing combination, delivering lowest mean and 0.25
+quartile distance error measures, as shown in Table 4.
+However, due to the same combination without T-F mask-
+ing giving near-identical performance, except median
+distance error, for which showed visibly better improve-
+ments, was considered the best-performing combination.
+Perhaps due to the T-F mask not being a data-driven solu-
+tion, it is more stable against unfamiliar scenarios. Given
+that the T-F mask is primarily designed for speech signals,
+with the target source being broadband noise, could be
+the cause of the lack in performance. The T-F mask from
+[30] delivered the worst results compared to the other
+presented methods. Using the best-performing localisa-
+tion technique (GCC-PHAT) showed that it was unable to
+
+outperform both [28] and the proposed method, with or
+without RPSL post-processing. This is likely driven by the
+broadband target source, where its diffuse characteristics
+rendered it difficult to distinguish the time-continuity in
+the UAV rotor noise from the target sound mixed signal.
+Overall, SNR response scaling and the T-F mask from [28]
+and [30] struggled to deliver noticeable improvements in
+localisation performance.
+
+5.3. Task 3: Flying UAV scenario, speech sound source
+Figure 14 shows the localisation results for task 3, with
+details of the statistical test results shown in Table 5. Sim-
+ilar to the results in task 2, the proposed method using
+only RPSL post-processing outperformed most baseline
+methods, delivering lower overall distance error mea-
+sures under all aspects (mean, median, etc.). Further-
+more, the proposed method with both SNR response
+scaling and RPSL post-processing using many of the
+localisation techniques also outperformed most base-
+line methods. In this task, the DS localisation tech-
+nique with max aggregation and RPSL post-processing is
+the best-performing combination, delivering the lowest
+overall mean, median, and quartile distance error mea-
+sures, with ¢ test results indicating the improvement is
+distinct.
+Yen and Hioka EURASI/P Journal on Audio, Speech, and Music Processing
+
+(2020) 2020:13 Page 19 of 26
+
+ 
+
+Elevataion [degree]
+A nN
+oO oO oO
+
+o
+oO
+
+-80
+
+ 
+
+Elevataion [degree]
+A nO
+oO oO oO
+
+®
+3S
+
+ 
+
+X
+
+One aspect to note is that the many of the localisa-
+tion techniques using both SNR response scaling and
+RPSL post-processing delivered lower mean, median,
+0.75 quartile, and RMSE measured compared to the
+same setup without SNR response scaling, as shown in
+Fig. 14 and Table 5. The only exceptions are MVDR
+with sum aggregation, DS with max aggregation, and
+DNM with max aggregation. This indicates that while
+SNR response scaling lowered the sensitivity in estimat-
+ing peak response locations more accurately, its abil-
+ity to reduce unwanted noise is still apparent. Fur-
+thermore, under the proposed method with only SNR
+response scaling, except MVDR with sum aggrega-
+tion, showed a reduction in maximum distance errors
+
+40.64
+40.62
+40.6
+
+40.58
+40.56
+40.54
+40.52
+40.5
+
+40.48
+
+150 -100 -50 0 50 100 150
+
+Azimuth [degree]
+
+(a)
+-150 -100 -50 0 50 100 150
+
+Azimuth [degree]
+
+Fig. 11 SNR angular spectral response (dB) from SPCup flying UAV broadband sound source (task 2) case 11 a w/o SNR response scaling and b w/ SNR
+response scaling, using GCC-NONLIN with max aggregation. Cross (x) in the diagram represents the algorithm’s estimated peak response location
+
+33.9
+
+ 
+
+(b)
+
+ 
+
+relative to the baseline method. Given that SNR response
+scaling also improved the performance of MVDR with
+max aggregation for task 1 suggest that SNR response
+scaling is still able to deliver some benefits over the base-
+line method when paired with the RPSL post-processing
+algorithm. Another potential aspect could be driven by
+the temporally sparse nature of speech sources. This
+allows the distinguishing between target and UAV noise
+sources to be easier than, for example, broadband sources,
+which is much more continuous and diffuse. However,
+despite these indications of improvement, further tun-
+ing and proper DAE training are still required to bring
+out the true performance gains of SNR response scal-
+ing.
+Yen and Hioka EURASI/P Journal on Audio, Speech, and Music Processing
+
+(2020) 2020:13 Page 20 of 26
+
+ 
+
+ 
+
+ 
+
+ 
+
+Ground truth
+0 Y |» GCC-PHAT [sum]
+> GCC-PHAT [sum]
+5, + RPSL
+Cc
+S -40 1
+©
+>
+® -60 +
+Ww
+-80
+pes
+™<
+100 ™
+ae
+0 ~
+-100
+
+Azimuth [deg]
+
+(RPSL only)
+
+ 
+
+ 
+
+Time [s]
+
+Fig. 12 Example of localisation path estimated for flying UAV broadband sound source (task 2) case 14 [1], using the baseline and proposed method
+
+ 
+
+ 
+
+Despite significant improvements in the overall dis-
+tance error reduction, the accuracy of the predictions for
+most cases is not yet satisfactory for robust localisation
+path estimation. This is suspected to be caused by the
+non-stationary nature of speech (i.e. not all time frames
+contained the target sound source), which may be an issue
+with methods based on using the SNR response in angular
+spectra, according to the previous study [27]. Therefore,
+the fact that localisation can only be carried out in a
+limited number of time frames would have caused the
+
+proposed method to degrade significantly in performance
+when the source signal was speech. In addition, the input
+SNRs in task 3 seem to be much lower than that of other
+tasks in the DREGON database. This elevates the chal-
+lenge in estimating the peak response of the target audio
+source.
+
+Figures 15 and 16 demonstrate two of the more suc-
+cessful path estimates using the proposed method with
+only RPSL post-processing applied, compared against the
+baseline method (cases 2 and 3 [1]), using DS with max
+
+ 
+
+    
+
+  
+
+Ground truth
+~~ GCC-PHAT [sum]
+GCC-PHAT [sum]
++ RPSL
+
+ 
+    
+
+ 
+
+Elevation [deg]
+RL
+oO
+
+ 
+
+(RPSL only)
+
+  
+
+-60
+-80
+“ee _—
+100 ie “see 4
+5 aul —— 3
+. te ae 2
+100 ~~ —— 4
+Azimuth [deg] Time (s]
+
+Fig. 13 Example of localisation path estimated for flying UAV broadband sound source (task 2) case 18 [1], using the baseline and proposed method
+
+ 
+
+ 
+Page 21 of 26
+
+(2020) 2020:13
+
+Yen and Hioka EURASI/P Journal on Audio, Speech, and Music Processing
+
+ 
+
+ 
+
+ 
+
+ 
+
+ 
+
+ 
+
+ 
+
+ 
+
+ 
+
+ 
+
+ 
+
+ 
+
+ 
+
+ 
+
+ 
+
+ 
+
+ 
+
+ 
+
+ 
+
+ 
+
+ 
+
+ 
+
+ 
+
+ 
+
+ 
+
+ 
+
+ 
+
+ 
+
+ 
+
+ 
+
+ 
+
+ 
+
+ 
+
+ 
+
+ 
+
+ 
+
+ 
+
+ 
+
+ 
+
+ 
+
+ 
+
+ 
+
+ 
+
+ 
+
+ 
+
+ 
+
+ 
+
+ 
+
+ 
+
+ 
+
+ 
+
+ 
+
+ 
+
+ 
+
+ 
+
+ 
+
+ 
+
+ 
+
+ 
+
+ 
+
+ 
+
+ 
+
+ 
+
+ 
+
+ 
+
+ 
+
+ 
+
+ 
+
+ 
+
+ 
+
+ 
+
+ 
+
+ 
+
+ 
+
+ 
+
+ 
+
+ 
+
+ 
+
+ 
+
+ 
+
+ 
+
+ 
+
+ 
+
+ 
+
+ 
+
+ 
+
+ 
+
+ 
+
+ 
+
+ 
+
+ 
+
+ 
+
+ 
+
+ 
+
+ 
+
+ 
+
+ 
+
+ 
+
+ 
+
+ 
+
+ 
+
+ 
+
+ 
+
+ 
+
+ 
+
+ 
+
+ 
+
+ 
+
+ 
+
+ 
+
+ 
+
+ 
+
+ 
+
+ 
+
+ 
+
+ 
+
+ 
+
+ 
+
+ 
+
+ 
+
+ 
+
+ 
+
+ 
+
+ 
+
+ 
+
+ 
+
+ 
+
+ 
+
+ 
+
+ 
+
+ 
+
+ 
+
+ 
+
+ 
+
+ 
+
+ 
+
+ 
+
+ 
+
+ 
+
+ 
+
+ 
+
+ 
+
+ 
+
+ 
+
+ 
+
+ 
+
+I-—-—- tee ee Ke Lo aa —----44
+t— IH —- - so or——OdtSE FH
+t— bF-----— al ae --4
+Fo enn nnn - = 44
+L poa------ a
+t— h----—-— a |
+Pe OO SH SH Ee I
+LH Hi ------------- {><} ---=5
+[=== === -------- ——- ------ +
+Oe
+t— h--—-—-—-—-——-—-—----+ x --
+Hi 4 -+
+POCO J PH +H
+ood as
+L po ------------4 a a
+| poe eee EE
+a i --- 4
+t— IH - - HH HH a x k}- 4
+I Poa----- a a
+KO anna = 4
+F as
+L po - === -- {oo -- - = == -4
+- 1------------- a a |
+Bb rr a
+| TUF HH 4H
+Ha HY I rrt—<“SC—isS +4
+HW --------------- or} - - = = = 4
+t— f-—-—-—--—-—-----4H x ----—
+i
+— f—-—-———-—-—-—---H+ IrCC EE 4
+t x
+TE aA
+H+ ------------- ae 4
+| TCR A
+t— F-——-———-—-—--4H TF 4
+rd ee eH Hf IT OH 4
+| el AS
+| To a
+}---------------- a a +
+H— — —————————-—---—--— a ee
+TUN a
+Hin = === eH -- 4
+t— Fo---—-— HH foOme——i+égF 4
+b i
+poe ee ee ee ome dF eH
+ao - = = == == - 44
+i Toot
+N - Oo
+
+[pes] G JOU8 BOURISIP SUISIBACH
+
+[wns] 1Sdu + Buljeos “dsei YNS /M WNG
+[xew] 1Sdy + Bulyeos ‘dseu YNS /M WNG
+[wns] Sd + Bulyeos ‘dseu YNS /M Sq
+[xew] 7Sdy + Bulyeos ‘dsau YNS /M Sq
+[wins] 1Sd¥y + Bulyeos “dseu YNS /M HCAW
+[xew] 1Sdy + Bulyeos “dse1 YNS /M HCAW
+[wns] 1Sdu + Bulyeos “dse1 YNS /M NIINON-009
+[xew] 1Sdu + Buljeos ‘dsed YNS /M NIINON-005
+[wns] 1Sduy + Bulyeos “dseu YNS /M LWHd-009
+[xew] 1Sdy + Bulyeos ‘dse YNS /M LWHd-009
+[wns] 1Sdu + [0€] /M SG
+
+[xew] 1Sdu + [oe] sa
+
+[wins] 1SdH + [82] /M LVWHd-005
+
+[xew] 1SdH + [82] /M LWHd-009D
+
+[wns] SdH /M WING
+
+[xew] Sd /M WING
+
+[wins] 1Sdy /M Sd
+
+[xew] 1Sdy /M Sd
+
+[wins] 1Sdy /M HCAW
+
+[xew] 1Sdy /M HOAW
+
+[wins] 7Sd¥ /M NIINON-0909
+
+[xew] 7Sdy /M NIINON-009
+
+[wns] 1SdHy /M LWHd-009
+
+[xew] 1SdY /M LWHd-009D
+
+[wins] Bulyeos "dsou YNS /M WING
+
+[xew] Bulyeos ‘dsei YNS /M [ING
+
+[wins] Bulyeos ‘dsau YNS /M Sq
+
+[xe] Bulyeos ‘dsei YNS /M Sq
+
+[wins] Buryeos ‘dses YNS /M HGAW
+
+[xew] Buryeos ‘dsos YNS /M HGAW
+
+[wins] Bulyeos ‘dsed YNS /M NIINON-O0D
+[xew] Bulyeos ‘dsed YNS /M NIINON-00D
+[wins] Buljeos ‘dsed YNS /M LWHd-00D
+[xew] Buljeos ‘dsed YNS /M LWHd-00D
+[wins] [oe] /M Sd
+
+[xew] [og] /M Sd
+
+[wns] [gz] /M 1WHd-009
+
+[xew] [8Z] /M 1WHd-009
+
+[wins] WING
+
+[xew] WING
+
+[wns] sq
+
+[xew] Sd
+
+[wns] YHCAW
+
+[xew] HCAW
+
+[wins] NIINON-O0D
+
+[xew] NIINON-099
+
+[wns] 1VWHd-009
+
+[xew] 1WHd-009
+
+Localisation Method
+
+speech sound source (task 3) haversine distance error distribution. Red line indicates the median, upper and lower edges of
+
+Fig. 14 Flying UAV.
+
+the blue box indicate the 75% and 25% quartiles, upper and lower black bars indicate the maximum and minimum, and upper and lower corners of
+
+the trapezoidal indicate the 95% upper and lower confidence limits
+
+ 
+
+ 
+
+Table 5 Haversine distance error performance comparison (task 3—flying UAV, speech sound source)
+
+ 
+
+p value: paired sample t test (ref.
+
+best case)
+
+Haversine distance error D (rad)
+
+ 
+
+RMSE
+
+0.75 quartile
+
+0.25 quartile
+
+Max
+
+Min
+
+Median
+
+Mean
+
+ 
+
+Baseline
+
+1.81x107!7
+2.11«10729
+
+2.13x107!!
+
+1.362
+1.582
+1.233
+1.390
+1.138
+1.232
+1.141
+1.328
+1.300
+1.356
+
+1.680
+1.920
+1.638
+1.665
+1.515
+1.680
+1.36]
+1.668
+1.674
+1.698
+
+0.5444
+0.7456
+0.4434
+0.7088
+0.3166
+0.5146
+0.2789
+0.4927
+0.5015
+0.6410
+
+3.039
+
+0.00440
+0.02862
+0.00440
+0.02862
+0.00708
+
+0.9486
+1.2730
+0.8480
+1.0604
+0.8164
+0.8897
+0.7378
+0.8598
+0.9123
+0.9798
+
+1.143
+1.375
+1.022
+1.206
+0.913
+
+GCC-PHAT (max)
+GCC-PHAT (sum)
+
+3.039
+
+2.912
+
+GCC-NONLIN (max)
+
+8.98x 1072!
+
+2.971
+
+GCC-NONLIN (sum)
+
+MVDR (max)
+
+5.83107’
+
+2.993
+
+23910718
+
+2.501
+
+0.01019
+
+1.045
+0.881
+
+MVDR (sum)
+DS (max)
+DS (sum)
+
+1.27x 1074
+2.47 107'6
+
+3.015
+
+0.00800
+0.01492
+
+0.00437
+
+3.024
+3.015
+
+1.083
+1.088
+1.160
+
+2.31«107!6
+
+DNM (max)
+
+1.19x 10720
+
+3.056
+
+0.03962
+
+DNM (sum)
+
+w/ [28] T-F mask
+
+1.181073!
+
+1.441
+1.398
+
+1.824
+1.735
+
+0.07181 2.776 0.6593
+2.827 0.7090
+
+1.2783
+1.2153
+
+1.277
+1.247
+
+GCC-PHAT (max)
+GCC-PHAT (sum)
+
+1.06 10728
+
+0.07979
+
+w/ [30] T-F mask
+
+3.05x107!7
+
+1.243
+1.281
+
+1.602
+1.644
+
+2.540 0.4983
+0.5042
+
+2.540
+
+0.01399
+0.01038
+
+0.9775
+1.0249
+
+1.052
+1.097
+
+DS (max)
+DS (sum)
+
+7.08 10729
+
+ 
+Yen and Hioka EURAS/P Journal on Audio, Speech, and Music Processing
+
+(2020) 2020:13 Page 22 of 26
+
+Table 5 Haversine distance error performance comparison (task 3—flying UAV, speech sound source) (Continued)
+
+ 
+
+Haversine distance error D (rad)
+
+p value: paired sample t
+test (ref. best case)
+
+ 
+
+ 
+
+ 
+
+ 
+
+ 
+
+ 
+
+Mean Median Min Max 0.25 quartile 0.75 quartile RMSE
+w/ SNR response scaling
+GCC-PHAT (max) 1.207 1.1717 0.07321 2.669 0.6054 1.811 1.390 5.77x 10772
+GCC-PHAT (sum) 1.325 1.2988 0.11448 2.989 0.7246 1.866 1.501 3.25 107°
+GCC-NONLIN (max) 1.170 1.1192 0.07740 2.633 = 0.5953 1.711 1.347. 285x107?!
+GCC-NONLIN (sum) 1.250 1.2045 0.06879 2.956 0.7501 1.761 1.404 1.75x 10779
+MVDR (max) 1.045 0.9847 0.02859 2472 0.5349 1.596 1.204  297x107'6
+MVDR (sum) 1.103 1.0282 0.02711 2.729 0.6316 1.594 1.253 1.22 10774
+DS (max) 0.999 0.8668 0.03225 2.583 0.4278 1.626 1.198 115x107"
+DS (sum) 1.115 1.0375 0.01969 2.991 0.5803 1.722 1.292 433x107?!
+DNM (max) 1.174 1.2215 0.02945 2.613 0.6012 1.728 1.345 2.37x 107?
+DNM (sum) 1.160 1.0620 0.04191 2740 0.6189 1.724 1.323 548x 10774
+w/ RPSL post-processing
+GCC-PHAT (max) 1.129 1.0451 0.03077 2.691 0.6323 1.547 1.282 3.221077?
+GCC-PHAT (sum) 1.294 1.1847 0.03292 2877 0.7323 1.769 1.458 1.44x 1073!
+GCC-NONLIN (max) 1.083 1.0325 0.00474 2.543 0.5527 1.568 1.265 1.66x107!/
+GCC-NONLIN (sum) 1.093 1.0342 0.00901 2644 0.6126 1.505 1.251 4.22 10-7
+MVDR (max) 0826 0.6226 0.02069 2382 0.2362 1.476 1.063 3.07x 10-5
+MVDR (sum) 0864 0.6437 0.02214 2.250 0.3550 1.583 1.078  467x10-8
+DS (max) 0.706 04435 0.02207 2424 0.1956 1.176 0.962 ns.
+DS (sum) 0850 0.6395 0.02145 2.501 0.3336 1.325 1.071 1.28 10~°
+DNM (max) 0.982 0.8109 0.01968 2.444 0.4646 1.441 1.167 1.33x107'4
+DNM (sum) 0.980 0.7641 0.03962 2.551 0.4765 1.434 1.169 181x107)?
+w/ [28] T-F mask + RPSL post-processing
+GCC-PHAT (max) 1.167 1.0996 0.09304 2.617 0.6643 1.607 1316 8.901076
+GCC-PHAT (sum) 1.285 1.1122 0.04744 2.912 0.6868 1.751 1.473 4.50x 107°?
+w/ [30] T-F mask + RPSL post-processing
+DS (max) (bestcase) 0.684 0.4362 0.00038 2593 0.1827 0.937 0.951 N/A
+DS (sum) 0786 05264 0.02560 2452 0.2546 1.288 1.015 2.66x 107?
+w/ SNR response scaling + RPSL post-processing
+GCC-PHAT (max) 1.067 0.9980 0.07649 2852 0.5852 1.515 1.241 5.90x 10-18
+GCC-PHAT (sum) 1.202 1.1322 0.06775 2.945 0.6837 1.696 1.373 4.18x 1077
+GCC-NONLIN (max) 0893 0.6941 0.01799 2408 0.4562 1.208 1.082 1.401077
+GCC-NONLIN (sum) 1066 0.9414 0.07722 2510 05493 1.565 1.236  2.76x107!°
+MVDR (max) 0770 0.5080 0.01199 2530 0.2716 1.207 0.996 ns.
+MVDR (sum) 0.984 0.8222 0.03901 2.297 0.4840 1.558 1.167 2.44 107!°
+DS (max) 0759 05406 0.01738 2344 0.2379 1.268 0.996 ns.
+DS (sum) 0753 0.5300 0.02859 2.311 0.2693 1.094 0.978 ns.
+DNM (max) 0.996 0.8491 0.04045 2.451 0.4684 1.520 1.189 952x107!
+DNM (sum) 0.957 08381 0.05366 2303 0.4342 1.371 1.142 1.19x107!?
+
+ 
+
+Results from the baseline method are first presented, followed by results using the T-F mask from [28] and [30] and the proposed method (SNR response scaling and RPSL).
+Best-performing numericals for each category are highlighted in bold
+Yen and Hioka EURASI/P Journal on Audio, Speech, and Music Processing
+
+(2020) 2020:13 Page 23 of 26
+
+ 
+
+Ground truth
+0 {| —— ps [max]
+DS [max]
+
+Elevation [deg]
+® &k WN
+© © a)
+
+o
+°
+
+(RPSL only)
+
+ 
+
+ 
+
+Eo ——— 2
+400 ~~~ ="
+Azimuth [deg] 0 Time [s]
+
+Fig. 15 Example of localisation path estimated for flying UAV speech sound source (task 3) case 2 [1], using the baseline and proposed method
+
+ 
+
+ 
+
+aggregation. As shown with the baseline method, the low
+input SNR coupled with speech source being temporally
+sparser than UAV rotor noise, there are major fluctuations
+in location estimations. On the other hand, the proposed
+method with only RPSL post-processing applied is able
+to estimate some of the locations along the path success-
+fully. As some of the location estimates from the baseline
+method are correctly estimated, the RPSL post-processing
+algorithm is able to utilise these data points and per-
+form restricted peak search (see Section 3.3), limiting
+
+influences coming from the UAV rotors and reverbera-
+tion effects, and thereby give a much more accurate path
+
+estimate.
+Figure 17 shows an unsuccessful example of localisation
+
+path estimation (case 10 [1]). Here, while there were a few
+
+correct estimates of Os slight (t) using the baseline method,
+most are significantly different to that of the ground truth.
+Therefore, there was a limited basis for the RPSL post-
+processing algorithm to perform restricted peak search
+effectively. Therefore, while the variation in localisation
+
+ 
+
+ND
+So O°
+
+Elevation [deg]
+i
+oO
+
+   
+
+“60 - Ground truth
+*—— DS [max]
+ais DS [max]
+—— + RPSL
+100 ™
+>
+0 Tg __
+-4 00 SS 1
+Azimuth [deg] 0 Time [s]
+
+Fig. 16 Example of localisation path estimated for flying UAV speech sound source (task 3) case 3 [1], using the baseline and proposed method
+(RPSL only)
+
+ 
+
+ 
+Yen and Hioka EURASIP Journal on Audio, Speech, and Music Processing (2020) 2020:13 Page 24 of 26
+
+ 
+
+Elevation [deg]
+
+Ground truth
+—>— DS [max]
+
+DS [max]
++ RPSL
+
+   
+
+peo
+ae 2
+—_—
+
+400 \—
+Azimuth [deg] 0 Time [s]
+
+Fig. 17 Example of localisation path estimated for flying UAV speech sound source (task 3) case 10 [1], using the baseline and proposed method
+(RPSL only)
+
+ 
+
+ 
+
+ 
+
+path estimate is much less chaotic compared to the base- performance difference is not definitive. Therefore, the
+line method, the overall path is incorrect. A potential performance advantages delivered by SNR response scal-
+method to resolve this deficiency would be to generate an _ ing should not be overlooked. In addition, both T-F masks
+and SNR response scaling with RPSL post-processing out-
+performed RPSL post-processing alone. This could be
+driven by the target sound source being speech, where
+temporal sparsity can be expected, and some aspects of
+the UAV noise can be distinguished more successfully
+from the target source.
+
+It should be noted that for both tasks 2 and 3, SNR
+response scaling suffered significantly from the lack of
+
+initial Os, sight(E) that takes in multiple peaks, such as the
+second and third largest peaks (instead of the single max-
+imum peak), to create a wider grid of location points to
+perform local path search. Since it is unlikely that the UAV
+flight path would change in a severely rapid manner, hav-
+ing a larger number of potential local path estimates may
+grant a higher possibility in successful linking of the cor-
+rect local paths together. However, exploring the problem
+further remains as future work. available training data. As mentioned in Section 4.1,
+
+Like with task 2, we compare the performance between 8iven access to the UAV system for noise recordings,
+GCC-PHAT with the proposed method against the T- it is expected that noise removal performance would
+F mask from [28], and the best-performing localisation significantly increase with sufficient data available for
+technique using the T-E mask from [30] (DS). Again, Proper DAE training, thereby improving localisation
+
+as shown Fig. 14 and Table 5, both T-E masks and performance for both target source types. However, this
+
+SNR response scaling could not outperform the base- ‘eMains a future investigation.
+
+line. Different to that from task 2, while SNR response
+
+scaling with max aggregation alone outperformed both 6 Conclusion
+
+[28], this was not the case with sum aggregation. How- A method based on the multi-source TDOA estimation
+ever, when paired with the RPSL post-processing algo- in reverberant audio using angular spectra, to perform
+rithm, SNR response scaling with max aggregation out- sound localisation for a UAV-embedded audio record-
+performed [28], with sum aggregation showing simi- ing system, is proposed. The study proposes extensions
+lar performance. On the other hand, comparing RPSL _ to improve localisation accuracy of the baseline method.
+paired SNR response scaling against the pairing with The extensions include a means of reducing the UAV
+[30] using DS showed similar performance. Although rotor noise effect via a weighting envelope based on the
+[30] was able to deliver slightly better performance UAV rotor noise PSD. In addition, the proposed method
+figures with max aggregation (while SNR response scal- also introduces an angular spectral range RPSL post-
+ing slightly outperformed [30] with sum aggregation), the | processing algorithm to improve localisation accuracies
+p value from the paired sample ¢ test indicates that this for the flying (moving) UAV scenario.
+Yen and Hioka EURASI/P Journal on Audio, Speech, and Music Processing
+
+Experimental results using the dataset provided by
+the SPCup show that with proper DAE training, SNR
+response scaling improves SNR angular spectral response,
+resulting in a reduction in localisation error. The RPSL
+post-processing algorithm also displayed improvement in
+performance consistency even under low input SNR con-
+ditions when the source is a non-stationary signal, and
+the UAV is in motion. Future work includes accessing the
+UAV system for proper UAV rotor noise data collection,
+to properly investigate the SNR response scaling’s ability
+to reduce UAV rotor noise effects under flying UAV sce-
+narios. More challenging scenarios to investigate include
+rapid movement of the UAV or inclusion of spatially
+coherent interfering sound sources Ny.
+
+Abbreviations
+
+UAV: Unmanned aerial vehicle; SNR: Signal-to-noise ratio; TDOA: Time
+difference of arrival; PSD: Power spectral density; NN: Neural network; CNN:
+Convolutional neural network; DAE: Denoising autoencoder; MUSIC: Multiple
+signal classification; SRP-PHAT: Steered response power with phase transform;
+SPCup: 2019 IEEE Signal Processing Cup; STFT: Short-time Fourier transform;
+GCC-PHAT: Generalised cross-correlation-phase transform; GCC-NONLIN:
+Generalised cross-correlation- nonlinear; MVDR: Minimum variance
+distortionless response; DNM: Diffuse noise model; AE: Autoencoder; ReLU:
+Rectified linear unit; LeakyReLU: Leaky rectified linear unit; MSE: Mean square
+error; REHASP: REpeated HArvard Sentence Prompts; RMSE: Root mean square
+error; RPSL: Restricted peak search and link; ANOVA: Analysis of variance
+
+Acknowledgements
+
+We would like to give our thanks to the Acoustics Research Centre, University
+of Auckland, for supporting this project. We would also like to thank Alec
+Handyside, James Kennelly, Dylan Leslie, and Weichi Liu for their work and
+effort as ateam in the development of the study's proposed method for the
+2019 IEEE SPCup.
+
+Authors’ contributions
+
+Benjamin Yen led the University of Auckland student team in the participation
+of the 2019 IEEE SPCup, including algorithm development, prototyping, and
+tuning. Benjamin Yen prepared the manuscript. Yusuke Hioka led the initiative
+of the study and supervised Benjamin Yen. Yusuke Hioka and Benjamin Yen
+reviewed edited the manuscript. All authors read and approved the
+manuscript.
+
+Funding
+This study was funded by the Acoustics Research Centre, University of
+Auckland.
+
+Availability of data and materials
+
+The datasets generated and/or analysed during the current study are available
+in the DRone EGonoise and localizatiON dataset (DREGON) repository, http://
+dregon.inria.fr/datasets/the-spcup19-egonoise-dataset/.
+
+Competing interests
+The authors declare that they have no competing interests.
+
+Received: 29 May 2020 Accepted: 10 September 2020
+Published online: 22 September 2020
+
+References
+
+1. A. Deleforge, D. Di Carlo, M. Strauss, R. Serizel, L. Marcenaro, Audio-based
+search and rescue with a drone: highlights from the IEEE signal processing
+cup 2019 student competition. IEEE Signal Proc. Mag., 138-144 (2019)
+
+2. R. Verrier, Drones Are Providing Film and TV Viewers a New Perspective on the
+Action. (Los Angeles Times, 2017). http://www.latimes.com/
+
+(2020) 2020:13
+
+20.
+
+Page 25 of 26
+
+entertainment/envelope/cotown/la-et-ct-drones-hollywood-20151008-
+story.html|
+
+M. Margaritoff, An English Lifeboat Crew Is Testing Drones for Search and
+Rescue. (The Drive, 2017). http://www.thedrive.com/aerial/14528/an-
+english-lifeboat-crew-is-testing-drones-for-search-and-rescue
+
+A. Charlton, Police Drone to Fly Over New Year's Eve Celebrations in Times
+Square. (Salon, 2018). https://www.salon.com/2018/12/31/police-drone-
+to-fly-over-new- years-eve-celebrations-in-times-square_partner
+
+S. McCarthy, Chinese Police Use Drone to Rescue Man Lost in XinJiang Desert.
+(South China Morning Post, 2018). https://www.scmp.com/news/china/
+society/article/2 16809 1/chinese- police- use-drone-rescue-man-lost-
+xinjiang-desert
+
+A. Lusher, Teenage Rape Victim Found by Police Drone with Thermal Imaging
+Camera. (The Independent, 2018). https://www.independent.co.uk/news/
+uk/crime/police-drone-thermal-rape-victim-teenager-boston-
+lincolnshire-surveillance-technology-crime-fighting-a85 72656.htm|
+
+M. Ablon, Crews: Both Climbers from Looking Glass Rock Rescued, One Taken
+to Hospital After Nearly 150-Foot Fall. (FOX Carolina, 2019). https://www.
+foxcarolina.com/news/rescuers-searching-for-rock-climbers-at-looking-
+glass-rock/article_40faa27c-273e-11e9-8d/7f-9f80965783a8.htm|
+
+Y. Bando, H. Saruwatari, N. Ono, S. Makino, K. Itoyama, D. Kitamura, M.
+Ishimura, M. Takakusaki, N. Mae, K. Yamaoka, et al, Low latency and high
+quality two-stage human-voice-enhancement system for a hose-shaped
+rescue robot. J. Robot. Mechatron. 29(1), 198-212 (2017)
+
+Y. Hioka, M. Kingan, G. Schmid, R. McKay, K. A. Stol, Design of an
+unmanned aerial vehicle mounted system for quiet audio recording.
+Appl. Acoust. 155, 423-427 (2019)
+
+B. Yen, Y. Hioka, B. Mace, in 2078 16th International Workshop on Acoustic
+Signal Enhancement (IWAENC). Improving power spectral density
+estimation of unmanned aerial vehicle rotor noise by learning from
+non-acoustic information, (2018), pp. 545-549. https://ieeexplore.ieee.
+org/document/8521 324. Accessed 19 Dec 2019
+
+L. Wang, A. Cavallaro, in 2016 13th IEEE International Conference on
+Advanced Video and Signal Based Surveillance (AVSS). Ear in the sky: ego-
+noise reduction for auditory micro aerial vehicles (IEEE, 2016), pp. 152-158.
+https://ieeexplore.ieee.org/document/7738063. Accessed 19 Dec 2019
+
+L. Wang, A. Cavallaro, Microphone-array ego-noise reduction algorithms
+for auditory micro aerial vehicles. IEEE Sensors J. 17(8), 2447-2455 (2017)
+M. Brandstein, D. Ward, Microphone Arrays: Signal Processing Techniques
+and Applications, Digital Signal Processing. (Springer, 2001). http://link.
+springer.com/10.1007/978-3-662-04619-7. Accessed 26 June 2017
+
+P. Marmaroli, X. Falourd, H. Lissek, in Acoustics 2012, ed. by S. F.
+d’Acoustique. A UAV motor denoising technique to improve localization
+of surrounding noisy aircrafts: proof of concept for anti-collision systems,
+(Nantes, 2012). https://hal.archives-ouvertes.fr/hal-0081 1003/document
+K. Furukawa, K. Okutani, K. Nagira, T. Otsuka, K. Itoyama, K. Nakadai, H. G.
+Okuno, in 2013 IEEE/RSJ International Conference on Intelligent Robots and
+Systems (IROS). Noise correlation matrix estimation for improving sound
+source localization by multirotor UAV, (2013), pp. 3943-3948. https://
+ieeexplore.ieee.org/document/6696920
+
+K. Washizaki, M. Wakabayashi, M. Kumon, in 2076 IEEE/RSJ International
+Conference on Intelligent Robots and Systems (IROS). Position estimation of
+sound source on ground by multirotor helicopter with microphone array
+(IEEE, Daejeon, 2016), pp. 1980-1985. http://ieeexplore.ieee.org/abstract/
+document/7759312/. Accessed 29 June 2017
+
+L. Wang, A. Cavallaro, Acoustic sensing from a multi-rotor drone. IEEE
+Sensors J. 18(11), 4570-4582 (2018)
+
+K. Okutani, T. Yoshida, K. Nakamura, K. Nakadai, in /ntelligent Robots and
+Systems (IROS), 2012 IEEE/RSJ International Conference on. Outdoor auditory
+scene analysis using a moving microphone array embedded in a
+quadrocopter, (2012), pp. 3288-3293. https://ieeexplore.ieee.org/
+abstract/document/6385994. Accessed 19 Dec 2019
+
+T. Ohata, K. Nakamura, T. Mizumoto, T. Taiki, K. Nakadai, in 2074 IEEE/RSJ
+International Conference on Intelligent Robots and Systems. Improvement in
+outdoor sound source detection using a quadrotor-embedded
+microphone array (IEEE, 2014), pp. 1902-1907. https://ieeexplore.ieee.
+org/document/6942813. Accessed 19 Dec 2019
+
+K. Nakadai, M. Kumon, H. G. Okuno, K. Hoshiba, M. Wakabayashi, K.
+Washizaki, T. Ishiki, D. Gabriel, Y. Bando, T. Morito, R. Kojima, O. Sugiyama,
+in 2017 IEEE/RSJ International Conference on Intelligent Robots and Systems
+Yen and Hioka EURASI/P Journal on Audio, Speech, and Music Processing
+
+21.
+
+22.
+
+23.
+
+24.
+
+25,
+
+26.
+
+2/.
+
+28.
+
+29,
+
+30.
+
+31.
+
+32.
+
+33.
+
+34.
+
+35.
+
+36.
+
+37.
+
+38.
+
+39.
+
+(IROS). Development of microphone-array-embedded UAV for search and
+rescue task, (2017), pp. 5985-5990. https://doi.org/10.1 109/IROS.2017.
+8206494
+
+M. Basiri, F. Schill, P. U. Lima, D. Floreano, in 2012 IEEE/RSJ International
+Conference on Intelligent Robots and Systems. Robust acoustic source
+localization of emergency signals from micro air vehicles, (2012),
+
+pp. 4737-4742. https://ieeexplore.ieee.org/document/6385608. Accessed
+19 Dec 2019
+
+M. Basiri, F. Schill, P. Lima, D. Floreano, On-board relative bearing
+estimation for teams of drones using sound. IEEE Robot. Autom. Lett. 1(2),
+820-827 (2016)
+
+T. Ishiki, M. Kumon, in 2074 IEEE International Symposium on Safety, Security,
+and Rescue Robotics (SSRR). A microphone array configuration for an
+auditory quadrotor helicopter system, (2014), pp. 1-6. https://ieeexplore.
+ieee.org/document/701 7653. Accessed 19 Dec 2019
+
+T. Ishiki, M. Kumon, in 2075 IEEE/RSJ International Conference on Intelligent
+Robots and Systems (IROS). Design model of microphone arrays for
+multirotor helicopters, (2015), pp. 6143-6148. https://ieeexplore.ieee.org/
+document/7354252. Accessed 19 Dec 2019
+
+T. Ishiki, K. Washizaki, M. Kumon, Evaluation of microphone array for
+multirotor helicopters. J. Robot. Mechatron. 29(1), 168-176 (2017)
+
+J. Choi, J. Chang, in 2020 International Conference on Electronics,
+Information, and Communication (ICEIC). Convolutional neural
+network-based direction-of-arrival estimation using stereo microphones
+for drone, (Barcelona, 2020), pp. 1-5. https://ieeexplore.ieee.org/
+document/905 1364
+
+C. Blandin, A. Ozerov, E. Vincent, Multi-source TDOA estimation in
+reverberant audio using angular spectra and clustering. Signal Process.
+92(8), 1950-1960 (2012). Latent Variable Analysis and Signal Separation
+R. Lee, M.-S. Kang, B.-H. Kim, K.-H. Park, S. Q. Lee, H.-M. Park, Sound source
+localization based on GCC-PHAT with diffuseness mask in noisy and
+reverberant environments. IEEE Access. 8, 7373-7382 (2020)
+
+W. Zhang, Y. Zhou, Y. Qian, in Proc. Interspeech 2019. Robust DOA
+estimation based on convolutional neural network and time-frequency
+masking, (Graz-Austria, 2019), pp. 2703-2707. https://www.isca-speech.
+org/archive/Interspeech_2019/pdfs/3158.pdf
+
+T. Gerkmann, R. C. Hendriks, Unbiased MMSE-based noise power
+estimation with low complexity and low tracking delay. IEEE Trans. Audio
+Speech Language Process. 20(4), 1383-1393 (2012)
+
+X. Li, S. Leglaive, L. Girin, R. Horaud, Audio-noise power spectral density
+estimation using long short-term memory. IEEE Signal Process. Lett. 26(6),
+918-922 (2019)
+
+Z.-W. Tan, A. H.-T. Nguyen, A. W.-H. Khong, in 2019 Proceedings of
+Asia-Pacific Signal and Information Processing Association (APSIPA). An
+efficient dilated convolutional neural network for UAV noise reduction at
+low input SNR, (2019), pp. 1885-1892
+
+Y. Hioka, M. Kingan, G. Schmid, K. A. Stol, in 2076 IEEE International
+Workshop on Acoustic Signal Enhancement (IWAENC). Speech
+enhancement using a microphone array mounted on an unmanned
+aerial vehicle, (2016), pp. 1-5. http://ieeexplore.ieee.org/abstract/
+document/7602937/. Accessed 24 June 2017
+
+C. Knapp, G. Carter, The generalized correlation method for estimation of
+time delay. IEEE Trans. Acoust. Speech Signal Process. 24(4), 320-327
+(1976). https://doi.org/10.1109/TASSP.1976.1 162830
+
+|. McCowan, Microphone Arrays: a Tutorial. (Queensland University,
+Australia, 2001), pp. 1-38
+
+H. Cox, R. M. Zeskind, M. M. Owen, Robust adaptive beamforming. IEEE
+Trans. Acoust. Speech Signal Process. 35(10), 1365-1376 (1987)
+
+C. Blandin, E. Vincent, A. Ozerov, in 20177 IEEE International Conference on
+Acoustics, Speech and Signal Processing (ICASSP). Multi-source TDOA
+estimation using SNR-based angular spectra, (2011), pp. 2616-2619
+
+B. Loesch, B. Yang, in 9th International Conference on Latent Variable
+Analysis and Signal Separation (LVA/ICA). Blind source separation based on
+time-frequency sparseness in the presence of spatial aliasing, (2010),
+
+pp. 1-8
+
+P. Vincent, H. Larochelle, Y. Bengio, P.-A. Manzagol, in Proceedings of the
+25th International Conference on Machine Learning. Extracting and
+composing robust features with denoising autoencoders (ICML, Helsinki,
+2008), pp. 1096-1103. https://dl.acm.org/doi/abs/10.1145/1390156.
+1390294
+
+(2020) 2020:13
+
+40.
+
+41.
+
+42.
+
+43.
+
+Ad,
+
+ 
+
+ 
+
+Page 26 of 26
+
+P. Welch, The use of fast fourier transform for the estimation of power
+spectra: a method based on time averaging over short, modified
+periodograms. IEEE Trans. Audio Electroacoustics. 15(2), 70-73 (1967)
+A.L. Maas, A. Y. Hannun, A. Y. Ng, in ICML Workshop on Deep Learning for
+Audio, Speech and Language Processing. Rectifier nonlinearities improve
+neural network acoustic models (ICML, Atlanta, 2013). http://robotics.
+stanford.edu/~amaas/papers/relu_hybrid_icm1|2013_final.pdf
+
+D. P. Kingma, J. Ba, in International Conference on Learning Representations
+(ICLR). Adam: a method for stochastic optimization (ICLR, San Diego,
+2015). https://arxiv.org/abs/1412.6980
+
+Y. Bando, K. Itoyama, M. Konyo, S. Tadokoro, K. Nakadai, K. Yoshii, T.
+Kawahara, H. G. Okuno, Speech enhancement based on bayesian low-rank
+and sparse decomposition of multichannel magnitude spectrograms.
+IEEE/ACM Trans. Audio Speech Lang. Process. 26(2), 215-230 (2018)
+
+M. Strauss, P. Mordel, V. Miguet, A. Deleforge, in 2078 IEEE/RSJ International
+Conference on Intelligent Robots and Systems (IROS). Dregon: dataset and
+methods for uav-embedded sound source localization (IROS, Madrid,
+2018), pp. 1-8. https://ieeexplore.ieee.org/abstract/document/8593581/
+F. Grondin, D. Létourneau, F. Ferland, V. Rousseau, F. Michaud, The
+manyears open framework. Auton. Robot. 34(3), 217-232 (2013)
+
+G. E. Henter, T. Merritt, M. Shannon, C. Mayo, S. King, in Fifteenth Annual
+Conference of the International Speech Communication Association.
+Measuring the perceptual effects of modelling assumptions in speech
+synthesis using stimuli constructed from repeated natural speech, (2014)
+R. W. Sinnott, Virtues of the haversine. Sky Telesc. 68, 159 (1984)
+
+F. Curtin, P. Schulz, Multiple correlations and Bonferroni's correction. Biol.
+Psychiatry. 44(8), 775-777 (1998)
+
+Y. Ephraim, D. Malah, Speech enhancement using a minimum
+mean-square error log-spectral amplitude estimator. IEEE Trans. Acoust.
+Speech Signal Process. 33(2), 443-445 (1985)
+
+Publisher’s Note
+Springer Nature remains neutral with regard to jurisdictional claims in
+published maps and institutional affiliations.
+
+ 
+
+ 
+
+ 
+
+ 
+
+ 
+
+S
+Submit your manuscript to a SpringerOpen®
+journal and benefit from:
+> Convenient online submission
+> Rigorous peer review
+> Open access: articles freely available online
+> High visibility within the field
+> Retaining the copyright to your article
+Submit your next manuscript at > springeropen.com
+)
+
+ 

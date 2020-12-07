@@ -1,0 +1,1808 @@
+np} Quantum Information
+
+ARTICLE OPEN
+
+www.nature.com/npjqi
+
+® Check for updates
+
+The Born supremacy: quantum advantage and training
+
+of an Ising Born machine
+
+Brian Coyle@'*, Daniel Mills@®', Vincent Danos'* and Elham Kashefi'”
+
+The search for an application of near-term quantum devices is widespread. Quantum machine learning is touted as a potential
+
+utilisation of such devices, particularly those out of reach of the simulation capabilities of classical computers. In this work, we study
+such an application in generative modelling, focussing on a class of quantum circuits known as Born machines. Specifically, we
+
+define a subset of this class based on Ising Hamiltonians and show that the circuits encountered during gradient-based training
+cannot be efficiently sampled from classically up to multiplicative error in the worst case. Our gradient-based training methods use
+cost functions known as the Sinkhorn divergence and the Stein discrepancy, which have not previously been used in the gradient-
+based training of quantum circuits, and we also introduce quantum kernels to generative modelling. We show that these methods
+outperform the previous standard method, which used maximum mean discrepancy (MMD) as a cost function, and achieve this
+with minimal overhead. Finally, we discuss the ability of the model to learn hard distributions and provide formal definitions for
+‘quantum learning supremacy’. We also exemplify the work of this paper by using generative modelling to perform quantum circuit
+
+compilation.
+
+npj Quantum Information (2020)6:60; https://doi.org/10.1038/s41534-020-00288-9
+
+INTRODUCTION
+
+As quantum devices with ~80—200 qubits, but without fault
+tolerance, begin to be built, we near the dawn of the noisy
+intermediate scale quantum (NISQ)' technology era. Because of
+the low number of qubits, the limited connectivity between them,
+and the low circuit depth permitted by low decoherence times,
+these devices cannot perform many of the most famous
+algorithms thought to demonstrate exponential speedups over
+classical algorithms”.
+
+In spite of this, NISQ devices could provide efficient solutions to
+other problems that cannot be solved in polynomial time by
+classical means. Showing this to be true is referred to as a
+demonstration of quantum computational supremacy~ ”, with the
+first such experimental realisation occurring recently’®.
+
+Proposals for demonstrations of quantum computational
+supremacy on NISQ technology typically involve sampling from
+the output distribution of random quantum circuits. While a
+realisation of such an advantage is of great theoretical importance,
+generating random samples is not obviously independently
+interesting. We incorporate this sampling into a useful application,
+keeping the provable quantum advantage, but in a context with
+more practical applicability.
+
+Specifically, we explore generative modelling in quantum
+machine learning (QML), which is the task of generalising from a
+finite set of samples, fy}“, drawn from a data set. By learning the
+underlying probability distribution from which these samples are
+drawn, 71(y), a model should be able to generate new samples
+from the said distribution.
+
+Generative models range from simple naive Bayes'' models to
+complicated neural networks, like generative adversarial networks
+(GANs)'*. The intrinsic randomness inherent in quantum
+mechanics allows for the definition of a new class of generative
+models that are without a classical analogue. Known as Born
+machines'*"'?, they have the ability to produce statistics
+
+according to Born’s measurement rule. Specifically, for a state
+|W), a measurement produces a sample x ~ p(x) = |(x|W)|*. There
+are several variants, including Bayesian approaches'®, adversarial
+training methods'’, and adaptations to continuous distributions '®.
+
+Quantum circuit Born machines (QCBM) are a subclass of
+parameterised quantum circuits (PQCs) and are widely applicable
+(see ref. '? for a review). PQCs consist of a quantum circuit which
+carries parameters that are updated during a training process
+(typically a classical optimisation routine). The circuit is kept as
+shallow as possible so as to be suitable for NISQ devices.
+
+We ask in this work whether it is possible to have a machine
+learning application for a PQC, which comes with a provable
+superior performance over all classical alternatives on near term
+devices? Such provable guarantees are even more relevant given
+recent work in QML algorithm ‘dequantisations’?° **.
+
+We take the first steps in answering this question in several
+ways. We define a subclass of QCBM that we call Ising Born
+machines (QCIBM). We improve the training of the model over
+previous methods, which use the maximum mean discrepancy
+(MMD) with a classical kernel, by introducing quantum kernels
+into the MMD, as well as by using entirely new cost functions: the
+Stein discrepancy (SD) and the Sinkhorn divergence (SHD). To do
+so, we derive their corresponding gradients in the quantum
+setting.
+
+We show that these novel methods outperform the MMD with
+classical kernel by achieving a closer fit to the data as measured by
+the total variation (TV) distance. We derive forms of the SHD,
+which can either be efficient to compute or result in an upper
+bound on TV. We observe numerically that the SD provides an
+upper bound to TV. Next, we show that sampling from this model
+cannot be simulated efficiently by any classical randomised
+algorithm, up to multiplicative error in the worst case, subject to
+common assumptions in complexity theory (namely the non-collapse
+
+ 
+
+'School of Informatics, University of Edinburgh, 10 Crichton Street, Edinburgh, UK. 2CNRS, Ecole Normale Supérieure, 75005 Paris, France. 3CNRS, LIP6, Sorbonne Université, 4
+
+Place Jussieu, 75005 Paris, France. “email: brian.coyle@ed.ac.uk
+
+Published in partnership with The University of New South Wales
+
+np} nature partner
+
+journals
+np}
+
+B. Coyle et al.
+
+ 
+
+ 
+
+of the polynomial hierarchy). Furthermore, this holds for many
+circuit families encountered during training.
+
+We define a framework in which a provable advantage could be
+demonstrated, which we refer to as quantum learning supremacy
+(QLS), and based on distribution learning theory*’. Based on our
+classical sampling hardness results, we conjecture that the QCIBM
+may be a good candidate for a quantum model which could
+demonstrate this notion of learning supremacy; however, we
+leave the further investigation of QLS and its potential to be
+achieved by such models to future work. Finally, we provide a
+novel utilisation of such generative models in quantum circuit
+compilation.
+
+RESULTS
+
+The main results of this work are new efficient gradient-based
+training methods and results on the hardness of simulating the
+model we introduce using classical computers. First, we define the
+model used and discuss its connection to previously studied
+quantum circuit families. We then discuss the efficient training of
+the model, first recalling a previously known gradient-based
+training method, which uses the MMD cost function, and then
+moving onto our new training methods, which use the SD and the
+SHD. We then discuss the SHD complexity in detail, and further
+argue, using its connection to the TV distance, why it should be
+used. We then prove the hardness results mentioned above,
+namely that many circuits encountered during gradient-based
+training are hard to classically simulate, before finally discussing
+the potential use of quantum generative models in learning
+distributions that are intractable to classical models. In addition,
+we provide a framework to study these advantages.
+
+Ising Born machine
+
+Here we define the model we use for distribution learning. A
+generic quantum circuit Born machine consists of a parameterised
+quantum circuit, which produces samples by measuring the
+resulting quantum state, and a classical optimisation loop used to
+learn a data distribution. The circuits we study have the following
+structure:
+
+where x; €{0, 1}; the unitaries are defined by Eqs. (2) and (3); Sj
+indicates the subset of qubits on which each operator, j, is applied;
+and a boldface parameter indicates a set of parameters, a = {a}.
+
+U,(a) := | | Uz(qj, 5) = |] exp (ia & Z:) (2)
+j j /
+
+U; (F, A, X):= exp ( TX, + AY, + 12 (3)
+
+k=1
+
+The operators, X;,, Y,, and Z,, are the standard Pauli operators
+acting on qubit k. Restricting to the case |S < 2 (since only single
+and two-qubit gates are required for universal quantum
+computation), the term in the exponential of Eq. (2) becomes
+exactly an Ising Hamiltonian:
+
+n
+H:= iS IZZj +i d— deZx, (4)
+1
+
+i<j k=
+
+where we are dividing the diagonal unitary parameters, a = {J;,
+
+npj Quantum Information (2020) 60
+
+b;,}, into local terms that act only on qubit k, {b,}, and coupling
+terms between two qubits j and j, Uj}. We call the model a QCIBM.
+
+A measurement on all qubits in the computational basis results
+in sample vectors, x € ¥”, where XY = {0,1}. These samples are
+drawn from the distribution, pg(x), parameterised by the set of
+angles, 6 = {a, F, A, =}:
+
+po(x) := | (x|Us(F, A, £)U,(a)|+)°"|°. (5)
+
+We denote the above model and parameters by QCIBM(8) :=
+QcIBM(a, F, A, Z). We choose this structure in order to easily
+recover two well-known circuit classes, namely instantaneous
+quantum polynomial time*® (IQP) circuits, and the shallowest
+depth (p = 1) version of the quantum approximate optimisation
+algorithm?” (QAOA).
+
+lQP circuits are named to reflect the commuting nature of
+elements in the produce defining the unitary U,, while QAOA’’ was
+originally developed as an approximate version of the quantum
+adiabatic algorithm~®. Both of these classes of circuits are known to
+be routes to demonstrate quantum supremacy*°*””, and we extend
+this property here by using the results of ref. °°. These classes can be
+recovered by setting the parameters of a QCIBM as follows:
+
+as oF tava})
+
+(6)
+QAOAp-1 ({Jj, bx }, F) = QCIBM({Jj, bx}, F = —1,0, 0). (7)
+
+OP ({J;, be }) = QCIBM (ty, b,},F = {
+
+We denote, for example {a5}, to be all parameters of the n single
+
+qubit gates set to the same value, 77/2\/2. We choose the final gate
+before the computational basis measurement to be in the form of
+Eq. (3), rather than the more common Euler decomposition of a
+single qubit gate decomposition found in the literature'”'®. This is
+chosen to make the classical simulation hardness results more
+apparent in our proofs.
+
+To recover IQP circuits, we simply need to generate the final
+layer of Hadamard gates (up to a global phase) and do so by
+setting U; in Eq. (3) as follows:
+
+ylap ({s75}-2 ist) — & ena Xi +Zk) _ iH2”. (8)
+f 2/2 2/2 k=
+
+To recreate depth 1 QAOA circuits, we need to set the Pauli Z and
+Y parameters, A, X = 0, since the final gates should be a product of
+Pauli-X rotations with parameters, —TI.
+
+Training the Ising Born machine
+
+Here we introduce the alternative training methods that we use
+for our purposes and that would be applicable to any generative
+model. The training procedure is a hybrid of classical and
+quantum computation, with the only quantum component being
+the model itself. The remainder of the computation is classical,
+bringing our scheme into the realm of what is possible for NISQ
+devices. The procedure can be seen in Fig. 1.
+
+The optimisation procedures we implement are stochastic
+gradient descents. Parameters, 0,, are updated at each epoch of
+training, d, according to the rule 67*' — 6% — nado, Lg. The
+parameter n is the learning rate and controls the speed of the
+descent. The initial proposals to train QCBMs were gradient-
+free'°*', but gradient-based methods have also been pro-
+posed'*'®?*. In this work, we advocate for increasing the classical
+computational power required in training to achieve better
+performance, rather than increasing the quantum resources, for
+example by adding extra ancillae'® or adding costly and
+potentially unstable (quantum) adversaries '”*?**.
+
+For gradient-based methods, a cost function or metric is
+required, £g(pe(x),7(y)) to compare the Born Machine distribu-
+tion, Pe(x), and the data distribution, 7(y). Good cost functions will
+
+Published in partnership with The University of New South Wales
+QUAN TUM
+
+ 
+
+    
+
+B. Coyle et al.
+
+np)
+
+ 
+
+6«<6—nOeLB
+
+CLASSTCAL
+
+Fig.1 The hybrid training procedures we propose in this work. We have a quantum generator along with auxiliary circuits used to compute
+the gradient of the various cost functions with respect to the parameters. The training procedure proceeds as follows. First, the QCIBM is
+sampled from N times via measurements. These samples, along with M data samples y ~ 7(y), are used to evaluate a cost function, Lg, where
+Be {MMD, SD, SHD} is one of the efficiently computable cost functions. For each updated parameter, 0,, two parameter-shifted circuits are also
+ran to generate samples, a, b ~ pgs, which are used to compute the corresponding gradients, dg£z. For all costs functions and gradients, either
+a kernel (if a quantum kernel is used, the circuit in this figure must be run) is computed for each pair of samples (as is the case for MMD and
+SD) or an optimal transport cost function is evaluated (as is the case for SHD).
+
+have several characteristics. They should be efficient to compute,
+measured both by sample and computational complexity. They
+should also be powerful in the sense that they are sensitive to
+differences between the two distributions. In this work, we will
+assess ‘cy by using the TV metric as a benchmark:
+
+TV(Pe, 77) : => |Pe(x x)|. (9)
+
+As discussed later, this is a particularly strong metric. The cost
+functions we use are typically easier to deal with than TV, and we
+will remark on their relationship to TV.
+
+One cost function commonly used to train generative models is
+the Kullback-Leibler (KL) divergence. The KL divergence is also
+relatively strong, in the sense that it upper bounds TV through
+Pinsker’s inequality:
+
+TV (Pe, 1) <
+
+where Dx(pel|7) is the KL divergence of 7 from pg. Unfortunately,
+it is difficult to compute, having a high sample complexity, so
+neither its gradient nor the KL divergence itself can be evaluated
+efficiently when training parameterised circuits '*
+
+The first efficient gradient method to train Born machines was
+proposed by ref. '*. There the MMD is used to define the cost
+function. We extend this methodology in two ways. The first is an
+alteration to the MMD itself, and the second is by introducing new
+cost functions. From the MMD, the following cost function®””*° can
+be defined:
+
+Lump := EE (Kx, y)) + (K(x, y)) — 2 TE (Kx, y)). (11)
+
+y~Pg yon yw
+
+1
+5 Dx (Pol\7), (10)
+
+The MMD has some very favourable properties; it is a metric on
+the space of probability distributions, and it is relatively easy to
+compute (due to low sample complexity). The function, k in Eq.
+(11) is a kernel function, a measure of similarity between points in
+the sample space x € 1”. A popular choice for this function is the
+Gaussian mixture kernel '*
+
+The parameters, o;, are bandwidths that determine the scale at
+which the samples are compared, and ||-||2 is the 22 norm.
+Recent works*”*® on the near term advantage of using
+quantum computers in QML have explored quantum kernels,
+which can be evaluated on a quantum computer. To gain such an
+
+Published in partnership with The University of New South Wales
+
+advantage, these kernels should be difficult to compute on a
+classical device. In particular, we will adopt the following kernel*”
+in which the samples are encoded in a quantum state, |¢(x)), via a
+feature map, @:x — |f(x)). The kernel is the inner product between
+vectors:
+
+Ka(% y) = |(P(~)|A(y))I’. (13)
+
+The inner product in Eq. (13) is evaluated on a quantum computer
+and is conjectured to be hard to compute on a classical one®’,
+given only a classical description of the quantum states. The state
+|\p(x)) is produced by acting an encoding unitary on an initial state,
+|\P(x)) = U px)|0)°”. Explicitly, the kernel is then given by:
+
+2
+Ka(X ) = [O° Uy gy) 0°") (14)
+which can be calculated by measuring, in the computational basis,
+the state which results from running the circuit given by Ugvy)
+
+followed by that of U's): This is seen in Fig. 1. The kernel, Eq. (14),
+
+is the observed probability of measuring the all-zero outcome, 0”.
+If this outcome is not observed after polynomially many
+measurements, the value of the kernel for this particular pair of
+samples (x, y) is set to zero. Intuitively, this means the feature map
+has mapped the original points to points with at most
+exponentially small overlap in the Hilbert space and therefore
+will not contribute to the MMD.
+
+It is also necessary to derive an expression for the gradient of
+the cost function. For the MMD, the gradient with respect to the
+kth parameter’, carried by the kth unitary gate, U,(@,), is given by:
+
+OLmmp
+= 2]
+00, a~p
+
+X~P9 xX~p9
+
+ 
+
+ 
+
+ 
+
+ 
+
+ 
+
+eI
+
+(k(a,x)) — 2 (k(b,x)) — 2IE (k(a,y)) + 2 (k(b, y)),
+
+bept
+Po
+
+(15)
+
+where Pa, are output distributions generated by running the
+following auxiliary circuits??*° for each unitary gate, U;,(0,):
+
+joy” (16
+
+where 0, := 0, +71/2 and Up = UUj41...Um—1Um are the unitary
+gates in the Born machine. This gradient occurs because the form
+of the unitary gates in our case are exponentiated Pauli operators
+U,(0,) = exp(iO,2,), with x = |. With the unitaries in this form, the
+gradient of the probabilities outputted from the parameterised
+
+npj Quantum Information (2020) 60
+B. Coyle et al.
+
+ 
+
+state, with respect to a parameter 9, is given by'*”°:
+
+Ope(z
+
+Pe — py, (2) — pi, (2), (17)
+There is a slight difference between Eq. (17) and that of ref. '*, due
+to a different parameterisation of the unitaries above.
+
+The gradients of the cost functions which we introduce next will
+also require the parameter-shifted circuits in Eq. (16). For more
+details on kernel methods and the MMD, see Supplementary
+Material Section Il.
+
+ 
+
+SD training
+
+So far, we have only proposed a change of kernel in the MMD
+method of training QCIBMs. We now consider changing the cost
+function altogether. We endeavour to find costs which are
+efficient to compute for quantum models, yet stronger than MMD.
+
+The first cost we propose is called the SD. SD has become
+popular for goodness-of-fit tests*', ie. testing whether samples
+come from a particular distribution or not, as opposed to the
+MMD, which is typically used for kernel two-sample tests*°®. This
+discrepancy is based on Stein’s method*’, which is a way to bound
+distance metrics between probabilities including, for example, the
+other integral probability metrics (IPM) we utilise in this work. For
+details on IPMs, see Supplementary Material Section I.
+
+We use the discrete version of the SD* since, in its original
+form*', it only caters for the case where the distributions are
+supported over a continuous space. The discretisation is necessary
+since the QCIBM outputs binary strings and so the standard
+gradient w.r.t. a sample, x, Vx, is undefined. As such, we need to
+use a discrete ‘shift’ operator, A,, instead, which is an operator
+defined by [A,f(x)];:= fix) — f(-,x) for a function f, where -; flips
+the ith element of the binary vector x.
+
+Fortunately, the discretisation procedure is relatively straightfor-
+ward (the necessary definitions and proofs can be found in
+Supplementary Material Section Ill). The discrepancy is derived*'*
+from the (discrete) Stein identity*®, given by:
+
+E [Anh(x)] = E [Sn()0(%) — Oxh(X)] = 0, (18)
+An (p(X) = Sy (x) h(x) — Dep), (19)
+
+where E denotes the expectation value over the distribution, 77.
+
+X~7T
+This holds for any function ¢: X” — C and probability mass
+function 7 on XX”. The function s,(x) = A, log(7(x)) is the Stein
+score function of the distribution 7, and A, is a so-called Stein
+operator of 7. Now, the SD cost function can be written in a
+kernelised form*'*°, similarly to the MMD:
+
+Lsp(Pe, 7) = Exy~pe[Kn(% y)], (20)
+
+K(X, Y) = Sn(X)! K(X, Y)Sn(y) — (6) AYK(X, y)
+—AxK (x, y)"Sr(y) + tr(AX yk (x y)),
+
+where k,, is the Stein kernel and k is a usual positive semi-definite
+kernel. Ay is a conjugate version of the operator A,, but for our
+purposes, the behaviour of both A, and A, are identical. For
+completeness, we define it in generality in Supplementary
+Material Section Ill.
+
+Just as above, the gradient (derived in an identical fashion to
+the MMD gradient Eq. (15) as is detailed in Supplementary
+Material Section Ill) of L£sp with respect to the parameter, 0, is
+given by:
+
+OL
+
+<= E [kn(x,y)] — EB [kn(%,y)] — E [kn(x,y)] — E [kn 0y)].
+
+00; *~Po x~Pp ype Pe
+y~Pg y~p9 Po y~Pe
+
+(21)
+
+(22)
+We show that almost every term in Eqs. (20) and (22) can be
+
+npj Quantum Information (2020) 60
+
+computed efficiently, even when the quantum kernel kg from Eq.
+(13) is used in Eq. (21), that is, with the exception of the score
+function s, with respect to the data distribution. The score
+contains an explicit dependence on the data distribution, 7. If we
+are given oracle access to the probabilities, 7(y), then there is no
+issue and SD will be computable. Unfortunately, in any practical
+application this will not be the case.
+
+To deal with such a scenario, we give two approaches to
+approximate the score via samples from 77. The first of these we
+call the ‘Identity’ method since it inverts Stein’s identity*’ from Eq.
+(18). We refer to the second as the ‘Spectral’ method since it uses a
+spectral decomposition®® of a kernel to approximate the score.
+The latter approach uses the Nystrém method’, which is a
+technique used to approximately solve integral equations. We will
+only use the Spectral method in training the QCIBM in the
+numerical results in Fig. 3, since the Identity method does not give
+an immediate out-of-sample method to compute the score.
+Details of these methods can be found in Supplementary Material
+Section Ill.
+
+Notice that, even with the difficulty in computing the score, the
+SD is still more suitable for training these models than the KL
+divergence as the latter requires computing the circuit probabil-
+ities, Pe(x), which is in general intractable, and so could not be
+computed for any data set.
+
+SHD training
+
+The second cost function we consider is the so-called SHD. This is
+a relatively new method to compare probability distributions*® °°,
+defined by the following:
+
+] ]
+L5yp (Pe, 77) := OT’ (pe, 7) — 5 OT: (Pe Pa) — 5 OTe 7, 1), (23)
+
+OT’(pe, 7) := min
+
+S— c(x, y)U(% y) + eKL(U|p9 ® m) |,
+UEU (pe,T)
+
+(xy)
+exd x yd
+
+(24)
+
+where € > 0 is a regularisation parameter, c(x, y) is a Lipschitz ‘cost’
+function, and U/(p, 7) is the set of all couplings between pg and 7,
+i.e. the set of all joint distributions, whose marginals with respect
+to x and y are po(x) and my), respectively. The above cost function,
+Loup, is particularly favourable as a candidate because of its
+relationship to the theory of optimal transport?! (OT), a method to
+compare probability distributions. It has become a major tool used
+to train models in the classical domain, for example with GANs>?
+through a restriction of OT called the Wasserstein metric, which is
+derived from OT, when the cost (c(x, y)) is chosen to be a metric
+on the space of +”.
+
+We would like to use OT itself to train generative models, due to
+its metric properties. Unfortunately, OT has high computational
+cost and exponential sample complexity’. For this reason, the
+SHD was proposed in refs *°-°° to interpolate between OT and the
+MMOD as a function of the regularisation parameter e€ in Eq. (24). In
+particular, for the two extreme values of ¢, we recover*® both
+unregularised OT and the MMD:
+
+— 0:
+
+(25)
+Lup (Pa, m™) — OT (Po, 7)
+
+Ea C}C::
+LS (Pe, 7) — MMD(p9, 77) : K(x, y) = —c(x, y)
+
+As before, we need a gradient of the Lz, with respect to the
+parameters, which is given by:
+
+OL Syp (Pe, 7) _ _
+"36, ~ bo p(x) | wey lp(x)], (27)
+
+(26)
+
+Published in partnership with The University of New South Wales
+where (x) is a function that depends on the optimal solutions
+found to the regularised OT problem in Eq. (24). See Supplemen-
+tary Material Section IV for more details on the SHD and its
+gradient.
+
+Sinkhorn complexity
+
+The sample complexity of the SHD is of great interest to us as we
+claim that the TV and the KL are not suitable to be directly used as
+cost functions. This is due to the difficulty of computing the
+outcome probabilities of quantum circuits efficiently. We now
+analyse why the MMD is a weak cost function and why the SHD
+should be used as an alternative. This will depend critically on the
+regularisation parameter ¢, which allows a smooth interpolation
+between the OT metric and the MMD.
+
+First, we address the computability of £¢,, and we find, due to
+the results of ref. °*, a somewhat ‘optimal’ value for e, for which
+the sample complexity of Lsyp becomes efficient. Specifically, the
+mean error between Lsyp and its approximation L.,, for n qubits,
+computed using M samples, scales as:
+
+€ OE 1 n2+n ]
+EleS99 ~ Liyol = O( (1 tel? € (1 + cma) } (28)
+
+We show in Supplementary Material Section IV.1 that by choosing
+¢ = O(n’), we get:
+
+ 
+
+E\coip) — £516 ’| = 0 (=) | (29)
+which is the same sample complexity as the MMD°° but
+exponentially better than that of unregularised OT, which scales
+as O(1/M1/")°?.
+
+A similar result can be derived using a concentration bound”,
+such that, with probability 1 — 6,
+
+2 A 2 n
+e518) — £969| = 0( Float /8)""), 80
+where we have chosen the same scaling for e as in Eq. (29).
+Therefore, we can choose an optimal theoretical value for the
+regularisation, such that Lsyp is sufficiently far from OT to be
+efficiently computable but perhaps still retains some of its
+favourable properties. It is likely in practice, however, that a much
+lower value of ¢ could be chosen without a blow up in sample
+complexity*’°*. See Supplementary Material Section IV for
+derivations of the above results.
+
+Second, we can relate the £syp to unregularised OT and TV via a
+sequence of inequalities. We have mentioned that the MMD is
+weak, meaning it provides a lower bound on TV in the following
+way”:
+
+MMD (pp, 7)
+TV(pe,7) > ———_
+(Pe ) JVC
+if C := SUPycynK(X, X) < 00.
+Note that for the two kernels introduced earlier:
+
+1 Alyy)? 1
+Kg (X, x) —_— =e 30% x| —_— <(¢) — 1, (32)
+Cc
+
+(31)
+
+Ka(x, x) = |(b(x)|6(x))|? = |(00)°" |? = 1, (33)
+
+hence C= 1 and the lower bound is immediate.
+
+In contrast, as is seen from the inequality on a discrete sample
+space in Eq. (34)°°, the Wasserstein metric (unregularised OT)
+provides an upper bound on TV, and hence we would expect it to
+be stronger than the MMD.
+
+minTV (pe, 7) < OT§(pe,™) < diam(X)TV(po, 7), (34)
+
+where diam(") = max{d(x,y),x,y € ¥"}, dmin=Minyzy d(x, y),
+and d(x, y) is the metric on the space, V”. This arises by choosing
+
+Published in partnership with The University of New South Wales
+
+B. Coyle et al.
+
+np)
+
+ 
+
+c=dande = 0 in Eq. (24). If, for instance, we were to choose d(x,
+y) to be the £; metric between the binary vectors of length n (a.k.a.
+the Hamming distance), then we get that dmin = 1,diam(¥) =n,
+and so:
+
+TV(pe, 7) < OTo' (pe, 7) < NTV(pe, 7). (35)
+
+Finally, we can examine the relationship induced by the
+regularisation parameter through the following inequality; Theo-
+rem 1 in ref. >*:
+
+21D
+0 < OT: (pe,7) — OT5 (Pe, 7) < 2elog (< 7
+€
+
+ 
+
+) ~e30 2€log(1/e),
+
+(36)
+
+where the size of the sample space is bounded by D, as measured
+by the metric, and L is the Lipschitz constant of the cost c. As
+detailed in Supplementary Material Section IV.1, we can choose
+D=nandL=n:
+
+2
+0 < OT" (pg, 7) — OTS! (pe, 7) < 2e log (—*). (37)
+
+The log term will be positive as long as € < ne’, in which case
+regularised OT will give an upper bound for the Wasserstein
+metric, and hence the TV through Eq. (34), so we arrive at:
+
+TV (pe, 77) S OT) (Pe, 7) S OT! (38)
+
+e<ne2°*
+
+Unfortunately, comparing this with Eqs. (29) and (30), we can see
+that, with this scaling of e, the sample complexity would pick up
+an exponential dependence on the dimension, n, so it would not
+be efficiently computable. We comment further on this point later.
+
+Numerical performance
+
+In Figs 2-4, we illustrate the superior performance of our
+alternative training methods, as measured by the TV distance. A
+lower TV indicates that the model is able to learn parameters
+which fit the true data more closely. TV was chosen as an objective
+benchmark for several reasons. First, it is typically the notion of
+distance that is required by quantum supremacy experiments
+where one wants to prove hardness of classical simulation.
+Second, we use it in the definitions of QLS. Finally, it is one of the
+strongest notions of convergence in probability one can ask for, so
+it follows that a training procedure that can more effectively
+minimise TV, in an efficient way, should be better for generative
+modelling.
+
+We train the model on Rigetti’s Forest platform?” using both a
+simulator and the real quantum hardware, the Aspen QPU. Figure
+2 illustrates the training of the model using the Gaussian (Eq. (12))
+vs. the quantum kernel (Eq. (13)) for 4 qubits, and we see that the
+quantum kernel offers no significant advantage vs. training with a
+purely classical one. Figure 2a shows the TV as trained for 200
+epochs, using both the classical and quantum kernels with various
+learning rates. Figure 2b shows the learned probabilities out-
+putted after training with each kernel, and Fig. 2c shows the
+difference in the actual Lymp itself while training with both
+methods. Interestingly, the latter behaviour is quite different for
+both kernels, with the quantum kernel initialising with much
+higher values of Lymp, whereas they both minimise TV in
+qualitatively the same way. This indicates that hardness of
+classical simulation (of computing the kernel) does not imply an
+advantage in learning.
+
+On the other hand, a noticeable outperformance is observed for
+the SHD and the SD relative to training with the MMD (using a
+Gaussian kernel), as measured by TV in Fig. 3. Furthermore, we
+observed that the gap (highlighted in the inset in Fig. 3a) which
+separates the SHD and SD (red and blue lines) from the MMD
+(green, yellow, and cyan lines) grows as the number of qubits
+grows. Unfortunately, the Spectral method to approximate the
+
+npj Quantum Information (2020) 60
+np}
+
+ 
+
+ 
+
+ 
+
+ 
+
+ 
+  
+ 
+ 
+ 
+
+ 
+
+ 
+
+ 
+
+ 
+
+ 
+
+  
+
+ 
+
+ 
+
+ 
+
+ 
+
+ 
+
+ 
+
+ 
+
+ 
+
+ 
+
+ 
+
+ 
+
+B. Coyle et al.
+\Se— MMD for Ko, Mnie = 0.005. 023 —s— MMD for kg, Minit = 0.005.
+025 — MMD for ko, Minit = 0.007. 0.175; mae Data ith — MMD for ka Man = 0007
+MMO fer Ko, Fie = Oa ma =MMD with ke —.— MMD for Ko, Minit = 0.010.
+—=— \MMD for ko, Minit = 0.005. : yitnit
+» | tb ereesnee=ocor | 5 0.150} mm MMD with Ko a 020) I <= MMO fer ko, fie = 0.005.
+020 RT Meee 00 = MMD for a, A = O6n0,
+=
+NQ ab
+> 015 Q
+S 0.10
+10) Q
+= 0.05
+=
+Q.05
+000 ° Q
+(a) 0 50 100 150 200 (b) (c) 0 50 100 150 200
+epochs outcome epochs
+
+Fig.2 The performance of the quantum kernel Kg (red) vs. the Gaussian kernel, Kg (blue) (with ninit = 0.1) for 4 qubits. During training, we
+sample from the QCIBM and the data 500 times and use a minibatch size of 250. One epoch is one complete update of all parameters
+according to gradient descent. Error bars represent maximum, minimum, and mean values achieved over five independent training runs, with
+the same initial conditions on the same data samples. a TV difference achieved with both kernel methods during training. No observable or
+obvious advantage is seen in using the quantum kernel over the Gaussian one; in contrast, the Gaussian kernel seems to perform better on
+average. b Final learned probabilities with ninit = 0.01 using the Adam optimiser. c MMD computed using 400 samples as training points and
+100 as test points (seen as the thin lines without markers), independent of the training data.
+
+ 
+
+ 
+
+  
+  
+   
+ 
+
+ 
+
+ 
+
+ 
+
+ 
+
+ 
+
+ 
+
+ 
+
+ 
+
+ 
+
+ 
+
+ 
+
+—— MDMD for ke, Minit = 0.010. |
+03 —— MMD for ke, Mnit = 0.050. 035 mmm Daa
+—— MMD for ke, rnit = 0.100. ma MMD
+030 — _ Sinkhorn using Hamming cost, ninit = 0.010. 0.30 ME Sinkhon
+— Sten using Exact score for ninjt = 0.080. .
+— Stdn using Spectral score for ninjt = 0.010. Mmm Exact Stan
+02) | > 0.25; mmm Spectral Stdn
+x
+0.20 — 020:
+> ie)
+F os g
+i\\ sole 2 0b
+S o
+10 O, 010.
+0.05
+; FS ; 0.05;
+0.00: 000
+0 Pa) 50 BD 100 15 150 15 200 8 N 9 N § N 9 Ny
+N Ny 9 y Ny
+(a) (b) § § FF Fey A
+epochs outcomes
+
+Fig. 3 MMD (cyan, yellow, green) vs. Sinkhorn (blue) and Stein training with Exact score function (red) and Spectral score method
+(magenta) for 3 qubits with fully connected topology on the Rigetti 3q—qvm, _~ _ trained on the data, Eq. (44). Five hundred data points
+are used for training, with 400 used as a training set and 100 used as a test set. Plots show mean, maximum, and minimum values achieved
+over five independent training runs on the same data set. a TV difference between training methods, with regularisation parameter for SHD
+and 3 eigenvectors for Spectral Stein method. Both Sinkhorn divergence and Stein discrepancy are able to achieve a lower TV than the MMD.
+Inset shows region of outperformance on the order of ~0.01 in TV. We observe that the Spectral score method was not able to minimise TV as
+well as the exact Stein discrepancy, potentially indicating the need for better approximation methods. b Final learned probabilities of each
+training method. See Supplementary Material Section V for behaviour of corresponding cost functions.
+
+ 
+
+ 
+
+ 
+
+    
+
+ 
+
+ 
+
+ 
+
+ 
+
+ 
+
+ 
+
+ 
+
+ 
+
+ 
+
+ 
+
+ 
+
+ 
+
+ 
+
+— MMD, en Acper4aQ.A gum = MD, cr Ape QA Sinkhom on training set for A wee MMD on training set for A AOA
+040 —— Sinkhorn, on Aspear44Q-A 0175) fees MMO, on Aspen dQ-A-aym 14 Srkhorn on trainings to acer AQA au — _ MMD ontest set for Aspen-44Q-A
+. " . IE Sinkhom, on Aspar-44Q-A a —— Sin Nn on training for Aspen -A-qvm a a A
+—*— Sinkhorn, on Aspen-4-4Q-A-qvm. Sinkhar, on Agpen-440.A- . oh —— MMD on training set for Asper-4-4Q-A-qvm
+0.35 S 150} mmm Sinkhom, on Aspe-44Q-A-qvm, 512 ——_ Sinkhorn on test set for Aspen-4-4Q-A-qvm 2 av —— MIMD on test st for Asay 4-4Q-A-qvm
+030 = avs Q Q
+> os ‘3 y 10 n
+2 ao 3 Q
+- oe a8 3
+0.20: OQ q 4
+O q QO
+015 = © 06 S
+Oy aos a
+0.10. q 04 =
+102s, a
+Nn
+0.05, | a2
+0,000!
+° “ sochs, ° ™ Se ee FF FSF EGEEG (c) ° 2 40 © Ea) 100 d)° 20 40 6 100
+(a) epochs (b) outcomes epochs (d) epochs
+
+Fig.4 MMD (green, yellow) vs. Sinkhorn (blue, cyan) for 4 qubits comparing performance on the real QPU (Aspen-4-4Q-A) vs. simulated
+behaviour on QVM (Aspen-4-4Q-A-qvm) using 500 samples and a batch size of 250, learning target data (black), and a initial learning
+rate for Adam as init = 0.01. a TV difference between training methods with regularisation parameter ¢ = 0.08. b Final learned probabilities
+(black) indicates the probabilities of a random instance of the data distribution (see ‘Methods’) chosen. The probabilities given by the other
+bars are those achieved after training the model with either the MMD or SHD on the simulator or the physical Rigetti chip, on an average run.
+The probabilities of the model are generated by simulating the entire wavefunction after training. ¢ £343 on QVM (cyan) vs. QPU (blue).
+d Lump on QVM (yellow) vs. QPU (green). In both latter cases, trained model performance on 100 test samples is seen as the thin lines without
+markers. Again it can be seen that the Sinkhorn divergence outperforms the MMD both simulated and on chip, with the deviation apparent
+towards the end of training. Similar behaviour observed after 100 epochs but not shown due to limited QPU time.
+
+Stein score does not outperform the MMD, despite training tuning the hyperparameters of the model in order to get better
+successfully. The discrepancy between the true and approximate performance to future work.
+
+versions of the Stein score is likely due to the low number of This behaviour is shown to persist on the QPU, Fig. 4, where we
+samples used to approximate the score, with the number of show training of the model with both the MMD and SHD relative
+
+samples limited by the computational inefficiency. We leave to TV, (Fig. 4a), the learned probabilities of both methods on, and
+
+npj Quantum Information (2020) 60 Published in partnership with The University of New South Wales
+off, the QPU (Fig. 4b), and the behaviour of the cost functions
+associated with both methods (Fig. 4c, d). This reinforces our
+theoretical argument that the SHD is able to better minimise TV to
+achieve superior results.
+
+Given the performance noted above, we would recommend the
+SHD as the primary candidate for future training of these models,
+due to its simplicity and competitive performance. One should also
+note that we do not attempt to learn these data distributions
+exactly since we use a shallow fixed circuit structure for training (i.e.
+a QAOA circuit), which we do not alter. Better fits to the data could
+likely be achieved with deeper circuits with more parameters.
+
+For extra numerical result demonstrating the performance of the
+learning algorithms, see Supplementary Material Section V, includ-
+ing a comparison between the quantum and Gaussian kernels for
+two qubits, similar to Fig. 2; the behaviour of the corresponding cost
+functions themselves associated with Fig. 3; the performance of the
+model for 4 qubits, similar to Fig. 3; and the results using a 3 qubit
+device, the Aspen—4—3Q-A. In all cases, the performance was
+qualitatively similar to that reported in the main text.
+
+Hardness and quantum advantage
+
+It is crucially important, not just for our purposes but for the
+design of QML algorithms in general, that the algorithm itself is
+providing some advantage over any classical one for the same
+task. This is the case for so-called coherent algorithms, like the
+HHL linear equation solver®, which is BQP-complete, and therefore
+unlikely to be fully dequantised. However, such a_ proven
+advantage for near term QML algorithms is yet out of reach. We
+attempt to address such a question in two steps.
+
+1. We show that, for a large number of parameter values, 8,
+our QCIBM circuits are ‘hard’. That is to say, it cannot be
+efficiently simulated classically up to a multiplicative error, in
+the worst case. We also show that this holds for the auxiliary
+quantum circuits used for the gradient estimation, and
+hence the model may remain hard during training (although
+we do not know for sure).
+
+2. We provide formal definitions for QLS, the ability of a
+quantum model to provably outperform all classical models in
+a certain task, and a potential pathway to prove such a thing.
+
+The intuition behind point 2 is the following. If our QCIBM
+model could learn a target distribution 7, which demonstrates
+quantum supremacy, by providing a quantum circuit C close
+enough to 77 (i.e. below a threshold error in TV), then the model
+would have demonstrated something that is classically infeasible.
+Else there would exist an efficient classical algorithm that can get
+close to 7, which contradicts hardness.
+
+Point 1 does not completely fit that intuition. For one thing,
+hardness is not known to hold for the required notion of additive
+error (i.e. TV distance) but only for multiplicative error. Also, even
+though the model is more expressive than any classical model'®,
+this does not imply that it could actually learn a hard distribution.
+On the other hand, it is easy to see why the converse would be
+true, if the QCIBM could learn a distribution that is hard to sample
+from classically, the underlying circuit must have, at some point,
+reached a circuit configuration for which the output distribution is
+hard to classically sample.
+
+We can address point 1 informally (see Supplementary Material
+Section VI for the formal statements and proof) in three steps:
+
+e If the parameters of the model are initialised randomly in
+{a} = {Jj, b«} € {0,%, ... ,Z} and final measurement angles
+are chosen such that UAT A, X) =H®”, then the resulting
+QCIBM circuit class will be hard to simulate up to an additive
+error of 1/384 in TV distance, subject to a conjecture relating
+to the hardness of computing the Ising partition function®.
+
+e If certain configurations of the parameters are chosen to be
+
+Published in partnership with The University of New South Wales
+
+B. Coyle et al.
+
+np)
+
+ 
+
+either of the form, (2/ + 1)7/kd, where | and d are integers and
+k is anumber that depends on the circuit family, or in the form
+2mv, where v is irrational, then the resulting class of circuits will
+be hard to sample from classically, up to a multiplicative error,
+in the worst case.
+
+@ The circuits produced at each epoch as a result of the gradient
+updates will each result in a hard circuit class as long as the
+gradient updates are not chosen carelessly. In each epoch, if
+the update step is constrained in a way that the new value of
+the parameter @, aH — 6 — N09,£g does not become rational,
+then the updated circuits will also belong to a class that is
+hard to simulate (a similar result can be shown for the case
+where the parameters are updated to keep within the form of
+(2/+ 1)m/kd). This is because the updates can simply be
+absorbed into the original gates, to give a circuit which has
+the same form. This holds also for the gradient-shifted circuits
+in Eq. (16) since these correspond to (circuits whose
+parameters are updated as follows: en * — ee +77/2.
+
+We now provide definitions to meet the requirements of point
+2, adapting definitions from distribution learning theory”? for this
+purpose. Specifically, we say that a generative QML algorithm,
+A © BOP (with a small abuse of notation) has demonstrated QLS if
+there exists a class of probability distributions D, over XV” (bit
+vectors of length n), for which there exists a metric d and a fixed e€
+such that D, is (d,e,BQP)-learnable via A but not
+(d, ¢, BPP)-learnable (i.e. learnable by a purely classical algorithm).
+The task of the learning algorithm A is, given a target distribution
+D € Dp, to output, with high probability, a Generator, GENp,, for a
+distribution D’, such that D’ is close to D € D, with respect to the
+metric d. For the precise definitions of learnability we employ, see
+Supplementary Material Section VII.
+
+This framework is very similar to that of, and inspired by,
+probably approximately correct (PAC) learning, which has been
+well studied in the quantum case” but it applies more closely to
+the task of generative modelling. It is known that, in certain cases,
+the use of quantum computers can be beneficial to PAC learning
+but not generically°’. Based on this, it is possible that there exist
+some classes of distributions that cannot be efficiently learned by
+classical computers (BPP algorithms) but that could be learned by
+quantum devices (BPQ algorithms). The motivation for this is
+exactly rooted in the question of quantum supremacy and
+illustrated crudely in Fig. 5b.
+
+An initial attempt at QLS is as follows. As mentioned above, if
+random IQP circuits could be classically simulated to within a TV
+error of e = 1/384° in the worst case (with high probability over
+the choice of circuit), this would imply unlikely consequences for
+complexity theory. Now, if a generative quantum model was able
+to achieve a closeness in TV less than this constant value, perhaps
+by minimising one of the upper bounds in Eq. (38), then we could
+claim that this model had achieved something classically
+intractable. For example, if we make the following assumptions,
+
+1. QCIBM could achieve a TV<6 to a target IQP distribution.
+2. A classical probabilistic algorithm, C, could output a
+distribution q in polynomial time which was y close in TV
+Then to the QCIBM, i.e. it could simulate it efficiently.
+
+TV(Piap; 7) => [Piap (x) — q(x)| (39)
+1
+=5 ~ |Piap (x) — pe(x) + pe(x) — 9(x)| (40)
+1 1
+<5) [Pier (x) — po(x)| +57 |pe(x) — a(x)| (41)
+<6d+y=6e, (42)
+
+npj Quantum Information (2020) 60
+np}
+
+B. Coyle et al.
+
+ 
+
+Parameter Space, 0
+
+ 
+
+Fig. 5 Quantum learning supremacy in distribution learning. a Illustration of a learning procedure using a Generator. The algorithm A is
+given access to GENp, which provides samples, x~D, and must output a Generator for a distribution that is close to the original. We allow the
+target generator to be classical, hence it may take as input a string of random bits of size polynomial in n, r(n), if not able to generate its own
+randomness. b Crude illustration of quantum learning supremacy. No classical algorithm, C;, should be able to achieve the required closeness
+in total variation to the target distribution, but the QCIBM (or similar) should be able to, for some class of target distributions. There should be
+some path in the parameter space of the QCIBM, 8, which achieves this.
+
+ 
+
+ 
+
+ 
+
+ 
+
+ 
+
+ 
+
+(a) (b) outcomes” (c)
+
+ 
+
+ 
+
+ 
+
+ 
+
+ 
+
+ 
+
+ 
+
+ 
+
+/ INITIAL
+INITIAL as. mmm QP Data 0.10;
+(63) 6 99) EEE. QAOA IBM with Sinkhorn.
+
+{ Boa 0.08:
+TRAINED | 393, > 0.06
+Z a
+
+~ 2
+TARGET a1 a y | ace
+
+5.37 0.00.
+
+\ G03) Ss) ) 00 ~ - y
+
+ 
+
+i i 06 —e— Sinkhor training set using H ing cost, Minit = 0.002.
+Ran S00 SEI | ~~ Sera atm ba
+I a5
+wn
+Q
+mm 04
+wn
+3
+03
+S
+S
+ej 02
+a4
+al
+WM
+00
+O 50 100 150 200 0 5 50 B wm 3d bh wm 2
+epochs (d) epochs
+
+Fig.6 Automatic compilation of IQP circuit to a p= 1 QAOA circuit with two qubits using C%,, with « = 0.1. Five hundred data samples
+were used with 400 used for a training set and 100 used as a test set. QCIBM circuit is able to mimic the target distribution well, even though
+actual parameter values and circuit families are different. Error bars represent mean, maximum, and minimum values achieved over five
+independent training runs on the same data set. a Initial (cyan) and trained (grey) QAOA circuit parameters for two qubits. Target IQP circuit
+parameters (green). Parameter values scaled by a factor of 10 for readability. b Final learned probabilities of QCIBM (QAOA) (blue) circuit vs.
+‘data’ probabilities (IQP) (black). ¢ Total variation distance and d Sinkhorn divergence for 400 training samples and 100 test samples, using a
+
+Hamming optimal transport cost.
+
+where the third line follows from the triangle inequality. Therefore,
+C could simulate an IQP distribution also, and we arrive at a
+contradiction.
+
+The major open question left by this work is whether QLS is
+possible at all; can a quantum model outperform all classical ones
+in generative learning? This idea motivated our search for metrics
+that upper bound TV but yet were efficiently computable and
+therefore could be minimised to efficiently learn distributions to a
+sufficiently small value of TV. Unfortunately, we can see from the
+exponential scaling observed in Eq. (38), which gives the upper
+bound on TV by regularised OT, that SHD will not provably achieve
+this particular task, despite achieving our primary goal of being
+stronger than the MMD for generative modelling. We briefly
+discuss avenues of future research in the ‘Discussion’ section,
+which could provide alternative routes to QLS.
+
+Quantum compiling
+
+As a concrete application of such a model outside the scope of
+classical generative modelling, we can use the QCIBM training to
+perform a type of ‘weak’ quantum circuit compilation. There are
+potentially other areas that could be studied using these tools or
+by applying techniques in generative modelling to other quantum
+information processing tasks, but this is beyond the scope of
+this work.
+
+The major objective in this area is to compile a given target
+unitary, U, into one that consists exclusively of operations available
+to the native hardware of the quantum computer in question. For
+example, in the case of Rigetti’s Aspen QPU, the native gates are
+{R,(+71/2), R,(@), CZP”°°, and any unitary which a user wishes to
+implement must be compiled into a unitary V that contains only
+these ingredients.
+
+Potential solutions to this problem involve approximating
+the target unitary by assuming that V is a parametric circuit built
+
+60,61
+
+npj Quantum Information (2020) 60
+
+from the native gates, which can be trained by some optimisation
+strategy. We adopt a similar view here, but we do not require any
+extra quantum resources to perform the compilation. With this
+limitation, we make a trade-off in that we are not guaranteed to
+apply the same target unitary, only that the output distribution
+will be close to that produced by the target. Clearly this is a much
+weaker constraint than the task of direct compilation, since many
+unitaries may give rise to the same distribution, but it is much
+closer to the capabilities of near term devices. To illustrate this
+application, we train an QCIBM to learn the output distribution of
+a random IQP circuit when restricted to a QAOA architecture itself
+using Lsyp as a cost function. The process is illustrated in Eq. (43),
+where we try to determine suitable QAOA _ parameters,
+{ JOAOA
+
+FO oO}, which reproduce the distribution observed from
+
+a set of random IQP parameters, {J;?", b/??}.
+
+QcIBM ({ 380, boron}. {r, =},0, 0)
+
+Compile aciam ({y)°, bert. {re = sah, 0, {% = sah).
+
+The measurement unitary at the end of the circuit makes this
+process non-trivial, since this will give rise to significantly different
+distributions, even given the same parameters in U,. We illustrate
+this in Fig. 6 using the Rigetti 2q-qvm and for three qubits in
+Supplementary Material Section V. We find that, even though the
+learned parameter values are different from the target, the
+resulting distributions are quite similar, as expected.
+
+(43)
+
+DISCUSSION
+
+Providing provable guarantees of the superior performance of
+near term quantum computers relative to any classical device for
+some particular non-trivial application is an important milestone
+of the field. We have shown one potential route towards this goal
+
+Published in partnership with The University of New South Wales
+by combining complexity-theoretic arguments’”’, with an
+
+application in generative machine learning'* '°°?, and improved
+training methods of generative models. Specifically, we intro-
+duced the Ising Born machine, a restricted form of a quantum
+circuit Born machine. These models utilise the Born rule of
+quantum mechanics to train a parameterised quantum circuit as a
+generative machine learning model, in a hybrid manner.
+
+We proved that the model cannot be simulated efficiently by
+any classical algorithm up to a multiplicative error in the output
+probabilities, which holds for many circuit families that may be
+encountered during gradient-based training. As such, this type of
+model is a good candidate for a provable quantum advantage in
+QML using NISQ devices. To formalise this intuition, we defined a
+notion of QLS to rigorously define what such an advantage would
+look like, in the context of machine learning.
+
+We adapted novel training methods for generative modelling in
+two ways. First, by introducing quantum kernels to be evaluated
+on the quantum hardware and, second, by proposing and
+adapting new cost functions. In the case of SHD, we discussed
+its sample complexity and used this to define a somewhat optimal
+cost function through a judicious choice of the regularisation
+parameter. It is possible to choose this parameter such that the
+cost is efficiently computable even as the number of qubits grows.
+We showed numerically that these methods have the ability to
+outperform previous methods in the random data set we used as
+a test case.
+
+Finally, we demonstrated an application of the model as a
+heuristic compiler to compile one quantum circuit into another via
+classical optimisation techniques, which has the advantage of
+requiring minimal quantum overhead. These techniques could
+potentially be adapted into methods to benchmark and verify
+near term quantum devices.
+
+The major question that this work raises is whether or not a
+provable notion of quantum learning could be achievable for a
+particular data set, thereby solidifying a use case for quantum
+computers in the near term with provable advantage. The best
+prospect for this is the quantum supremacy distributions we know
+of (for example, IQP), but they are not efficiently testable®’. Owing
+to this, they are also likely to not be efficiently learnable either,
+given the close relationship between distribution testing and
+learning”. Furthermore, we can see from the exponential scaling
+required in Eq. (38) for regularised OT to upper bound TV that
+other techniques are necessary to achieve QLS, since the methods
+we present here are not suited to this particular task, despite
+achieving our goal of being stronger than the MMD for generative
+modelling. However, this assumes that we have access only to
+classical samples from the distribution, and the possibility of
+gaining an advantage using quantum samples**”® is unexplored
+in the context of distribution learning.
+
+METHODS
+
+In this section, we detail the methods used to train the QCIBM to
+reproduce a given probability distribution. The target distribution is the
+one given by Eq. (44), which is used in both refs °*°° to train versions of the
+quantum Boltzmann machine:
+
+1 T
+my) == Spr onic — pyr (44)
+k=1
+
+To generate this data, T binary strings of length n, written s, and called
+‘modes’, are chosen randomly. A sample y is then produced with a
+probability that depends on its Hamming distance dy(s,, y) to each mode.
+In all of the above, the Adam°” optimiser was applied, using the suggested
+hyperparameters, i.e. B, = 0.9, B = 0.999, e = 1x 10-8, and initial learn-
+ing rate, Nini This was chosen since it was found to be more robust to
+sampling noise'*.
+
+In all of the numerical results, we used a QAOA structure as the
+underlying circuit in the QCIBM. Specifically, the parameters in U; were
+
+Published in partnership with The University of New South Wales
+
+B. Coyle et al.
+
+np)
+
+ 
+
+chosen such that Vk, [, = 71/4, A, =0, and 2, = 0. The Ising parameters {J;,
+6,3 were initialised randomly.
+
+For the SD, we used 3 Nystr6m eigenvectors to approximate the Spectral
+score in Fig. 3 for 3 qubits, and 6 eigenvectors for 4 qubits. In all cases
+when using the MMD with a Gaussian kernel, we chose the bandwidth
+parameters, o=[0.25, 10, 1000]'*. Note that this article was previously
+published as a preprint”.
+
+DATA AVAILABILITY
+
+Data and simulations presented in this work are available from the corresponding
+author upon request. Code used in this work is available from the corresponding
+author upon request or on Github”’.
+
+Received: 29 August 2019; Accepted: 12 May 2020;
+Published online: 08 July 2020
+
+REFERENCES
+
+1. Preskill, J. Quantum computing in the NISQ era and beyond. Quantum 2, 79
+(2018).
+
+2. Shor, P. Polynomial-time algorithms for prime factorization and discrete loga-
+rithms on a quantum computer. SIAM J. Comput. 26, 1484-1509 (1997).
+
+3. Harrow, A. W., Hassidim, A. & Lloyd, S. Quantum algorithm for linear systems of
+equations. Phys. Rev. Lett. 103, 150502 (2009).
+
+4. Bremner, M. J., Jozsa, R. & Shepherd, D. J. Classical simulation of commuting
+quantum computations implies collapse of the polynomial hierarchy. Proc. R. Soc.
+Lond. A 467, 459-472 (2011).
+
+5. Gao, X. Wang, S.-T. & Duan, L-M. Quantum supremacy for simulating a
+translation-invariant Ising spin model. Phys. Rev. Lett. 118, 040502 (2017).
+
+6. Bremner, M. J., Montanaro, A. & Shepherd, D. J. Average-case complexity versus
+approximate simulation of commuting quantum computations. Phys. Rev. Lett.
+117, 080501 (2016).
+
+7. Aaronson, S. & Arkhipov, A. The computational complexity of linear optics. Theory
+Comput. 9, 143-252 (2013).
+
+8. Farhi, E. & Harrow, A. W. Quantum supremacy through the quantum approximate
+optimization algorithm. Preprint at http://arxiv.org/abs/1602.07674 (2016).
+
+9. Boixo, S. et al. Characterizing quantum supremacy in near-term devices. Nat. Phys.
+14, 595-600 (2018).
+
+10. Arute, F. et al. Quantum supremacy using a programmable superconducting
+processor. Nature 574, 505-510 (2019).
+
+11. Maron, M. E. Automatic indexing: an experimental inquiry. J. ACM 8, 404-417
+(1961).
+
+12. Goodfellow, |. J. et al. Generative Adversarial Nets. In Advances in Neural Infor-
+mation Processing Systems 27 (eds Ghahramani, Z., Welling, M., Cortes, C., Lawr-
+ence, N. D. & Weinberger, K. Q.), pp. 2672-2680 (Curran Associates, Inc., 2014).
+
+13. Cheng, S., Chen, J. & Wang, L. Information perspective to probabilistic modeling:
+Boltzmann machines versus born machines. Entropy 20, 583 (2018).
+
+14. Liu, J.-G. & Wang, L. Differentiable learning of quantum circuit Born machines.
+Phys. Rev. A 98, 062324 (2018).
+
+15. Benedetti, M. et al. A generative modeling approach for benchmarking and
+training shallow quantum circuits. npj Quantum Inf. 5, 1-9 (2019).
+
+16. Du, Y., Hsieh, M.-H., Liu, T. & Tao, D. The expressive power of parameterized
+quantum circuits. Preprint at http://arxiv.org/abs/1810.11922 (2018).
+
+17. Zeng, J., Wu, Y., Liu, J.-G., Wang, L. & Hu, J. Learning and inference on generative
+adversarial quantum circuits. Phys. Rev. A 99, 052306 (2019).
+
+18. Romero, J. & Aspuru-Guzik, A. Variational quantum generators: generative
+adversarial quantum machine learning for continuous distributions. Preprint at
+http://arxiv.org/abs/1901.00848 (2019).
+
+19. Benedetti, M., Lloyd, E., Sack, S. & Fiorentini, M. Parameterized quantum circuits as
+machine learning models. Quantum Sci. Technol. 4, 043001 (2019).
+
+20. Tang, E. Quantum-inspired classical algorithms for principal component analysis
+and supervised clustering. Preprint at http://arxiv.org/abs/1811.00414 (2018).
+
+21. Tang, E. A quantum-inspired classical algorithm for recommendation systems. In
+Proceedings of the 51st Annual ACM SIGACT Symposium on Theory of Computing,
+217-228 (2019).
+
+22. Andoni, A., Krauthgamer, R. & Pogrow, Y. On solving linear systems in sublinear
+time. Preprint at http://arxiv.org/abs/1809.02995 (2018).
+
+23. Chia, N.-H., Lin, H-H. & Wang, C. Quantum-inspired sublinear classical algorithms for
+solving low-rank linear systems. Preprint at http://arxiv.org/abs/1811.04852 (2018).
+
+24. Gilyén, A., Lloyd, S. & Tang, E. Quantum-inspired low-rank stochastic regression
+with logarithmic dependence on the dimension. Preprint at http://arxiv.org/abs/
+1811.04909 (2018).
+
+npj Quantum Information (2020) 60
+np}
+
+B. Coyle et al.
+
+ 
+
+10
+
+25.
+
+26.
+
+27.
+
+28.
+
+29.
+
+30.
+
+31.
+
+32.
+
+33.
+
+34.
+
+35.
+
+36.
+
+37.
+
+38.
+
+39.
+
+40.
+
+41.
+
+42.
+
+43.
+
+44,
+
+45.
+
+46.
+
+47.
+
+48.
+
+49.
+
+50.
+
+51.
+
+52.
+
+Kearns, M. et al. On the learnability of discrete distributions. In Proc. Twenty-sixth
+Annual ACM Symposium on Theory of Computing 273-282 (ACM, New York, NY,
+1994),
+
+Shepherd, D. & Bremner, M. J. Temporally unstructured quantum computation.
+Proc. R. Soc. A. https://doi.org/10.1098/rspa.2008.0443 (2009).
+
+Farhi, E., Goldstone, J. & Gutmann, S. A Quantum approximate optimization
+algorithm. Preprint at http://arxiv.org/abs/1411.4028 (2014).
+
+Farhi, E., Goldstone, J., Gutmann, S. & Sipser, M. Quantum computation by
+adiabatic evolution. Preprint at http://arxiv.org/abs/quant-ph/0001106 (2000).
+Bremner, M. J., Montanaro, A. & Shepherd, D. J. Achieving quantum supremacy
+with sparse and noisy commuting quantum computations. Quantum 1, 8 (2017).
+Fujii, K. & Morimae, T. Commuting quantum circuits and complexity of Ising
+partition functions. New J. Phys. 19, 033003 (2017).
+
+Leyton-Ortega, V., Perdomo-Ortiz, A. & Perdomo, O. Robust implementation of
+generative modeling with parametrized quantum circuits. Preprint at http://arxiv.
+org/abs/1901.08047 (2019).
+
+Hamilton, K. E., Dumitrescu, E. F. & Pooser, R. C. Generative model benchmarks for
+superconducting qubits. Phys. Rev. A 99, 062323 (2019).
+
+Lloyd, S. & Weedbrook, C. Quantum generative adversarial learning. Phys. Rev.
+Lett. 121, 040502 (2018).
+
+Dallaire-Demers, P.-L. & Killoran, N. Quantum generative adversarial networks.
+Phys. Rev. A 98, 012324 (2018).
+
+Borgwardt, K. M. et al. Integrating structured biological data by kernel maximum
+mean discrepancy. Bioinformatics 22, e49-e57 (2006).
+
+Gretton, A., Borgwardt, K. M., Rasch, M., Schdlkopf, B. & Smola, A. J. A kernel
+method for the two-sample-problem. In Advances in Neural Information Processing
+Systems 19 (eds. Schdlkopf, B., Platt, J. C. & Hoffman, T.) 513-520 (MIT Press, 2007).
+Havlicek, V. et al. Supervised learning with quantum-enhanced feature spaces.
+Nature 567, 209-212 (2019).
+
+Schuld, M. & Petruccione, F. Supervised Learning with Quantum Computers.
+Quantum Science and Technology (Springer International Publishing, 2018).
+Mitarai, K., Negoro, M., Kitagawa, M. & Fujii, K. Quantum circuit learning. Phys. Rev.
+A 98, 032309 (2018).
+
+Schuld, M., Bergholm, V., Gogolin, C., Izaac, J. & Killoran, N. Evaluating analytic
+gradients on quantum hardware. Phys. Rev. A 99, 032331 (2019).
+
+Liu, Q., Lee, J. D. & Jordan, M. A Kernelized Stein Discrepancy for Goodness-of-fit
+Tests. In Proceedings of the 33rd International Conference on International Con-
+ference on Machine Learning - Volume 48, 276-284 (JMLR.org, New York, NY,
+2016).
+
+Stein, C. A bound for the error in the normal approximation to the distribution of
+a sum of dependent random variables. In Proc. Sixth Berkeley Symposium on
+Mathematical Statistics and Probability, Volume 2: Probability Theory. 583-602
+(University of California Press, Berkeley, CA, 1972).
+
+Yang, J., Liu, Q., Rao, V. & Neville, J. Goodness-of-fit testing for discrete dis-
+tributions via Stein discrepancy. In Proc. 35th International Conference on Machine
+Learning, vol. 80 of Proceedings of Machine Learning Research (eds Dy, J. & Krause, A.)
+5561-5570 (PMLR, Stockholm, 2018).
+
+Gorham, J. & Mackey, L. Measuring sample quality with Stein’s method. In
+Advances in Neural Information Processing Systems 28 (eds Cortes, C., Lawrence, N.
+D., Lee, D. D., Sugiyama, M. & Garnett, R.) 226-234 (Curran Associates, Inc., 2015).
+Li, Y. & Turner, R. E. Gradient estimators for implicit models. In 6th International
+Conference on Learning Representations (ICLR) 2018, Vancouver, BC, Canada
+(OpenReview.net, 2018).
+
+Shi, J., Sun, S. & Zhu, J. A spectral approach to gradient estimation for implicit
+distributions. in Proceedings of the 35th International Conference on Machine
+Learning, Proceedings of Machine Learning Research, 4644-4653, (eds Jennifer, D. y.
+& Andreas, K.), (PMLR, 2018).
+
+Nystrom, E. J. Uber die praktische auflésung von integralgleichungen mit
+anwendungen auf randwertaufgaben. Acta Math. 54, 185-204 (1930).
+
+Ramdas, A., Trillos, N. G. & Cuturi, M. On wasserstein two-sample testing and
+related families of nonparametric tests. Entropy 19, 47 (2017).
+
+Genevay, A., Peyre, G. & Cuturi, M. Learning generative models with Sinkhorn
+divergences. In Proc. Twenty-First International Conference on Artificial Intelligence
+and Statistics, Vol. 84 (eds Storkey, A. & Perez-Cruz, F.) 1608-1617 (PMLR, Playa
+Blanca, 2018).
+
+Feydy, J. et al. Interpolating between optimal transport and MMD using Sinkhorn
+divergences. In Proc. Machine Learning Research, Vol. 89 (eds Chaudhuri, K. &
+Sugiyama, M.) 2681-2690 (PMLR, 2019).
+
+Villani, C. Optimal Transport: Old and New [Grundlehren der mathematischen
+Wissenschaften] (Springer, Berlin, 2009).
+
+Arjovsky, M., Chintala, S. & Bottou, L. Wasserstein Generative Adversarial Net-
+works. In Proceedings of the 34th International Conference on Machine Learning,
+Proceedings of Machine Learning Research 70, 214-223 (eds Doina, P. & Yee, W. T.),
+International Convention Centre, Sydney, Australia, (PMLR, 2017).
+
+npj Quantum Information (2020) 60
+
+53.
+
+54.
+
+55.
+
+56.
+
+57.
+
+58.
+
+59.
+
+60.
+
+61.
+
+62.
+
+63.
+
+64.
+
+65.
+
+66.
+
+67.
+
+68.
+
+69.
+
+Dudley, R. M. The speed of mean Glivenko-Cantelli convergence. Ann. Math. Stat.
+40, 40-50 (1969).
+
+Genevay, A., Chizat, L., Bach, F., Cuturi, M. & Peyré, G. Sample complexity of
+Sinkhorn divergences. In Proceedings of Machine Learning Research 89, 1574-1583
+(eds Chaudhuri, K. & Sugiyama, M.), (PMLR, 2019)
+
+Sriperumbudur, B. K., Fukumizu, K., Gretton, A., Schélkopf, B. & Lanckriet, G. R. G.
+On integral probability metrics, phi-divergences and binary classification. Preprint
+at http://arxiv.org/abs/0901.2698 (2009).
+
+Gibbs, A. L. & Su, F. E. On choosing and bounding probability metrics. /nt. Stat.
+Rev. 70, 419-435 (2002).
+
+Smith, R. S., Curtis, M. J. & Zeng, W. J. A practical quantum instruction set
+architecture. Preprint at http://arxiv.org/abs/1608.03355 (2016).
+
+Arunachalam, S. & de Wolf, R. Guest column: A survey of quantum learning
+theory. ACM SIGACT News 48, 41-67 (2017).
+
+Arunachalam, S., Grilo, A. B. & Sundaram, A. Quantum hardness of learning
+shallow classical circuits. Preprint at http://arxiv.org/abs/1903.02840 (2019).
+Khatri, S. et al. Quantum-assisted quantum compiling. Quantum 3, 140 (2019).
+Jones, T. & Benjamin, S. C. Quantum compilation and circuit optimisation via
+energy dissipation. Preprint at http://arxiv.org/abs/1811.03147 (2018).
+
+Gao, X., Zhang, Z. & Duan, L. An efficient quantum algorithm for generative
+machine learning. Sci. Adv. 12, https://doi.org/10.1126/sciadv.aat9004
+(2018).
+
+Hangleiter, D., Kliesch, M., Eisert, J. & Gogolin, C. Sample complexity of device-
+independently certified “quantum supremacy”. Phys. Rev. Lett. 122, 210502
+(2019).
+
+Goldreich, O., Goldwasser, S. & Ron, D. Property testing and its connection to
+learning and approximation. J. ACM 45, 653-750 (1998).
+
+Amin, M. H., Andriyash, E., Rolfe, J., Kulchytskyy, B. & Melko, R. Quantum Boltz-
+mann machine. Phys. Rev. X 8, 021050 (2018).
+
+Verdon, G., Broughton, M. & Biamonte, J. A quantum algorithm to train neural
+networks using low-depth circuits. Preprint at http://arxiv.org/abs/1712.05304
+(2017).
+
+Kingma, D. P. & Ba, J. Adam: a method for stochastic optimization. In 3rd Inter-
+national Conference on Learning Representations, (ICLR) 2015, (eds Yoshua, B. &
+Yann, L.) (San Diego, CA, USA, 2015)
+
+Coyle, B., Mills, D., Danos, V. & Kashefi, E. The Born supremacy: quantum
+advantage and training of an Ising Born machine. Preprint at http://arxiv.org/abs/
+1904.02214 (2019).
+
+Coyle, B. IsingBornMachine. https://zenodo.org/record/3779865#.XqvfknVKhrk
+(2020).
+
+ACKNOWLEDGEMENTS
+
+B.C. thanks Andru Gheorghiu for useful discussions and title suggestion. We also
+thank Jean Feydy, Patric Fulop, Vojtech Havlicek, and Jiasen Yang for clarifying
+pointers. We thank Atul Mantri for comments on the manuscript. This work was
+supported by the Engineering and Physical Sciences Research Council (grants EP/
+LO1503X/1, EP/N003829/1), EPSRC Centre for Doctoral Training in Pervasive
+Parallelism at the University of Edinburgh, and School of Informatics and Entrapping
+Machines (grant FA9550-17-1-0055). We also thank Rigetti Computing for the use of
+their quantum compute resources, and views expressed in this paper are those of the
+authors and do not necessarily reflect the views or policies of Rigetti Computing.
+
+AUTHOR CONTRIBUTIONS
+
+B.C. devised the theoretical aspects of the work and wrote the code for the numerical
+results with help from D.M.; D.M. contributed to the learning supremacy definitions. E.K.
+and V.D. supervised the work. All authors contributed to the manuscript writing.
+
+COMPETING INTERESTS
+
+The authors declare no competing interests.
+
+ADDITIONAL INFORMATION
+
+Supplementary information is available for this paper at https://doi.org/10.1038/
+$41534-020-00288-9.
+
+Correspondence and requests for materials should be addressed to B.C.
+
+Reprints and permission information is available at http://www.nature.com/
+reprints
+
+Published in partnership with The University of New South Wales
+Publisher’s note Springer Nature remains neutral with regard to jurisdictional claims
+in published maps and institutional affiliations.
+
+Open Access This article is licensed under a Creative Commons
+
+7 Attribution 4.0 International License, which permits use, sharing,
+adaptation, distribution and reproduction in any medium or format, as long as you give
+appropriate credit to the original author(s) and the source, provide a link to the Creative
+
+Published in partnership with The University of New South Wales
+
+B. Coyle et al.
+
+Np}
+
+ 
+
+Commons license, and indicate if changes were made. The images or other third party
+material in this article are included in the article’s Creative Commons license, unless
+indicated otherwise in a credit line to the material. If material is not included in the
+article’s Creative Commons license and your intended use is not permitted by statutory
+regulation or exceeds the permitted use, you will need to obtain permission directly
+from the copyright holder. To view a copy of this license, visit http://creativecommons.
+org/licenses/by/4.0/.
+
+© The Author(s) 2020
+
+npj Quantum Information (2020) 60
+
+11

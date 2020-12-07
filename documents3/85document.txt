@@ -1,0 +1,1746 @@
+Neural Networks 132 (2020) 232-244
+
+ 
+
+Contents lists available at ScienceDirect
+
+Neural Networks
+
+    
+
+ELSEVIER
+
+ 
+
+journal homepage: www.elsevier.com/locate/neunet
+
+ 
+
+Efficient search for informational cores in complex systems:
+Application to brain networks chsh
+
+ 
+
+Jun Kitazono*”, Ryota Kanai”, Masafumi Oizumi**
+
+* Graduate School of Arts and Sciences, The University of Tokyo, Tokyo, Japan
+> Araya, Inc., Tokyo, Japan
+
+ARTICLE INFO ABSTRACT
+
+Article history:
+
+Received 4 April 2020
+
+Received in revised form 4 August 2020
+Accepted 23 August 2020
+
+Available online 28 August 2020
+
+An important step in understanding the nature of the brain is to identify “cores” in the brain network,
+where brain areas strongly interact with each other. Cores can be considered as essential sub-networks
+for brain functions. In the last few decades, an information-theoretic approach to identifying cores has
+been developed. In this approach, interactions between parts are measured by an information loss
+function, which quantifies how much information would be lost if interactions between parts were
+removed. Then, a core called a “complex” is defined as a subsystem wherein the amount of information
+loss is locally maximal. Although identifying complexes can be a novel and useful approach, its
+application is practically impossible because computation time grows exponentially with system size.
+Here we propose a fast and exact algorithm for finding complexes, called Hierarchical Partitioning for
+
+Keywords:
+
+Network core
+
+Brain network
+
+Integrated information theory
+
+Complex Complex search (HPC). HPC hierarchically partitions systems to narrow down candidates for complexes.
+vita nvormation The computation time of HPC is polynomial, enabling us to find complexes in large systems (up to
+ubmodularity
+
+several hundred) in a practical amount of time. We prove that HPC is exact when an information
+loss function satisfies a mathematical property, monotonicity. We show that mutual information is
+one such information loss function. We also show that a broad class of submodular functions can be
+considered as such information loss functions, indicating the expandability of our framework to the
+class. We applied HPC to electrocorticogram recordings from a monkey and demonstrated that HPC
+
+revealed temporally stable and characteristic complexes.
+© 2020 The Authors. Published by Elsevier Ltd. This is an open access article under the CC BY license
+(http://creativecommons.org/licenses/by/4.0/).
+
+1. Introduction
+
+The brain achieves its highly sophisticated cognitive functions
+through the interaction of many neurons. To understand the
+neural mechanisms of brain functions, it is important to uncover
+network structures in the brain (Bassett & Sporns, 2017; Bressler
+& Menon, 2010; Bullmore & Sporns, 2009; Fornito et al., 2013,
+2016). An effective way to characterize these network structures
+is to identify “cores” of the network where neurons strongly
+interact with each other. The cores can be considered as the
+most important sub-networks for various functions and cognition
+(see Fornito et al., 2016, Chapter 6 for a detailed review). In the
+literature, cores have been defined in many ways using different
+approaches, such as maximal cliques (Ercsey-Ravasz et al., 2013),
+k-cores (Chatterjee & Sinha, 2007; Hagmann et al., 2008; Harriger
+et al., 2012; van den Heuvel & Sporns, 2011), rich-clubs (Har-
+riger et al., 2012; van den Heuvel & Sporns, 2011; Zamora-Lépez
+et al., 2010), and modularity (Chen et al., 2008; Meunier et al.,
+
+* Corresponding authors.
+E-mail addresses: c-kitazono@g.ecc.u-tokyo.ac.jp (J. Kitazono),
+c-oizumi@g.ecc.u-tokyo.ac.jp (M. Oizumi).
+
+https://doi.org/10.1016/j.neunet.2020.08.020
+
+2009; Schwarz et al., 2008; Shalizi et al., 2007; Sporns & Betzel,
+2016). Most of these methods are based on graph representa-
+tions of systems, wherein the dependence between two nodes
+is represented as the weight of the edge connecting the two
+nodes. The weight of the edges represents the strength of physical
+links (referred to as structural connectivity) or correlations in
+activity (referred to as functional connectivity). Although this
+graph-based analysis is easy to use, it does have a limitation
+no matter whether the graph is constructed by structural or
+functional connectivity: since a graph is fully described by one-
+to-one relations between nodes, graph-based analysis inevitably
+omits the effects of many-to-many interactions; and although
+these are not predicted by one-to-one interactions alone, they
+are still important for understanding complex interactions in the
+brain.
+
+To overcome the limitations of graph-based analysis, we uti-
+lize an information-theoretic approach (Balduzzi & Tononi, 2008;
+Tononi, 2008) to cores that takes account of many-to-many inter-
+actions. In this approach, the degree of interactions between parts
+in a system is measured by an information-theoretic measure,
+such as mutual information. More specifically, it is quantified
+by how much information would be lost if a system were cut
+
+0893-6080/© 2020 The Authors. Published by Elsevier Ltd. This is an open access article under the CC BY license (http://creativecommons.org/licenses/by/4.0/).
+J. Kitazono, R. Kanai and M. Oizumi / Neural Networks 132 (2020) 232-244 233
+
+into parts and statistical dependence between the parts were
+removed. This quantification can be done only from the dynamics
+of the system without knowing the physical links between ele-
+ments. Then, roughly speaking, a core is defined as a subsystem
+wherein the amount of information loss is larger than that in any
+of its supersets. We call such cores defined this way “informa-
+tional cores” or “complexes” (Balduzzi & Tononi, 2008; Tononi,
+2008).
+
+The original idea of the complex was proposed in the In-
+tegrated Information Theory (IIT) of consciousness (Balduzzi &
+Tononi, 2008; Oizumi et al., 2014; Tononi, 2004, 2008; Tononi
+et al., 2016, 1994). IIT hypothesizes that complexes in the brain
+correspond to the loci of consciousness, i.e., the areas where
+consciousness arises. Nevertheless, we can utilize complexes not
+only to study consciousness but also to analyze other systems
+unrelated to consciousness. This is because the complex is based
+on the information theory and can therefore be applied to any
+stochastic system, in principle at least.
+
+Despite the general applicability of the complex to stochastic
+systems and its potential superiority to other graph-based ap-
+proaches, only a few studies have utilized complexes to analyze
+systems, and the sizes of the systems analyzed were small (Al-
+bantakis et al., 2014; Albantakis & Tononi, 2015; Lee et al., 2009).
+This is because searching for complexes is extremely difficult in
+large systems: the search computation time grows exponentially
+with the number of elements in the system, and identifying com-
+plexes is virtually impossible even in systems with only dozens
+of elements.
+
+In this paper, we propose a fast and exact algorithm, which
+we call “Hierarchical Partitioning for Complex search” (HPC). HPC
+searches for complexes by hierarchically dividing subsystems.
+HPC is exact when the measure of the information loss satis-
+fies a certain mathematical property, i.e., monotonicity. Mutual
+information satisfies this property and is therefore used in this
+study. We also show that a class of submodular functions, where
+“submodular” is a mathematical property of set functions (Bach,
+2013; Fujishige, 2005), satisfies this monotonicity, indicating the
+expandability of our framework to the class of functions. HPC
+can identify complexes in polynomial time. More specifically,
+HPC enables us to find complexes of a system consisting of
+several hundreds of elements, which in turn makes possible the
+search for complexes in, for example, multi-channel EEG and
+ECoG, which typically involve several hundreds of electrodes, in
+a practical amount of time.
+
+The rest of the paper is organized as follows. In Section 2, we
+give preliminaries. Then, in Section 3, we introduce our new HPC
+algorithm. In Section 4, we show the relation between mono-
+tonicity and submodularity. In experiments in Section 5, we first
+demonstrate how HPC works by taking a simple model as an
+example. Second, we evaluate the computation time of HPC.
+Third, we demonstrate how the algorithm can be applied to real
+neural data using an open ECoG dataset as an example (Nagasaka
+et al., 2011). Finally, in Section 6, we discuss some limitations of
+HPC and prospects of this study.
+
+The MATLAB codes of HPC are available at https://github.com/
+oizumi-lab/PhiToolbox.
+
+2. Preliminaries
+
+In this section, we introduce important concepts that are
+used in this study. These concepts were all proposed in previous
+studies. First, we outline the concepts that are needed to define
+the complex (Section 2.1). Second, we explain information loss,
+in particular mutual information (Section 2.2). Third, we explain
+how information loss is utilized to quantify the strength of inter-
+actions in a system (Section 2.3). Finally, we define the complex
+(Section 2.4).
+
+A )
+
+-------------5>¢
+
+ 
+
+‘MIP
+
+Fig. 1. Schematic of Minimum Information Partition (MIP). We consider a
+subsystem consisting of four elements {1, 2, 3, 4}. The nodes connected by edges
+are dependent on each other, while others are not. If the subsystem is vertically
+cut into the two parts {1,2} and {3,4} as shown in Fig. 1A, no information is
+lost. In contrast, if the subsystem is partitioned horizontally as shown in Fig. 1B,
+some amount of information is lost. In this case, the vertical cut in Fig. 1A is
+the MIP.
+
+2.1. Outline of important concepts
+
+“Complex” is a rather complicated concept to understand.
+Before we give a formal mathematical definition of complexes, we
+first outline two important concepts, information loss functions
+and minimum information partitions, which are needed to define
+complexes, and then outline complexes.
+
+Information loss function Information loss functions measure
+the strength of dependence between parts from an
+information-theoretic viewpoint. Information loss func-
+tions quantify how much information is lost if a subsystem
+is “cut” into two smaller parts, where “cut” means re-
+moving the interactions between the two parts. If the two
+parts are independent of each other, no information is lost
+while if the parts are strongly dependent on each other,
+much information is lost. As we detail in the next section,
+mutual information and integrated information in IIT can
+be interpreted as information loss functions.
+
+Minimum information partition (MIP) The amount of informa-
+tion loss depends on how a subsystem is partitioned. As
+an example, consider a subsystem {1, 2, 3, 4} consisting
+of the two independent parts {1,2} and {3, 4} (Fig. 1). If
+the subsystem is vertically cut into the two parts {1, 2}
+and {3,4} as shown in Fig. 1A, no information is lost.
+In contrast, if the subsystem is partitioned differently, as
+shown in Fig. 1B, some amount of information is lost. The
+minimum information partition (MIP) of the subsystem is
+that partition among all possible partitions for which the
+information loss is minimum (Balduzzi & Tononi, 2008;
+Tononi, 2004, 2008). In this example, the vertical cut in
+Fig. 1A is the MIP. Thus, the MIP cuts the system with its
+weakest link.
+
+Complex Complexes are defined by using the concept of MIP: a
+complex is a subsystem such that the amount of informa-
+tion loss when it is partitioned with its MIP is larger than
+those of all its supersets (Balduzzi & Tononi, 2008; Tononi,
+2008). If we add elements to a complex, the amount of
+information loss of the extended subsystem for its MIP is
+smaller than that of the complex. Intuitively speaking, a
+complex is more strongly unified than any of its supersets,
+and adding elements to a complex inevitably includes a
+weaker link.
+234 J. Kitazono, R. Kanai and M. Oizumi / Neural Networks 132 (2020) 232-244
+
+2.2. Information loss function
+
+In this subsection, we explain the definition of information
+loss functions. Information loss functions measure the amount of
+information loss when interactions between parts are removed.
+After introducing a general definition of information loss func-
+tions, we consider the mutual information as an example of
+information loss functions. As we describe in Section 3, the mu-
+tual information satisfies essential properties for the proposed
+algorithm for complex search. For this reason, we use the mutual
+information as an information loss function in this paper.
+
+We consider a probabilistic system consisting of N elements
+with a distribution p(xXy ) = p(x1,..., Xv). Here, V denotes the set
+of indices (V = {1,..., N}) and xy denotes (x1, ..., Xn) = (Xi)iev-
+Similarly, for a subset S C V, xX; denotes (x;)jes. For example in
+the case of a multi-agent system, each variable x; can be a state
+of an agent, and N can be the number of agents. In the case of
+an EEG measurement of brain activity, x; can be a signal from an
+electrode and N can be the number of electrodes.
+
+We consider a bi-partition (S,, Sp) of a subset S that partitions
+S into two disjoint parts, S; and Sr (Sg = S\S,). We then
+consider a “disconnected” distribution, q(Xs) = q(Xs,, Xs, ), Where
+some types of interaction between S; and Sr are removed. We
+define the amount of information loss caused by the partitioning,
+f (Si; Sr), as the Kullback—Leibler divergence between the original
+distribution p and the disconnected distribution g:
+
+F (SL; Sk) = Dui(p (Xs) || g (Xs),
+
+= J 01s)10g Pas. 0)
+q(Xs )
+
+The Kullback-Leibler divergence, in general, can be interpreted
+
+as information loss when q is used to approximate p (Burnham
+
+& Anderson, 2003). Thus, the information loss function f can be
+
+interpreted as information loss caused by removing interactions
+
+between parts.
+
+Since S; is the complement of Sp in S, determining S; automati-
+cally specifies Sp. Therefore, an information loss function f(S_,; Sp)
+can be considered as a set function of S$, whose domain is the
+powerset of S. To emphasize this, we introduce the following
+notation:
+
+fs(SL) = f (St; S\St) = (S73 Sr). (2)
+
+There are various types of information loss function, depend-
+ing on what’ kind of “interactions” are removed
+(Amari et al., 2018; Mediano et al., 2019a, 2019b; Oizumi et al.,
+2016b; Tegmark, 2016). An example is integrated information,
+which was originally introduced in IIT (Balduzzi & Tononi, 2008;
+Oizumi et al., 2014; Tononi, 2004, 2008). Several variants have
+also proposed (Amari et al., 2018; Barrett & Seth, 2011; Medi-
+ano et al., 2019a, 2019b; Oizumi et al., 2016a, 2016b; Tegmark,
+2016). Integrated information can be interpreted as informa-
+tion loss when “causal” interactions between subsystems are
+removed (Amari et al., 2018; Oizumi et al., 2016b). Integrated
+information becomes large when two parts strongly affect each
+other across different time points (see Amari et al., 2018; Barrett
+& Seth, 2011; Mediano et al., 2019a, 2019b; Oizumi et al., 2016a,
+2016b; Tegmark, 2016 for more details).
+
+Another example of an information loss function is mutual
+information, which we use in this study. Mutual information
+quantifies statistical dependence between parts. Let us consider
+the following disconnected probability distribution q,
+
+q (Xs) = p (&s,) D (Xsp) - (3)
+
+In this model g, the two parts S; and Sp are independent, which
+means any kind of dependence between S, and Sp is completely
+removed. Then, by substituting Eq. (3) into Eq. (1), we can obtain
+
+a formula that corresponds (also) to the mutual information
+between the two parts S; and Sr:
+(Xs)
+
+154: Se) = plas) log — PS) a, (4)
+
+P(Xs, )P(Xsp )
+The mutual information measures how strongly two subsystems
+are statistically dependent on each other. It becomes large when
+the two parts are strongly dependent, and becomes 0 when the
+two parts are independent; that is, p(xs) = p(Xs,)p(Xs, ). The
+mutual information Eq. (4) is also represented as
+
+I(St; Sr) = H(S_) + H(Sr) — H(S), (5)
+
+where H(-) represents the entropy, e.g., H(S) = — f{ p(Xs ) log p(Xs )
+dx;. Equivalently, we can rewrite the above equation as a set
+function of S;:
+
+Is(S_) = I(S; S\Sz)
+= H(S,) + H(S\S,) — H(S).
+
+We use Eqs. (5) and (6) in Sections 2.3 and 4.
+
+The mutual information has two important mathematical
+properties which are utilized in this study, as shown later. The
+first is symmetric-submodularity, which enables a fast and exact
+search for minimum information partitions (MIPs) (Hidaka &
+Oizumi, 2018; Kitazono et al., 2018) (Section 2.3). The second
+is monotonicity, which is the basis of our new algorithm HPC
+(Section 3).
+
+(6)
+
+2.3. Minimum information partition
+
+In this subsection, we introduce the Minimum Information
+Partition (MIP) and an efficient algorithm for searching for MIPs,
+which is called Queyranne’s algorithm.
+
+2.3.1. Definition of MIPs
+
+The MIP is the bi-partition for which the amount of informa-
+tion loss is minimum among all bi-partitions. Mathematically, the
+MIP (S™'", SR''?) of a subsystem S is defined as follows:
+
+(Si, SR) = arg min f(S1; Sr), (7)
+(SL.SR)EPs
+
+where Ps; denotes the set of all the bi-partitions of the subset
+
+S. Since the information loss function f(S,; Sr) is represented as
+
+a set function fs(S,), the search for the MIP can be equivalently
+
+formulated as a minimization problem of the set function f¢(S,):
+
+sui = argmin fs(S,), Sp = S\Sy"". (8)
+SLES, S~#D
+
+We represent the amount of information loss for the MIP as
+MP sm FSM: SN”) = fo(SM”). (9)
+
+Similarly, we represent the mutual information for the MIP as
+Ix". Hereinafter, we refer to a bi-partition as a partition, for
+simplicity.
+
+By f.""", we can evaluate the “irreducibility” of the subsystem
+S. When f.""" = 0, this means the subsystem S consists of
+independent parts, i.e., the subsystem S can be reduced to inde-
+pendent parts. In contrast, when f."" is nonzero, the subsystem
+S cannot be reduced to independent parts. No matter how the
+subsystem S is cut into parts, at least as much information as f,""”
+is lost.
+J. Kitazono, R. Kanai and M. Oizumi / Neural Networks 132 (2020) 232-244 235
+
+2.3.2. Algorithm for searching for MIPs
+
+If we search for MIPs by exhaustively comparing all the parti-
+tions, the computation time grows exponentially with the num-
+ber of elements in the system. In previous studies, we utilized a
+mathematical concept, submodularity, to reduce the computation
+time (Hidaka & Oizumi, 2018; Kitazono et al., 2018; Narasimhan
+et al., 2006). In particular, we used a submodular-based algo-
+rithm called Queyranne’s algorithm (Queyranne, 1998). We first
+introduce the definition of submodularity and then introduce
+Queyranne’s algorithm.
+
+Submodularity. Submodularity is a property of set functions that
+is analogous to the concavity of continuous functions. Specifically,
+submodularity is defined as follows:
+
+Definition 1 (Submodularity). A set function f : 2° — R is
+submodular if it satisfies the following inequality for any A, B C
+S:
+
+f(A) + f(B) > f(AU B) + f(A B).
+
+The mutual information Is(S,) is submodular as a function
+of S,, and the entropy H is also submodular. The submodular-
+ity of the mutual information can be easily derived from the
+submodularity of the entropy by using Eq. (6) (Bach, 2013).
+
+If a submodular function f : 2” — R satisfies f(S) = f(V\S) for
+any subset S C V, the function f is called symmetric-submodular
+function. The mutual information I;(S,) is a symmetric-
+submodular function defined over the powerset of S.
+
+In general, given any submodular function f : 2° > Ra
+function gs : 2° — R defined as
+
+&s5(SL) = f(SL) + f(S\SL) — f(S) (SLE S) (10)
+
+is symmetric-submodular (Bach, 2013). In this paper, we call this
+type of symmetric-submodular functions “symmetrized” sub-
+modular functions. The mutual information, which is symmetric-
+submodular, is especially ‘“symmetrized”-submodular. We use
+the concept of symmetrized submodular functions in Section 4.
+
+Queyranne’s algorithm. If a set function f : 25 — R is symmetric-
+submodular, we can exactly and efficiently find the minimum of
+the function by Queyranne’s algorithm (Queyranne, 1998). Thus,
+we can use Queyranne’s algorithm to find MIPs when the mutual
+information is used as an information loss function (Hidaka &
+Oizumi, 2018; Narasimhan et al., 2006). The computation time
+of the algorithm is O(|S|?), where |S| indicates the number of
+elements of S. This is much smaller than an exhaustive search,
+wherein the computation time is 0(2'5!).
+
+2.4. Complex: informational core of a system
+
+In this subsection, we introduce the definition of a com-
+plex (Balduzzi & Tononi, 2008; Tononi, 2008). We also introduce
+a main complex, which is a stronger definition of a complex (Bal-
+duzzi & Tononi, 2008; Tononi, 2008).
+
+A subsystem is called a complex if the amount of information
+loss for its MIP is nonzero and larger than those of all its super-
+sets. The mathematical definition of a complex is given as follows.
+
+Definition 2 (Complex). A subset S C V is called a complex if it
+satisfies f"” > O and f.""" > f"" for any of its superset T (T > S
+andT CV),
+
+A schematic explanation of the definition of a complex is
+shown in Fig. 2. The subsystem {3, 4,5} is a complex if it has
+greater f™"’ than all its supersets; that is, fj.) is larger than
+
+MIP MIP MIP MIP
+fit3.a.sy Si3.45.7) S13.4,5.6.7) f11,2,3.4.5.6.7}° and so on.
+
+The whole system V is a complex if it satisfies f/"" > 0 by
+definition. We define f“'’ = 0 for single elements because we
+cannot consider partitions of a single element. Therefore, single
+elements cannot be complexes.
+
+A subsystem is called a main complex if the amount of infor-
+mation loss for its MIP is larger than those of all its supersets, and
+is also larger than or equal to those of its subsets. In other words,
+a complex is called a main complex if the amount of information
+loss with its MIP is larger than or equal to those of all its subsets.
+
+Definition 3 (Main Complex). A complex is called a main complex
+if it satisfies fM"" > fe" for any of its subset R (R C S).
+
+A schematic explanation of the definition of main complexes
+is shown in Fig. 2. The subsystem {3, 4,5} is a main complex if
+it has f™'’ larger than those of all its supersets, and also has f™”
+equal to or larger than those of all its subsets, ie., {3, 4}, {3, 5},
+and {4, 5}.
+
+A complex can be regarded as an informational core in the
+sense that when elements are added to it, its irreducibility always
+decreases, as quantified by f™'’. A main complex can be also re-
+garded as an informational core but in a stronger sense, in that its
+irreducibility always decreases, both when elements are added to
+it and also when they are removed from it. Thus, a main complex
+can be considered as a locally-most-irreducible subsystem. Please
+note that there can be multiple main complexes in a system.
+
+We end this subsection by mentioning a property of main
+complexes which will be utilized in HPC. A main complex does
+not include smaller complexes by definition of main complexes
+and complexes. Conversely, if a complex S does not include
+smaller complexes, then S is a main complex. This can be easily
+shown by contradiction. Thus, a main complex is a complex
+that does not include smaller complexes. This property of main
+complexes is stated as a lemma below.
+
+Lemma 4. A complex is a main complex if and only if the complex
+does not include other complexes.
+
+From Lemma 4, we can easily show that if a complex exists ina
+system, then a main complex always exists: the complex includes
+a main complex, or the complex itself is a main complex.
+
+3. Fast and exact algorithm for finding complexes
+
+If we search for (main) complexes by brute force, we need
+to find the MIPs of all the 0(2") subsets, and then compare the
+f™'? of the subsets to check if each subset satisfies the definition
+of a (main) complex (Definitions 2 and 3). In contrast, by using
+Hierarchical Partitioning for Complex search (HPC), we need to
+find the MIPs of only N — 1 subsets.
+
+In what follows, we describe the algorithm HPC. We first
+explain that the mutual information satisfies an important math-
+ematical property, i.e., monotonicity. We then show that, by
+taking advantage of the monotonicity of the mutual information,
+HPC enables us to find complexes efficiently.
+
+3.1. Monotonicity of mutual information
+
+The mutual information has a well-known mathematical prop-
+erty, i.e., monotonicity, as described below. Let us consider the
+mutual information between A and B, I(A; B), where A and B are
+sets of elements. Then, if we add another set of elements C to A,
+the mutual information does not decrease. That is,
+
+(AU C; B) > I(A; B). (11)
+
+Also if we add C to B, I(A; BUC) > I(A; B). This inequality means
+that the mutual information monotonically increases as elements
+236 J. Kitazono, R. Kanai and M. Oizumi / Neural Networks 132 (2020) 232-244
+
+°@99 6 SR: %@ 6
+O
+@°a Oo @°o
+< ‘eee >
+@, @ ® %§ © %@ ©
+eo © o © o ©
+qo"? @ qa QO°oa
+
+Main Complex
+
+Complex
+
+Fig. 2. Schematic of the definitions of complex and main aan (Definitions 2 and 2). A jie . is a ee if S has larger f™”” than any supersets of S.
+
+if S isa complex and S has a larger f™? than any subsets of S. The subsystem 3, "4 5} i is 3 main complex if {3, 4, 5} isa complex and Ji3.4.5) is larger than Ses, 4)"
+
+fs and fas)
+
+are added. We refer to this mathematical property as “monotonic-
+ity”. The above inequality is equivalent to the non-negativity of
+the conditional mutual information
+
+I(B; C|A) = I(A UC; B) — I(A; B) > 0. (12)
+
+To utilize this concept in HPC, we restate the monotonicity in the
+context of partitioning a system. Let T be a subset of V and (Tj, Tr)
+be a partition of T. For any non-empty subset S, of T, (S, C T;),
+the following inequality holds:
+
+I(T.; Tr) = I(Si; Tr). (13)
+3.2. Auxiliary theorems
+
+We show several auxiliary theorems that are the basis of our
+new algorithm HPC.
+
+By using the monotonicity of the mutual information Eq. (13),
+we can show an inequality that particularly holds for the mutual
+information for MIPs, which is denoted by /™'’, as follows.
+
+Proposition 5. Let T be a subset of V, and (T,, Tp) be the MIP of
+T. If a subset S of T (S C T) intersects both T, and TR (SQN T, # @
+and SMT # 9), then If" > 13".
+
+Proof. We show IM > I(S 1 T;5 1 Tr) > Ig". The first
+inequality immediately follows from the monotonicity of the
+mutual information Eq. (13):
+
+Ip’ = I(T; Tr)
+= (SM T,; Tr) (14)
+> (S$ A Ty; SM TR).
+
+Then, the second inequality holds by definition of the MIP: Since
+
+(SAT,, SOTp) is a partition of S, that is, (SAT,)U(SNTr) =S and
+
+(SO TL) O(S OTR) = Y, the mutual information I($ N TL; S 1 Tr) is
+
+always larger than or equal to I$".
+
+ 
+
+ 
+
+ 
+
+ 
+
+A schematic explanation of (the proof of) Proposition 5 is
+shown in Fig. 3. In this example, a system T = {1, 2, 3, 4, 5, 6, 7}
+is partitioned into T, = {1,2,3,4} and TR = {5,6, 7} with its
+MIP. A subsystem S = {2, 4,5, 7} is a subset of T (S C T). Then,
+I9.3,45.6,7) =I =I = Me 5,7), because S intersects both T,
+and Tp; that is, SAT, — {2,4,5, 7} {1, 2, 3, 4} = {2,4} 4 Wand
+SOTr = {2, 4,5, 7} {5, 6,7} = {5,7} FO.
+
+The inequality in Proposition 5 means that the subset S has
+smaller /™' than that of its superset T, and therefore S does not
+satisfy the definition of complexes (Definition 2). Thus, the lemma
+below follows immediately.
+
+949 99F, U5
+
+MIP MIP
+
+Lemma 6. Let T be a subset of V, and (T,, Tr) be the MIP of T. If
+a subset S of T (S C T) intersects both T, and Tp (SN T, 4 @ and
+SOTr 4 @), then S is not a complex.
+
+Lemma 6 means that a proper subset S of T (S Cc T) must
+be included in T, or Tp to be a complex. In other words, any
+complex that is a subset of T is included in T, or Tp. Therefore,
+the following proposition holds.
+
+Proposition 7. Let T be a subset of V, and (T,, Tp) be the MIP of
+T. Then, any complex S that is a subset of T (S C T) satisfies one of
+the following mutually exclusive conditions (a)-(c).
+
+(a) S=T,
+(b) SCT,
+(c) S C Tp.
+
+Proposition 7 is the main basis of our algorithm, Hierarchi-
+cal Partitioning for Complex search (HPC), as will be shown in
+Section 3.3.
+
+3.3. Hierarchical partitioning for complex search
+
+In this subsection, we explain our algorithm, Hierarchical Par-
+titioning for Complex search (HPC). HPC primarily consists of two
+steps. The first step is listing candidates of (main) complexes.
+HPC narrows down candidates for (main) complexes by hierar-
+chically partitioning a system. The second step is screening the
+candidates to find (main) complexes. We explain the first step in
+Section 3.3.1, and then the second step for finding complexes and
+main complexes in Sections 3.3.2 and 3.3.3, respectively.
+
+3.3.1. Hierarchical partitioning for listing candidates of complexes
+
+HPC enables the finding of all the complexes and main com-
+plexes by hierarchical partitioning of the system with the mini-
+mum information partitions. The hierarchical partitioning process
+is schematically shown in Fig. 4 and a pseudo-code is given in
+Algorithm 1 (the procedure “ListCandidates”’).
+
+As is shown in Fig. 4, HPC starts by dividing the whole system
+with its MIP, and then repeatedly divides the subsystems with
+their MIPs until the whole system is completely decomposed into
+single elements. This procedure in HPC is summarized as follows:
+
+1. Find the MIP (V,, Vr) of the whole system V and divide the
+whole system V into two subsystems V; and Vp.
+
+2. Find the MIPs of the subsystems found in the previous step,
+V, and Vp, and divide them into (Vi,, Vir) and (Vpr, Ver),
+respectively.
+J. Kitazono, R. Kanai and M. Oizumi / Neural Networks 132 (2020) 232-244 237
+
+M
+
+ 
+
+pMIP
+{1,2,3,4,5,6,7}
+
+> 1({2,4}3:{5,7) =
+
+Ul ty MIP
+
+yMIP
+{2,4,5,7}
+
+Fig. 3. Schematic explanation of the proof of Proposition 5. Here we consider a system T = {1,2,3,4,5,6,7}. This system T is partitioned by its MIP into
+two subsystems T, = {1, 2,3, 4} and Tr = {5,6,7}. The boundary of the MIP of T is indicated by a red-dashed vertical line. Then, we consider a subsystem S$ =
+
+holds. The second inequality 1({2, 4}; {5,7}) = (SA T;5 07) = IM" = 1957
+
+949 799F,I5U,
+
+holds by definition of the MIP. The boundary of the MIP of S is indicated by a
+
+red-dashed horizontal line. (For interpretation of the references to color in this figure legend, the reader is referred to the web version of this article.)
+
+ 
+
+© 9
+
+Fig. 4. Schematic of Hierarchical Partitioning for Complex search (HPC).
+In HPC, a system is hierarchically partitioned by MIPs until the system is
+decomposed into single elements. In this example, the whole system V =
+{1, 2,3, 4,5, 6, 7} is divided by its MIP (indicated by a dashed line) into V, =
+{1, 2, 3, 4} and Ve = {5, 6, 7}. Then, V,, is divided into V;; and Vip, and Vp into Va,
+and {7}. Finally, the whole system V is decomposed into seven single elements.
+
+3. Repeat this division until the whole system is decomposed
+into single elements.
+
+After the procedure above, we obtain the set of hierarchically
+partitioned subsystems, i.e., V, Vi, Vr, Vit. Vir, Vat, Ver, and so on.
+We consider all the set of subsystems V = {V, V,, Vr, Vit, Vir, Var,
+Ver, ---}, excluding single elements. Then, the following theorem
+holds.
+
+Theorem 8. Any complex S C V belongs to Vv (S € Vv).
+
+Proof. By repeatedly applying Proposition 7 to the subsets in Y,
+i.e., V, Vi, Ve, Vit, Vir, Vet, Ver, and so on, we obtain the desired
+result. More formally, we can easily see that a subset S that does
+not belong to Y intersects both T, and Tp of a superset T(S C T),
+and therefore S cannot be a complex from Lemma 6.
+
+ 
+
+ 
+
+ 
+
+ 
+
+Thus from Theorem 8, Y can be seen as the set of candidates
+of complexes. Also, Theorem 8 means that complexes in a sys-
+tem form a “nested” hierarchy: if there are two complexes, one
+includes the other, or the two are disjoint. They never partially
+
+overlap each other. This nested hierarchy of complexes cannot
+be derived only from the definition of complexes (Definition 2),
+because the definition does not specify the relation between
+complexes. For the nested hierarchy to hold, the inequality of the
+mutual information for MIPs (Proposition 5) is necessary.
+
+As described above, HPC decomposes the whole system into N
+single elements, by dividing a subsystem into two subsystems at
+every step. This means that HPC divides the system N — 1 times.
+That is, HPC evaluates MIPs of N—1 subsets. This number is much
+smaller than the number of subsets evaluated in the exhaustive
+search, 2’ — N — 1, which is the number of subsets consisting of
+more than one element.
+
+Next, we describe the way to select complexes and main
+complexes from the set of candidates V.
+
+3.3.2. Selection of complexes from the candidates
+
+After the hierarchical partitioning procedure described above,
+we need to check whether each candidate of complexes belonging
+to V is actually a complex or not in accordance with Definition 2.
+We can efficiently check this by taking advantage of the hierar-
+chical (tree) structure. A pseudo-code is given in Algorithm 1 (the
+procedure “ScreenCandidates’’). See Appendix A.1 for details.
+
+3.3.3. Selection of main complexes from the candidates
+
+As stated in Lemma 4, a main complex is a complex that does
+not include smaller complexes. Thus, a main complex is a locally
+farthest complex from the root (the whole system) in the tree.
+Based on this, we can easily find main complexes. A pseudo-code
+is given in Algorithm 1 (the procedure “ScreenCandidates’’). See
+Appendix A.2 for details.
+
+3.4. Time complexity of HPC
+
+We derive a rough estimate of the total time complexity for
+searching for complexes by HPC. Here we only consider the first
+step of HPC (hierarchical partitioning for listing candidates of
+complexes) and omit the second step (selection of complexes and
+main complexes from the candidates), because the computation
+time of the second step is negligible.
+
+The total time complexity of searching for complexes depends
+on three factors, i.e., (1) computing the mutual information, (2)
+searching for MIPs, and (3) searching for complexes. The total
+computational cost is roughly bounded above by the products of
+these three factors (1)-(3). Each factor is given as follows.
+
+(1) The time complexity of computing the mutual informa-
+tion depends on the type of probability distribution. If the
+probability distribution is Gaussian, aS we assume in ex-
+periments in Section 5, then the time complexity is O(N?).
+238 J. Kitazono, R. Kanai and M. Oizumi / Neural Networks 132 (2020) 232-244
+
+(2) For searching for MIPs, we utilize Queyranne’s algorithm in
+this study. The time complexity of Queyranne’s algorithm
+is known to be O(N?) (Queyranne, 1998).
+
+(3) HPC finds MIPs of N — 1 subsets as shown in Section 3.3.1.
+Thus, the time complexity of HPC is O(N).
+
+Therefore, the total time complexity is about O(N*) x O(N?) x
+O(N) = O(N’). We evaluate actual computation time in Sec-
+tion 5.2 using a simulation.
+Algorithm 1 Hierarchical Partitioning for Complex search (HPC)
+procedure HPC(V)
+VY, Z, parents <— ListCandidates(V)
+cs, mcs <— ScreenCandidates(V, Z, parents)
+return cs, mcs > cs: complexes, mcs: main complexes
+end procedure
+
+procedure LISTCANDIDATES(V )
+
+if |V|= 1 then > V is indivisible, i.e., a single element
+VY, Z, parents < []
+else
+
+Vi, Ve, Wy? <— MIP(V) > Find the MIP of V
+parents(V,) < V
+parents(Vp) < V
+Y, ZL, parents, < ListCandidates(V,)
+Ve, Zr, parentsp <— ListCandidates(Vp)
+V<[V,V. VR]
+I <— [IM”, L., Ir]
+parents < [parents(V,), parents, parents(Vp), parentsr |
+end if
+return ), Z, parents
+end procedure
+
+> V: candidates of (main) complexes
+
+procedure SCREENCANDIDATES(Y, Z, parents)
+cs < {V}, mcs <— {V}, mrac(V) < V_ > mrac: most-recent
+ancestor complex or self
+for all T © V\{V} doo Tree traversal starting from the root
+node
+if re > MaXscA(parents(T)) rye then
+MaXxsearyle < vr
+add T to cs
+remove mrac(parents(T )) from mcs
+add T to mcs
+mrac(T) <— T
+else
+MdXs <A(T) yr <— MaXs €A(parents(T)) yr
+mrcs(T ) <— mrac(parents(T ))
+end if
+end for
+return cs, mcs
+end procedure
+
+4. A relation between monotonicity and submodularity
+
+Before moving to the experiments, we show in this section
+a relation between monotonicity (Eq. (13)) and submodular-
+ity (Definition 1). We show that monotonicity is satisfied by a
+broader class of submodular functions. Based on this relation,
+we show that we can extend our framework to the class of
+submodular functions.
+
+As shown in Section 3.1, the mutual information has mono-
+tonicity, ie., I(T,; TR) > I(St; Tr) (Eq. (13)). This monotonicity
+
+can be derived only from the submodularity of the entropy, as
+follows.
+
+Proof.
+
+I(T; Tr) — (Si; Tr)
+={H(T,) + H(Tr) — H(T)} — {H(S_) + H(Tr) — H(Sz U Tr)}
+=H(T,) + H(S, U Tr) — H(T) — H(S;)
+=H(T,) + H(S, U Tr) — A(T, U (S, U Tr)) — A(T A (Sp U Tr))
+>0 (-.. H is submodular)
+
+ 
+
+ 
+
+ 
+
+ 
+
+(15)
+
+This relation between the submodularity of the entropy and
+the monotonicity of the mutual information is known as a re-
+lation between the submodularity of the entropy and the non-
+negativity of the conditional mutual information (Fujishige, 2005),
+This proof indicates that the relation between the monotonicity
+and the submodularity can be stated in a general form (Steudel
+et al., 2010):
+
+Proposition 9. Let f : 2” — R be a submodular function, and
+g:2” x 2” — R bea function defined as
+
+8(A; B) = f(A) + f(B) — f(A U B). (16)
+
+Let T be a subset of V and (T,, Tg) be a partition of T. Then, the
+function g satisfies the following inequality for any non-empty subset
+SL of T. (Sy, C T,).
+
+g(T.; Tr) = (St; Tr). (17)
+
+This proposition means that, given any submodular function
+f, we can define a new function g that satisfies the monotonicity.
+Consequently, the function g satisfies all the auxiliary theorems
+shown in Section 3.2, as the mutual information does. Therefore,
+if we regard g as an information loss function (although it does
+not have to be “informational’’), and define complexes using g,
+we can use HPC to search for the complexes. Note that a function
+with the form Eq. (16) satisfies the monotonicity, but not the
+other way around, i.e., a function that satisfies the monotonicity
+is not necessarily represented in the form of Eq. (16).
+
+In addition, the function g(S,; Sr) = gs(S,) is a symmetrized
+submodular function (Eq. (10)). This means that we can use
+Queyranne’s algorithm to search for MIPs when we use g as an
+information loss function.
+
+Thus, if we regard a symmetrized submodular function as an
+information loss function, we can utilize Queyranne’s algorithm
+and HPC to search for MIPs and complexes, respectively. This is
+summarized as follows.
+
+Submodular Complex (Complex for symmetrized submodular
+functions)
+Given any submodular function f : 2” — R, we consider a
+function g defined as
+
+(SL; Sr) =F (SL) + (Sr) — FCS). (18)
+
+Then, the function g satisfies the same properties as the
+mutual information, i.e., symmetric-submodularity and
+monotonicity. Therefore, if we regard g as an information
+loss function, we can use Queyranne’s algorithm and HPC
+to search for MIPs and complexes, respectively.
+
+5. Experiments
+
+We first evaluated the performance of the proposed algorithm
+HPC using simulated data in Sections 5.1 and 5.2. We then applied
+HPC to a real neural dataset in Section 5.3. The MATLAB codes
+for reproducing the results in the experiments are available at
+https://github.com/oizumi-lab/PhiToolbox
+J. Kitazono, R. Kanai and M. Oizumi / Neural Networks 132 (2020) 232-244 239
+
+Fig. 5. The connectivity matrix A of the AR model used in Section 5.1. The matrix A is symmetric, i.e. aj = aj. The self connections (aj) are omitted from this
+
+figure for simplicity.
+
+{1, 2,3,4,5,6} 15 3456) = 2.63 x 1077
+
+Iit2y = 3.27 x 107° {1,2}
+
+LN.
+1} (25 3}
+
+4}
+
+{3,4,5,6} 1/3!45,6) = 1.14 x 107
+
+/™.
+
+{4,5,6} Ifa) = 7.76 x 107°
+
+i™.
+
+{5, 6} I5'6, = 1.39 x 10°
+
+{5} {6}
+
+Fig. 6. The way HPC divided the system at MIPs. First, the entire system was divided into two subsystems {1, 2} and {3, 4,5, 6}. Then, the first subsystem {1, 2}
+was divided into single elements {1} and {2}. The second subsystem {3, 4,5, 6} was successively divided into {3} and {4,5,6}, {4} and {5,6}, and {5} and {6}.
+Among these subsystems, {1, 2}, {3,4,5, 6} and {5,6} are complexes, which are indicated by red color. The subsystems {1,2} and {5,6} are main complexes. (For
+interpretation of the references to color in this figure legend, the reader is referred to the web version of this article.)
+
+Throughout the simulations below, we consider a first-order
+autoregressive (AR) model with Gaussian noise,
+
+x =Ax+e, (19)
+
+where x and x’ are the present and the past states of a system con-
+sisting of N elements, A is an N x N matrix called the connectivity
+matrix, and € is Gaussian noise with mean 0 and covariance »(E).
+We consider the stationary distribution of this AR model. The sta-
+tionary distribution of p(x) is a Gaussian distribution with mean
+O and covariance »(X). The covariance »(X) can be computed
+from the following discrete Lyapunov equation
+
+= (X) = AD(X)A! + D(E). (20)
+
+By using the covariance matrix »'(X), the mutual information can
+be analytically calculated (see Appendix B). The details of the
+parameter settings are described in each subsection.
+
+5.1. A simple example
+
+We demonstrate how the proposed algorithm HPC works by
+considering a simple exemplary model. We consider an AR model
+with six elements (N = 6). The connectivity matrix A of the
+model is shown in Fig. 5 as a network. This connectivity matrix
+A is symmetric and consists of two modules, one consisting
+of two elements, 1 and 2, and the second consisting of four
+elements, 3-6. The intra-connection strength in each group is
+0.05/N, except the connection between the elements 5 and 6.
+The connection strength between 5 and 6 is 0.1/N, which is
+stronger than that between the other pairs. The inter-connections
+between the groups are 0.01/N, which are weaker than the intra-
+connections in each group. The strength of self connections is set
+to 0.9/N. The covariance »(E) of Gaussian noise is set to 0.01],
+where | is an identity matrix.
+
+Fig. 6 shows how HPC hierarchically divides the system with
+MIPs. First, since the connections between two subsystems {1, 2}
+
+and {3, 4,5, 6} are weak, the partition that splits the system into
+{1, 2} and {3, 4, 5, 6} is the MIP of the entire system. Then, these
+two subsystems are further divided with their MIPs. The first
+subsystem {1, 2} is divided into single elements {1} and {2}. The
+second subsystem {3, 4, 5, 6} is successively divided into {3} and
+{4,5, 6}, {4} and {5,6}, and {5} and {6}. Among these subsys-
+tems, {1, 2}, {3, 4,5, 6} and {5, 6} are identified as complexes by
+comparing the amount of mutual information of the subsystems
+for their MIPs, as described in Section 3.3.2. Furthermore, the
+subsystems {1, 2} and {5, 6} are identified as main complexes, as
+described in Section 3.3.3.
+
+Fig. 7 visualizes the relation among complexes, main com-
+plexes, and subsets that are not complexes. For example, the
+subsystem {4,5,6} is not a complex, because it is at a lower
+position than one of its ancestors {3, 4,5, 6} in the hierarchy.
+In contrast, the subsystem {3, 4,5, 6} is a complex, because it
+is at higher position than its only ancestor {1, 2, 3, 4,5, 6}. The
+subsystems {1,2} and {5,6} are main complexes because they
+are at the locally highest positions. HPC evaluates I™"” of only
+five subsystems, while the exhaustive search evaluates that of
+57(= 2° — 7) subsystems. Thus, our HPC algorithm efficiently
+finds the complexes and the main complexes by hierarchically
+partitioning the system.
+
+5.2. Computation time of HPC
+
+Next, we empirically measured the computation time of
+searching for complexes by simulation.
+
+We randomly generated the connectivity matrices A in Eq. (19).
+We determined each element of this connectivity matrix A by
+sampling from a Gaussian distribution with mean 0 and variance
+0.01/N, where N is the number of elements. The covariance »'(E)
+of the additive Gaussian noise in the AR model was set to 0.011.
+All computation times were measured on a machine with an Intel
+Xeon Gold 6154 processor at 3.00 GHz. All the calculations were
+implemented in MATLAB 2019a.
+240 J. Kitazono, R. Kanai and M. Oizumi / Neural Networks 132 (2020) 232-244
+
+ 
+
+ 
+
+«10%
+14 5 1.39e-05
+12 4 5
+10 6
+WSs 1.05e-05
+8 4 5. §
+S 6 “7 . A,
+N, e,- ---- % 7.09e-06 3
+1 i
+2
+0 N\ ss . 3.68e-06
+2 4 6
+2.63e-07
+
+Fig. 7. The amount of the mutual information /™"” of subsystems appeared
+in the dividing process of HPC. The elements in a subsystem are connected
+by edges in the same color. The color indicates the amount of the mutual
+information I™'’, The subsystems with solid lines are (main) complexes, and
+that with dashed lines is not a complex. (For interpretation of the references
+to color in this figure legend, the reader is referred to the web version of this
+article.)
+
+Fig. 8 shows the log-log plot of the actual computation time.
+For comparison with the HPC algorithm, we also measured the
+computation time when complexes are exhaustively searched for
+by brute force. The red circles indicate the computation time of
+the proposed algorithm HPC. To estimate the order of compu-
+tation time, we fitted a linear function to the red circles by the
+minimum mean squared error estimation. We discarded the first
+five circles (N < 50) from the fitting analysis, because, when N
+is small, computation time is affected by lower-order terms. We
+obtained the red solid line, log,) T = 4.777 log;, N—7.596, shown
+in Fig. 8. As can be seen, the red solid line well approximates
+the red circles for larger N. This means that the computation
+time of HPC increases in polynomial order (T « N*’’’). This
+is reasonably bounded above by the theoretical estimate of the
+computation time T « N’ (Section 3.4). The main reason why
+the empirical computation speed is faster than the theoretical
+estimate is thanks to the computation of the mutual information
+by MATLAB. As we mentioned in Section 3.4, the time complexity
+of the computation of mutual information for Gaussian distribu-
+tions is O(N?). However, the actual computation time grows more
+slowly (from O(N) to O(N7)), when N is up to several hundred.
+In contrast, when we exhaustively searched for complexes, the
+computation time grows exponentially as indicated by the black
+triangles. We fitted an exponential function to the black trian-
+gles by the minimum mean square error estimation, and also
+discarded the first five points (N < 7) from the fitting analysis.
+We obtained the black dashed curve, T « 2.690% as shown in
+Fig. 8.
+
+As can be seen from Fig. 8, HPC is much faster than the exhaus-
+tive search. For example, when N = 107, the actual computation
+time of HPC was about 88 s, while that of the exhaustive search
+would be about 3 x 10?! years.
+
+5.3. An application to real neural data
+
+Finally, we applied HPC to a neural dataset to demonstrate
+how HPC can be used in real settings. We used electrocorticogra-
+phy (ECoG) data recorded from a macaque monkey. The dataset is
+available at an open database, Neurotycho.org (http://neurotycho.
+org/) (Nagasaka et al., 2011). One hundred twenty-eight elec-
+trodes were implanted in the left hemisphere. The electrodes
+were placed at 5-mm intervals covering the frontal, parietal,
+
+ 
+
+1.0 nr
+I
+—~ 10°!
+O
+9
+— 10°
+®O
+e
+= 107;
+Oo
+S& 407:
+>
+—
+© 10°:
+O
+107
+
+ 
+
+ 
+
+ 
+
+10° 10' 102 10°
+Number of elements
+
+Fig. 8. Computation time of the proposed algorithm HPC and the exhaustive
+search. The red circles and the red solid lines indicate the computation time of
+HPC and the fitted linear function (log;, T = 4.777 log;y) N — 7.596). The black
+triangles and black dashed lines indicate the computation time of the exhaustive
+search and the fitted exponential function (log,) T = 0.4297N — 4.037).
+
+temporal and occipital lobes, and the medial frontal and parietal
+walls. Signals were sampled at a rate of 1 kHz. The monkey was
+awake with the eyes covered by an eye-mask to restrain visual re-
+sponses. To remove line noise and artifacts, we performed bipolar
+re-referencing between adjacent electrode pairs, i.e. subtracting
+the signal of one electrode from that of the other. The number
+of bipolar re-referenced electrodes was 64 in total. Among the
+64 channels, two channels were removed from further analysis
+because of measurement noise.
+
+We extracted 15-min signals and divided them into 1-min
+time windows. Each 1-min time window consists of 1 kHz x 60
+s = 60,000 samples. We searched for complexes in each time
+window. We approximated the probability distribution of the sig-
+nals with multivariate Gaussian distributions. Under the Gaussian
+approximation, we could compute the mutual information using
+the equation shown in Appendix B.
+
+Fig. 9 shows the main complexes and complexes in the first
+time window. In each panel, the main complexes and complexes
+are superimposed in ascending order of the amount of mutual
+information I’, We can see that the main complexes consist
+of pairs of nearby channels. In contrast, the complexes other
+than the main complexes, by definition, consist of more channels
+than the main complexes. In particular, the complexes with large
+[MIP tend to consist of channels clustered in posterior areas:
+the complex with the smallest [@”” among all complexes is the
+whole system (all 62 channels, shown in blue color). Then, the
+complexes with moderate I™” consist of channels clustered in
+the middle and posterior areas (shown in bluish-green color),
+and complexes with large I™!” consist of channels clustered in
+posterior areas (shown in yellowish-green color). Thus, we can
+see that the complexes tend to consist of channels in the more
+posterior area as /™"” increases. Every (main) complex at the
+first time window is separately shown in Fig. $1. We obtained a
+similar tendency at the different time windows: main complexes
+consist of pairs or triples of channels, and complexes cover a more
+posterior area as /™'? increases (Fig. S2 and Fig. $3).
+
+Thus, in this experiment, since main complexes consist of only
+pairs or triples of channels, it seems difficult to gain insights
+from the main complexes only. It would appear better to analyze
+not only the main complexes but also these other complexes to
+extract meaningful information.
+J. Kitazono, R. Kanai and M. Oizumi / Neural Networks 132 (2020) 232-244 241
+
+Main Complexes
+
+ 
+
+Complexes
+wee 0.33/74
+
+0.2711
+
+0.1385
+
+0.0722
+
+ 
+
+Fig. 9. Main complexes and complexes at the first time window. The channels in each (main) complex are connected by edges with the same color. The color
+indicates the amount of the mutual information /™” of the (main) complex. The main complexes and complexes are superimposed in ascending order of the amount
+
+of mutual information I™", (
+
+6. Discussion
+6.1. Summary
+
+In this study, we proposed a fast algorithm for searching
+for informational cores, or complexes. We call the proposed al-
+gorithm Hierarchical Partitioning for Complex search (HPC) be-
+cause it narrows down candidates for complexes by hierarchically
+partitioning a system. We proved that the HPC algorithm can
+efficiently enumerate all the complexes and the main complexes
+when mutual information is used as an information loss function.
+The number of subsystems whose MIPs are evaluated in HPC is
+a linear order of system size. This is dramatically smaller than
+that of an exhaustive search, which is exponential of system size.
+We also proved that if we regard a specific type of symmetric
+submodular function, which we call a symmetrized submodular
+function, as an information loss function, we can apply HPC
+to search for complexes. In the experiments, we numerically
+evaluated the computation time of the overall complex search
+process by HPC and showed that the computation time was
+approximately O(N°). We applied HPC to a simple model and
+monkey ECoG data to demonstrate how HPC can be applied.
+
+In the monkey ECoG data analyses, the main complexes were
+small and localized, i.e., pairs or triples of channels. This may
+be because the channels in a main complex were spatially so
+close to each other that the mutual information between them
+was high. In contrast, the complexes were larger than the main
+complexes, and there was a stable tendency for the complexes
+to cover the posterior area. Therefore, it appears important to
+consider not only main complexes but also complexes to uncover
+global characteristics of the brain network.
+
+6.2. Core of a network
+
+In the literature, while most approaches to finding cores of
+networks are based on graph representations of systems (Chatter-
+jee & Sinha, 2007; Chen et al., 2008; Ercsey-Ravasz et al., 2013;
+Hagmann et al., 2008; Harriger et al., 2012; van den Heuvel &
+Sporns, 2011; Meunier et al., 2009; Schwarz et al., 2008; Shalizi
+et al., 2007; Sporns & Betzel, 2016; Zamora-Lopez et al., 2010),
+our approach is based on information theory, which takes account
+of many-to-many interactions, which are missed in such graph
+representations. There is also another information-theoretic ap-
+proach which uses a measure called the cluster index (Tononi
+et al., 1998; Villani et al., 2015, 2018). The cluster index is defined
+as the ratio of the degree of interactions among elements inside
+
+For interpretation of the references to color in this figure legend, the reader is referred to the web version of this article.)
+
+a subsystem, which is measured by multi-information, to that
+between elements inside and outside the subsystem, which is
+measured by mutual information. A core is then defined as a
+subsystem in which the cluster index is large. Comparing this and
+graph-based approaches with ours is an intriguing problem.
+
+6.3. Information loss function for quantifying interactions
+
+An advantage of using information loss functions for quantify-
+ing the degree of interactions is that many-to-many interactions
+can be taken into account, as noted in the previous subsection. A
+second advantage is that information loss functions can directly
+estimate interactions from the dynamics of the system without
+knowing the physical links between elements. This is important
+in that we do not always have access to the data of physical links.
+Furthermore, this is also advantageous even when the physical
+links are known, because the physical links do not themselves
+solely directly reflect interactions between elements (Darmon
+et al., 2015; Honey et al., 2009, 2010; Suarez et al., 2020).
+
+As shown in Section 3, an information loss function must
+satisfy the inequality in Proposition 5 for HPC to be exact. While
+the mutual information satisfies the inequality, other informa-
+tion loss functions, e.g., stochastic interaction (Ay, 2015; Bar-
+rett et al., 2010), integrated information based on mismatched
+decoding (Oizumi et al., 2016a), and geometric integrated in-
+formation (Oizumi et al., 2016b), which are measures of causal
+interactions, do not necessarily satisfy it. Therefore, when these
+functions are utilized, there is no guarantee that HPC can find all
+the (main) complexes. Nevertheless, HPC might practically work
+well and might be used as an approximate algorithm. It would
+be interesting to test the extent to which HPC works well when
+these functions are utilized.
+
+As shown in Section 4, our framework can be naturally ex-
+tended by regarding a symmetrized submodular function as an
+information loss function. An example of such symmetrized sub-
+modular functions other than the mutual information is the
+weight of a graph cut. Since graph representations of systems are
+useful and important in many scientific fields, we will extend our
+framework to graphs in the next study.
+
+6.4. Applicability and expandability of HPC
+
+HPC enables us to search for (main) complexes in systems
+consisting of several hundred elements (N ~ 100-200) in a
+practical amount of time. The number of channels in EEG or
+ECoG is typically within this range. If a system consists of more
+242 J. Kitazono, R. Kanai and M. Oizumi / Neural Networks 132 (2020) 232-244
+
+elements (e.g., N ~ 1000), a further speeding-up may be required.
+To achieve this, approximate algorithms for finding MIPs can be
+utilized in place of Queyranne’s algorithm, such as the replica
+exchange Markov chain Monte Carlo method used in Kitazono
+et al. (2018) and the graph-based method proposed in Toker and
+Sommer (2019).
+
+The concept of (main) complex was originally proposed as a
+locus of consciousness in the integrated information theory of
+consciousness. However, it can be utilized to analyze brain net-
+works in contexts unrelated to consciousness, and also to other
+probabilistic systems apart from the brain. HPC will therefore be
+beneficial not only for consciousness studies but also in other
+general research fields.
+
+Declaration of competing interest
+
+The authors declare that they have no known competing finan-
+cial interests or personal relationships that could have appeared
+to influence the work reported in this paper.
+
+Acknowledgments
+
+This work was partially supported by JST CREST Grant Num-
+bers JPMJCR15E2 including AIP challenge program and
+JPMJCR1864, and JSPS KAKENHI Grant Number 18H02713, Japan.
+
+Appendix A. Select complexes and main complexes from the
+candidate set V
+
+In this section, we explain how we can select complexes and
+main complexes from the candidate set Y, which is defined in
+Section 3.3.
+
+A.1. Complex
+
+We need to check whether each candidate of complexes be-
+longing to Y actually satisfies the condition in Definition 2. The
+condition means that a candidate must have larger J™” than its
+supersets to be a complex. To check this, the tree structure ob-
+tained by the hierarchical partitioning procedure can be utilized:
+the candidate needs to be compared only with its ancestor can-
+didates in the tree because its supersets other than the ancestors
+straddle at least one of the MIP boundaries of the ancestors and
+therefore have smaller I™!’ than the ancestors (Proposition 5).
+Thus, a candidate is a complex if it has larger /™’ than its
+ancestor candidates. This comparison can be efficiently done by
+propagating the maximum value of /™'"” among ancestors and self
+from the root node (the whole system) to the leaf nodes (the
+single elements) as described below.
+
+Here, let A(-) denote ancestors and self. For example, A(VirR)
+indicates {V, V,, Vit, Vir}. Starting from the root node V, the
+amount of the mutual information I” of each candidate T € Vv
+is compared with the maximum of the mutual information of T’s
+ancestors Maxs<a(parents(r)) 1M ?(S):
+
+if" > max
+
+T is a complex, and
+MP then P
+S€A(parents(T ))
+
+maxsear) le = If, (A.1)
+T is not a complex, and
+otherwise
+
+MdaXs €A(T) rye = MaXs €A(parents(T)) yr
+
+By repeating this comparison while traversing the entire tree
+from the root to leaf nodes (i.e., in pre-order), we can list com-
+plexes without omission. In total, the comparison is done |V|
+times, where || indicates the number of subsystems in Y. We can
+easily show that |V| = N —1 as follows. Before the dividing steps,
+there is only one system (the whole system V) in Y. Then, two
+
+subsystems are added to Y every dividing step. Since HPC divides
+the system N — 1 times as described above, there are 1+2(N — 1)
+subsystems in Y at the end. Note, however, this number counts N
+single elements. Therefore, we finally get |V| = 1+2(N—1)—N =
+N — 1.
+
+A.2. Main complex
+
+As we Stated in Section 3.3.3, a main complex is a locally
+farthest complex from the root in the tree. Based on this, we can
+easily find main complexes during the tree traversal as follows.
+If we find a complex, add the complex to the list of main com-
+plexes temporarily. Then, if we find another complex that is a
+descendant of a temporal main complex, we remove the temporal
+main complex from the list and add the new one to the list. After
+finishing the tree traversal, we obtain the complete list of main
+complexes.
+
+Appendix B. Analytical formula of mutual information for
+Gaussian distribution
+
+We describe the analytical formula of the mutual information
+when the probability distribution is Gaussian. Let us begin by
+introducing the notation. We consider a probabilistic system con-
+sisting of N elements. We represent the states of the system as
+Xs = (X1,...,Xn). We assume that the probability distribution
+p (Xs) is Gaussian:
+
+1
+p (Xs) = —= ~'a) ;
+
+1
+—————_ eX
+JpaZl ( 2
+
+1 lr ory (Xt Zr - Xs
+= —— exp | —=(X. ,X L ,
+J |27 >| P ( 3! SL se) (si ZR Xsp
+(B.1)
+
+where 2’, X; Xp are the covariance matrices of Xs, Xs,, and Xs,, Xr
+is the covariance matrix between Xs, , and Xs,, and |-| indicates the
+determinant. Then, we get the marginalized distributions:
+
+(3) = Fay OP (—GRL*
+x = ex —xzX ’
+Dp SL [27 D1 p y) SLL SL
+1 Vit yt
+Xs, ) = —=[=——- exp [| — =X... 2, Xk .
+Ps) = Tae Ey r( arene »)
+
+Note that we can assume the mean of the Gaussian distribution is
+zero without loss of generality because the mean value does not
+affect the values of mutual information.
+
+The entropy of an N-dimensional Gaussian distribution with a
+covariance matrix ¥ is given by $ log |27 | + 4. By substituting
+this expression to Eq. (5), we get
+
+1, [21|| Lr
+I(Si; Sr) = 5 los Ss
+
+(B.2)
+
+(B.3)
+Appendix C. Supplementary data
+
+Fig. $1. The (main) complexes at the first time window in ECoG
+data analyses. The (main) complexes at the first time window are
+sorted by the amount of mutual information I™’ in descending
+order. The channels in each complex are connected by edges.
+The color of the markers and the edges indicates the amount
+of mutual information IM. The panels with a red box outline
+show main complexes and those with a black box outline show
+complexes that are not main complexes. We can see that the
+main complexes are small; in contrast, the complexes are larger
+than the main complexes; and the complexes tend to consist of
+channels in the more posterior area as /™"” increases.
+J. Kitazono, R. Kanai and M. Oizumi / Neural Networks 132 (2020) 232-244 243
+
+Fig. S2. Main complexes at all 15 time windows. The chan-
+nels in each main complex are connected by edges with the
+same color. The color of the markers and the edges indicates the
+amount of mutual information J’, We can see that the main
+complexes are pairs or triples of channels.
+
+Fig. S3. Complexes at all 15 time windows. The channels in each
+(main) complex are connected by edges with the same color.
+The color of the markers and the edges indicates the amount
+of mutual information I™”, The main complexes and complexes
+are superimposed in ascending order of the amount of mutual
+information I™"”, The complexes at different time windows are
+not exactly the same, but we can see that the complexes tend to
+
+consist of channels in the more posterior area as I™"" increases.
+
+Supplementary material related to this article can be found
+online at https://doi.org/10.1016/j.neunet.2020.08.020.
+
+References
+
+Albantakis, L., Hintze, A., Koch, C., Adami, C., & Tononi, G. (2014). Evolution
+of integrated causal structures in animats exposed to environments of
+increasing complexity. PLoS Computational Biology, 10(12), Article e1003966,
+URL: https://doi.org/10.1371/journal.pcbi.1003966.
+
+Albantakis, L., & Tononi, G. (2015). The intrinsic cause-effect power of discrete
+dynamical systems—from elementary cellular automata to adapting animats.
+Entropy, 17, 5472—5502, URL: https://doi.org/10.3390/e17085472.
+
+Amari, S., Tsuchiya, N., & Oizumi, M. (2018). Geometry of information integration.
+In N. Ay, P. Gibilisco, & F. Matus (Eds.), Information geometry and _ its
+applications (pp. 3-17). Cham: Springer International Publishing, URL: https:
+//doi.org/10.1007/978-3-319-97798-0_1.
+
+Ay, N. (2015). Information geometry on complexity and stochastic interaction.
+Entropy, 17(4), 2432-2458, URL: https://doi.org/10.3390/e17042432.
+
+Bach, F. (2013). Learning with submodular functions: a convex optimization
+perspective. Foundations and Trends in Machine Learning, 6(2-3), 145-373,
+URL: https://doi.org/10.1561/2200000039.
+
+Balduzzi, D., & Tononi, G. (2008). Integrated information in discrete dynamical
+systems: motivation and theoretical framework.. PLoS Computational Biology,
+4(6), Article e1000091, URL: https://doi.org/10.1371/journal.pcbi.1000091.
+
+Barrett, A. B., Barnett, L., & Seth, A. K. (2010). Multivariate Granger causality
+and generalized variance. Physical Review E, 81(4), Article 041907, URL:
+https://doi.org/10.1103/PhysRevE.8 1.041907.
+
+Barrett, A. B., & Seth, A. K. (2011). Practical measures of integrated information
+for time-series data. PLoS Computational Biology, 7(1), Article e1001052, URL:
+https://doi.org/10.1371/journal.pcbi.1001052.
+
+Bassett, D. S., & Sporns, O. (2017). Network neuroscience. Nature Neuroscience,
+20(3), 353, URL: https://doi.org/10.1038/nn.4502.
+
+Bressler, S. L, & Menon, V. (2010). Large-scale brain networks in cogni-
+tion: emerging methods and principles. Trends in Cognitive Sciences, 14(6),
+277-290, URL: https://doi.org/10.1016/j.tics.2010.04.004.
+
+Bullmore, E., & Sporns, O. (2009). Complex brain networks: graph theoretical
+analysis of structural and functional systems. Nature Reviews Neuroscience,
+10(3), 186-198, URL: https://doi.org/10.1038/nrn2575.
+
+Burnham, K. P., & Anderson, D. R. (2003). Model selection and multimodel infer-
+ence: a practical information-theoretic approach. Springer Science & Business
+Media.
+
+Chatterjee, N., & Sinha, S. (2007). Understanding the mind of a worm: hierar-
+chical network structure underlying nervous system function in C. elegans.
+In R. Banerjee, & B. K. Chakrabarti (Eds.), Progress in brain research: 168,
+Models of brain and mind (pp. 145-153). Elsevier, URL: https://doi.org/10.
+1016/S0079-6123(07)68012- 1.
+
+Chen, Z. J., He, Y., Rosa-Neto, P., Germann, J., & Evans, A. C. (2008). Revealing
+modular architecture of human brain structural networks by using cortical
+thickness from MRI. Cerebral Cortex, 18(10), 2374-2381, URL: https://doi.org/
+10.1093/cercor/bhn003.
+
+Darmon, D., Omodei, E., & Garland, J. (2015). Followers are not enough: a
+multifaceted approach to community detection in online social networks.
+PLoS One, 10(8), 1-20, URL: https://doi.org/10.1371/journal.pone.0134860.,
+
+Ercsey-Ravasz, M., Markov, N., Lamy, C., VanEssen, D., Knoblauch, K.,
+Toroczkai, Z., & Kennedy, H. (2013). A predictive network model of cerebral
+cortical connectivity based on a distance rule. Neuron, 80(1), 184-197, URL:
+https://doi.org/10.1016/j.neuron.2013.07.036.
+
+Fornito, A., Zalesky, A., & Breakspear, M. (2013). Graph analysis of the human
+connectome: promise, progress, and pitfalls. Neurolmage, 80, 426-444, URL:
+https://doi.org/10.1016/j.neuroimage.2013.04.087.
+
+Fornito, A., Zalesky, A., & Bullmore, E. (2016). Fundamentals of brain network
+analysis (1st ed.). Cambridge: Academic Press.
+
+Fujishige, S. (2005). Submodular functions and optimization (2nd ed.). Amsterdam:
+Elsevier Science.
+
+Hagmann, P., Cammoun, L., Gigandet, X., Meuli, R., Honey, C. J., Wedeen, V. J.,
+& Sporns, O. (2008). Mapping the structural core of human cerebral cortex.
+PLoS Biology, 6(7), 1-15, URL: https://doi.org/ 10.137 1/journal.pbio.0060159,
+
+Harriger, L., van den Heuvel, M. P., & Sporns, O. (2012). Rich club organization of
+macaque cerebral cortex and its role in network communication. PLoS One,
+7(9), 1-13, URL: https://doi.org/10.137 1/journal.pone.0046497.
+
+van den Heuvel, M. P., & Sporns, O. (2011). Rich-club organization of the human
+connectome. Journal of Neuroscience, 31(44), 15775-15786, URL: https://doi.
+org/10.1523/JNEUROSCI.3539- 11.2011.
+
+Hidaka, S., & Oizumi, M. (2018). Fast and exact search for the partition with
+minimal information loss. PLoS One, 13(9), 1-14, URL: https://doi.org/10.
+137 1/journal.pone.0201126.
+
+Honey, C. J., Sporns, O., Cammoun, L., Gigandet, X., Thiran, J. P., Meuli, R., &
+Hagmann, P. (2009). Predicting human resting-state functional connectivity
+from structural connectivity. Proceedings of the National Academy of Sciences,
+106(6), 2035-2040, URL: https://doi.org/10.1073/pnas.08 11168106.
+
+Honey, C. J., Thivierge, J.-P., & Sporns, O. (2010). Can structure predict function
+in the human brain? Neurolmage, 52(3), 766-776, URL: https://doi.org/10.
+1016/j.neuroimage.2010.01.071.
+
+Kitazono, J., Kanai, R., & Oizumi, M. (2018). Efficient algorithms for searching the
+minimum information partition in integrated information theory. Entropy,
+20(3), 173, URL: https://doi.org/10.3390/e20030173.
+
+Lee, U., Mashour, G. A., Kim, S., Noh, G.-J., & Choi, B.-M. (2009). Propofol induc-
+tion reduces the capacity for neural information integration: implications for
+the mechanism of consciousness and general anesthesia. Consciousness and
+Cognition, 18, 56-64, URL: https://doi.org/10.1016/j.concog.2008.10.005.
+
+Mediano, P. A. M., Rosas, F., Carhart-Harris, R. L., Seth, A. K., & Barrett, A. B.
+(2019). Beyond integrated information: a taxonomy of information dynamics
+phenomena. arXiv:1909.02297 [physics, q-bio], URL: http://arxiv.org/abs/
+1909.02297.
+
+Mediano, P. A., Seth, A. K., & Barrett, A. B. (2019). Measuring integrated
+information: Comparison of candidate measures in theory and simulation.
+Entropy, 21, 17, URL: https://doi.org/10.3390/e21010017.
+
+Meunier, D., Achard, S., Morcom, A., & Bullmore, E. (2009). Age-related changes
+in modular organization of human brain functional networks. Neurolmage,
+44(3), 715-723, URL: https://doi.org/10.1016/j.neuroimage.2008.09.062.
+
+Nagasaka, Y., Shimoda, K., & Fujii, N. (2011). Multidimensional recording (MDR)
+and data sharing: an ecological open research and educational platform for
+neuroscience. PLoS One, 6(7), Article e22561, URL: https://doi.org/10.1371/
+journal.pone.0022561.
+
+Narasimhan, M., Jojic, N., & Bilmes, J. A. (2006). Q-clustering. In Y. Weiss,
+B. Schélkopf, & J. C. Platt (Eds.), Advances in neural information processing
+systems (vol. 18) (pp. 979-986). MIT Press, URL: http://papers.nips.cc/paper/
+2760-q-clustering.pdf.
+
+Oizumi, M., Albantakis, L., & Tononi, G. (2014). From the phenomenology to
+the mechanisms of consciousness: integrated information theory 3.0. PLoS
+Computational Biology, 10(5), Article e1003588, URL: https://doi.org/10.1371/
+journal.pcbi. 1003588.
+
+Oizumi, M., Amari, S., Yanagawa, T., Fujii, N., & Tsuchiya, N. (2016). Measuring
+integrated information from the decoding perspective. PLoS Computational
+Biology, 12(1), Article e1004654, URL: https://doi.org/10.1371/journal.pcbi.
+1004654.
+
+Oizumi, M., Tsuchiya, N., & Amari, S. (2016). Unified framework for information
+integration based on information geometry. Proceedings of the National
+Academy of Sciences, 113(51), 14817-14822, URL: https://doi.org/10.1073/
+pnas.1603583113.
+
+Queyranne, M. (1998). Minimizing symmetric submodular functions. Mathemat-
+ical Programming, 82(1-2), 3-12, URL: https://doi.org/10.1007/BF0 1585863.
+
+Schwarz, A. J., Gozzi, A., & Bifone, A. (2008). Community structure and modularity
+in networks of correlated brain activity. Magnetic Resonance Imaging, 26(7),
+914-920, URL: https://doi.org/10.1016/j.mri.2008.01.048.
+
+Shalizi, C. R., Camperi, M. F., & Klinkner, K. L. (2007). Discovering functional
+communities in dynamical networks. In E. Airoldi, D. M. Blei, S. E. Fienberg,
+A. Goldenberg, E. P. Xing, & A. X. Zheng (Eds.), Statistical Network Analysis:
+Models, Issues, and New Directions (pp. 140-157). Berlin, Heidelberg: Springer
+Berlin Heidelberg.
+
+Sporns, O., & Betzel, R. F. (2016). Modular brain networks. Annual Review
+of Psychology, 67(1), 613-640, URL: https://doi.org/10.1146/annurev-psych-
+122414-033634.
+
+Steudel, B., Janzing, D., & Schoelkopf, B. (2010). Causal Markov condition for
+submodular information measures. arXiv: 1002.4020 [cs, math], URL: http:
+//arxiv.org/abs/1002.4020.
+
+Suarez, L. E., Markello, R. D., Betzel, R. F., & Misic, B. (2020). Linking structure
+and function in macroscale brain networks. Trends in Cognitive Sciences, 24(4),
+302-315, URL: https://doi.org/10.1016/j.tics.2020.01.008.
+
+Tegmark, M. (2016). Improved measures of integrated information. PLoS Com-
+putational Biology, 12(11), Article e1005123, URL: https://doi.org/10.1371/
+journal.pcbi.1005123.
+244 J. Kitazono, R. Kanai and M. Oizumi / Neural Networks 132 (2020) 232-244
+
+Toker, D., & Sommer, F. T. (2019). Information integration in large brain
+networks. PLoS Computational Biology, 15(2), 1-26, URL: https://doi.org/10.
+137 1/journal.pcbi. 1006807.
+
+Tononi, G. (2004). An information integration theory of consciousness. BMC
+Neuroscience, 5, 42, URL: https://doi.org/10.1186/1471-2202-5-42,
+
+Tononi, G. (2008). Consciousness as integrated information: a provisional man-
+ifesto. The Biological Bulletin, 215(3), 216-242, URL: https://doi.org/10.2307/
+25470707.
+
+Tononi, G., Boly, M., Massimini, M., & Koch, C. (2016). Integrated informa-
+tion theory: from consciousness to its physical substrate. Nature Reviews
+Neuroscience, 17(7), 450-461, URL: https://doi.org/10.1038/nrn.2016.44.
+
+Tononi, G., McIntosh, A. R., Russell, D., & Edelman, G. M. (1998). Functional
+clustering: Identifying strongly interactive brain regions in neuroimaging
+data. NeuroImage, 7(2), 133-149, URL: https://doi.org/10.1006/nimg.1997.
+0313.
+
+Tononi, G., Sporns, O., & Edelman, G. (1994). A measure for brain complex-
+ity: relating functional segregation and integration in the nervous system.
+Proceedings of the National Academy of Sciences, 91(11), 5033-5037, URL:
+https://doi.org/10.1073/pnas.91.11.5033.
+
+Villani, M., Roli, A., Filisetti, A., Fiorucci, M., Poli, I., & Serra, R. (2015). The search
+for candidate relevant subsets of variables in complex systems. Artificial Life,
+21(4), 412-431, URL: https://doi.org/10.1162/ARTL_a_00184.
+
+Villani, M., Sani, L., Pecori, R., Amoretti, M., Roli, A., Mordonini, M., Serra, R.,
+& Cagnoni, S. (2018). An iterative information-theoretic approach to the
+detection of structures in complex systems. Complexity, 2018, URL: https:
+//doi.org/10.1155/2018/3687839.
+
+Zamora-Lépez, G., Zhou, C., & Kurths, J. (2010). Cortical hubs form a module
+for multisensory integration on top of the hierarchy of cortical networks.
+Frontiers in Neuroinformatics, 4, 1, URL: https://doi.org/10.3389/neuro.11.001.
+2010.

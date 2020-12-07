@@ -1,0 +1,1809 @@
+Computers & Geosciences 145 (2020) 104599
+
+ 
+
+  
+  
+
+A
+
+ELSEVIER
+
+Contents lists available at ScienceDirect
+
+Computers and Geosciences
+
+journal homepage: www.elsevier.com/locate/cageo
+
+MPUTER
+GEOSCIENCES
+
+ 
+
+Research paper
+
+Check for
+
+ 
+
+A statistical analysis of lossily compressed climate model data updates
+Andrew Poppick*’", Joseph Nardi”, Noah Feldman‘, Allison H. Baker“, Alexander Pinard °,
+
+Dorit M. Hammerling *
+
+4 Mathematics and Statistics, Carleton College, Northfield, MN, USA
+
+> Harris School of Public Policy, University of Chicago, Chicago, IL, USA
+
+© Federal Reserve Board, Washington, DC, USA
+
+4 National Center for Atmospheric Research, Boulder, CO, USA
+
+© Applied Mathematics and Statistics, Colorado School of Mines, Golden, CO, USA
+
+ARTICLE INFO ABSTRACT
+Keywords: The data storage burden resulting from large climate model simulations continues to grow. While lossy data
+CESM compression methods can alleviate this burden, they introduce the possibility that key climate variables could
+
+Climate variability
+Earth system models
+Lossy compression
+SZ
+
+ZFP
+
+be altered to the point of affecting scientific conclusions. Therefore, developing a detailed understanding of
+how compressed model output differs from the original is important. Here, we evaluate the effects of two
+leading compression algorithms, sz and zrp, on daily surface temperature and precipitation rate data from a
+widely used climate model. While both algorithms show promising fidelity with the original output, detectable
+
+artifacts are introduced even at relatively tight error tolerances. This study highlights the need for evaluation
+methods that are sensitive to errors at different spatiotemporal scales and specific to the particular climate
+
+variable of interest.
+
+ 
+
+1. Introduction
+
+As supercomputing resources continue to advance, the scientific
+modeling community generates increasingly larger volumes of data.
+Unfortunately, storing massive simulation datasets is problematic and
+expensive for many institutions, and the geoscientific community is
+no exception. Scientific research objectives can be negatively affected
+when scientists are forced to decrease their data storage footprint, for
+example by reducing output frequency, simulation length or precision.
+Data compression is a possible solution to mitigating this “big data
+problem” and has been the subject of recent studies in the geoscience
+community in general for both scientific modeling data and other
+sources of large datasets (e.g., Lindstrom et al. (2016), Cappello et al.
+(2019), Li et al. (2017), Gotschel and Weiser (2019), Hill et al. (2015)
+and Kidner and Smith (2003)), as well as for Earth system models
+(ESMs) in particular (e.g., Woodring et al. (2011), Hiibbe et al. (2013),
+Baker et al. (2014), Kuhn et al. (2016), Zender (2016) and Baker et al.
+(2016, 2017)). For ESMs such as the widely used Community Earth
+System Model (CESM™) (Hurrell et al., 2013), climate scientists are
+justifiably concerned about the effects of data compression-induced
+artifacts, and more in-depth analysis is needed to satisfy those concerns.
+
+Data compression methods are either lossy or lossless. Lossy meth-
+ods give an approximation of the original data upon reconstruction,
+
+* Corresponding author.
+
+and the quality of approximation is controlled by algorithm-dependent
+parameters. This is in contrast to lossless methods, which exactly
+preserve the original data. Our interest is in lossy methods, as they offer
+the most meaningful data reduction for floating-point simulation data:
+it is well known that lossless compression is relatively ineffective on
+scientific simulation data due to randomness in the least significant bits
+(e.g., Lindstrom (2017), Lindstrom and Isenburg (2006), Baker et al.
+(2014) and Bicer et al. (2013)).
+
+Compression algorithms can generally be described in terms of two
+phases: “modeling” followed by “encoding”. While many lossy methods
+have been proposed for use on floating-point data recently (e.g., see
+methods in Lindstrom (2017)), predictive and transform methods are
+two of the most widely used types of lossy compression approaches in
+terms of how the data are modeled. As the name implies, predictive
+lossy approaches model data by traversing the data and predicting
+upcoming values based on previously visited values, typically retaining
+(and encoding) the residual between the predicted and actual data
+value. Ideally the predicted and actual values are quite similar, result-
+ing in a very small residual that takes few bits to encode. Transform
+methods, such as the well-known JPEG2000, reduce data volumes by
+modeling the data with, e.g., wavelets or discrete cosine transforms,
+and then encoding a subset of the transform coefficients; the fewer the
+
+E-mail addresses: apoppick@carleton.edu (A. Poppick), nardij@uchicago.edu (J. Nardi), noah.z.feldman@frb.gov (N. Feldman), absker@ucar.edu
+(A.H. Baker), apinard@mines.edu (A. Pinard), hammerling@mines.edu (D.M. Hammerling).
+
+https://doi.org/10.1016/j.cageo.2020.104599
+
+Received 17 March 2020; Received in revised form 29 August 2020; Accepted 31 August 2020
+
+Available online 5 September 2020
+
+0098-3004/© 2020 The Authors. Published by Elsevier Ltd. This is an open access article under the CC BY license (http://creativecommons.org/licenses/by/4.0/).
+A. Poppick et al.
+
+Minimum TS
+
+ 
+
+220 240 260 280 #300
+Mean TS
+
+   
+
+220 240 260 280 300
+
+Computers and Geosciences 145 (2020) 104599
+
+Maximum TS
+PE eg
+
+   
+
+ 
+
+220 240 260 280 #300
+Standard Deviation
+
+ 
+
+ 
+
+0 5 10 15 20 Z5
+
+Fig. 1. Summaries of the original surface temperature (TS) data. Top left, minimum TS; top right, maximum TS; bottom left, mean TS; bottom right, standard deviation.
+
+Mean Absolute Error by Day
+
+  
+
+ 
+
+ 
+
+ 
+
+ 
+
+O5F ee
+-1+ a
+$Z1.0
+= Beh i MU Src eo $Z0.5
+291.5 panenennnenennn en ennn scene en enee serene eneeemenenrmenenrmrnenmsnnnemennnemenenemenememenememenement] [ao = SZ0.1
+Vv $Z0.01
+o ZFP1.0
+a
+Dm -2
+L
+-2.5
+sail 4
+-3.5 L L L L 1 1 1
+50 100 150 200 250 300 350
+day
+
+Fig. 2. Mean absolute error for surface temperature (TS) by day of the year for both
+zrp and sz for a range of tolerances.
+
+transform coefficients needed to model the data, the more data reduc-
+tion is achieved. Because these two types of methods have different
+strengths and weaknesses (e.g., Baker et al. (2017)), we experiment
+with a popular compression method from each of these categories:
+sz (Di and Cappello, 2016; Tao et al., 2017) (a predictive method) and
+zFp (Lindstrom, 2014) (a transform method).
+
+The effects of lossy compression are routinely evaluated with simple
+metrics such as root mean squared error or maximum pointwise error.
+These metrics are quite appropriate for many applications (e.g., visual-
+ization), but less so for floating-point climate simulation data where,
+e.g., more detailed patterns in the structure of compression errors
+may be relevant. In this paper, we aim to provide a more thorough
+exploration of artifacts of lossy compression on CESM. Of particular
+interest is whether compression introduces any artifacts that change
+either the temporal or spatial characteristics of the model output. These
+issues are worth investigating in detail: examining climate characteris-
+tics over time is a critical component to most climate data analyses,
+as is examining coherent spatial features of climate variables. These
+issues are also salient in our setting, because compression algorithms
+applied to CESM data thus far (e.g., Baker et al. (2014, 2016, 2017))
+have been applied to spatial fields independently, and any dependence
+on time has been ignored (i.e., adjacent bytes on which the algorithms
+operate are temporally identical). The reason for this fact is that climate
+data is typically output by time slice, meaning that variables are stored
+by spatial fields; even for the so-called CESM “time-series” files, the
+
+multidimensional arrays are laid out such that time is the outer array
+dimension and the most efficient access is by spatial slice. Therefore
+not only the compression algorithms themselves, but also the manner in
+which they are applied to climate data, may play a role in the structure
+of the artifacts we investigate.
+
+The analysis in this work is largely a subset of our initial anal-
+ysis in Nardi et al. (2018), with the important distinction that the
+compression algorithms were incorrectly applied to the data analyzed
+there (data row and column dimensions were reversed), resulting in
+several artifacts due to incorrect compression algorithm usage and not
+the algorithms themselves, which has here been corrected. Our goal in
+this work is to address the specific issues that arise from this analysis
+together with compression algorithm development teams. Ultimately,
+a multidisciplinary effort is needed to develop suitable compression
+methods that reduce climate data volume while preserving information
+such that scientific conclusions are not substantively affected.
+
+2. Experiment details
+
+In this section, we describe the CESM data used in our study, the
+two different compression algorithms chosen, and how the compressors
+were applied to the data.
+
+2.1. CESM data
+
+We use data from the publicly available CESM Large Ensemble Com-
+munity Project (CESM-LENS) (Kay et al., 2015). The project includes a
+set of 40 ensemble runs for the period 1920-2100. All simulations use
+the fully coupled one degree latitude-longitude version of CESM with
+the Community Atmosphere Model (CAM) v5. As in Baker et al. (2016),
+we focus on the atmospheric model output and use the historical forcing
+period (1920-2005) for ensemble member 30. Each CAM variable (159
+total) is stored in a time-series file, and variable output is at temporal
+frequencies of monthly, daily, or 6-hourly. While CESM performs com-
+putations in IEEE-754 double precision (64-bit), it writes data to file in
+single precision (32-bit). The CAM grid corresponds to 192 x 288 grid
+points per vertical level (30 vertical levels), such that the 192 rows
+indicate the latitude (90° to —90°) and the 288 columns indicate the
+longitude (0° to 360°). We study the following 2D time-series variables,
+which consist of 31,390 time slices:
+
+* TS: Daily average surface temperature, in °K.
+* PRECT: Daily average precipitation rate, in m/s.
+A. Poppick et al.
+
+Table 1
+
+Computers and Geosciences 145 (2020) 104599
+
+Selected summary statistics for surface temperature (TS) by compression algorithm and error tolerance, «: mean (* indicates equivalent to the
+original for the number of digits shown), mean error, mean absolute error (MAE), root mean squared error (RMSE), maximum pointwise error
+magnitude (Max Abs Error), and compression ratio (CR).
+
+Mean TS Mean error MAE RMSE Max Abs Error CR
+Original 276.918 - - - -
+sz1.0 276.920 —1.52e—03 5.00e—01 5.77e-01 1.00 .05
+sz0.5 276.919 —7.49e—04 2.50e—-01 2.88e-01 5.00e—01 .06
+sz1E-1 * 8.14e—06 4.98e-02 5.76e—02 9.99e—02 12
+sz1E-2 * 4.31e—06 4.98e—03 5.76e—03 9.99e—03 .23
+sz1E-3 * 2.11e—06 4.94e-04 5.72e—04 9.91e—04 .44
+sz1E-4 * 0.00e+00 0.00e+00 0.00e+00 0.00e+00 .78
+SZ1E-5 * 0.00e+00 0.00e+00 0.00e+00 0.00e+00 .78
+zFP1.0 276.911 6.75e—03 5.75e—02 7.39e—02 4.63e-01 15
+ZFPO.5 276.921 —3.38e-03 3.05e—02 3.88e-—02 2.35e—-01 18
+ZFP1E-1 * 4.22e—04 4.21e—03 5.32e—03 2.99e—02 .26
+ZFP1E-2 * —5.25e-05 5.3le—04 6.71e—04 3.75e—03 .36
+ZFPLE-3 * 6.86e—06 6.62e—05 8.44e-05 4.88e—04 .45
+ZFP1E-4 * 4.86e—08 5.42e—07 3.18e—06 3.05e—05 08
+ZFPLE-5 * 0.00e+00 0.00e+00 0.00e+00
+
+‘ 0.00e+00 .67
+
+log10(Minimum PRECT + le-18)
+
+ 
+
+   
+
+ 
+
+ 
+
+log10(Maximum PRECT)
+a =
+
+ 
+
+ 
+
+-9 -8 =f -6
+
+ 
+
+ 
+
+ 
+
+ 
+
+-8 -7.5 a7 -6.5 -6 -5.5
+Probability of Positive Rainfall
+
+ 
+
+0.2 0.4 0.6 0.8 1
+
+Fig. 3. Summaries of the original precipitation rate (PRECT) data. Top left, minimum PRECT (log scale, adding 10~!® because of small negative values; see text); top right,
+maximum PRECT (log scale); bottom left, mean PRECT (log scale); bottom right, probability of positive PRECT value.
+
+The uncompressed file size is 6.5 GB for each. These variables were cho-
+sen as they are among the most commonly downloaded from the CESM-
+LENS project (together with surface pressure and sea-surface temper-
+ature), but have differing characteristics that affect their amenability
+to compression. Recall from Section 1 that compression algorithms
+reduce data volume by first modeling the data such that it can be
+encoded in fewer bits; data that is smooth and has a small range can
+intuitively be modeled with less information than data that spans a
+wide range of values or changes values unpredictably. In our case, TS
+data vary smoothly, and the minimum and maximum values are the
+same order of magnitude, resulting in a variable that is considered
+“easy” to compress. On the other hand, PRECT data contain values
+that can be quite small, change more abruptly, and have a dynamic
+range that spans many orders of magnitude, resulting in a variable
+that is considered “hard” to compress. In addition, PRECT, like some
+other climate variables, has zero or near-zero values that need to be
+preserved, which further challenges many compressors.
+
+2.2. Compression methods
+
+As described in Section 1, our focus is on lossy compression methods
+because lossless methods are relatively ineffective for scientific sim-
+ulation data. Compared to the original 6.5 GB files for the variables
+in our study, losslessly compressed file sizes are 3.8 GB (TS) and 5.4
+
+GB (PRECT) using zu compression, level 1 with shuffle, where less
+data reduction is achieved for PRECT than for TS for the reasons
+discussed above. By contrast, the lossy compression output we inves-
+tigate achieves between 1.28 to 20 times additional reduction for TS
+and 1.09 to 5000 times additional reduction for PRECT, depending
+on the compression algorithm and error tolerance (although with the
+highest data reduction resulting in unacceptable compression artifacts).
+Below we provide more details on the two compression methods we
+investigate.
+
+The sz compressor is a predictive method that features adaptive
+error-controlled quantization and variable-length encoding to optimize
+compression. We use sz 1.4.13 in fixed-accuracy mode (errorBound-
+Mode = ABS). Given the user-specified absolute error tolerance ¢ and
+parameter m, which determines the number of quantization intervals to
+store, sz defines 2” — 1 quantization intervals (each of size 2e) centered
+on the predicted value. The interval that the actual value falls into
+determines the identifying quantization index (which can be stored
+with m bits). If the actual value does not lie in any of the intervals, it
+is given an index that flags it as unpredictable and uses an alternative
+coding scheme (with codes longer than m bits). All predicted values
+are then subjected to Huffman encoding and compressed with cz. In
+this study, we use single layer prediction (layers = 1), optimized auto-
+selection of quantization intervals (quantization_intervals = 0) with a
+maximum number of 65,535 (i.e., m = 16), the sz default compression
+A. Poppick et al.
+
+Table 2
+
+Computers and Geosciences 145 (2020) 104599
+
+Selected summary statistics for precipitation rate (PRECT) by compression algorithm and error tolerance, e: mean (* indicates equivalent to the original for the number of digits
+shown), mean error, mean absolute error (MAE), root mean squared error (RMSE), maximum pointwise error magnitude (Max Abs Error), compression ratio (CR), probability of
+
+positive values (Prob > 0), and probability of negative values (Prob < 0).
+
+Mean PRECT Mean error MAE RMSE Max Abs Error CR Prob > 0 Prob < 0
+Original 2.818e—08 - - - - - 0.985 0.000209
+szlE-1 1.949e-09 2.62e—08 2.76e—08 6.51e—08 6.26e—06 .0002 0.992 0.0000637
+sz1E-6 2.058e—07 —1.78e-07 1.91e—07 2.49e—07 1.00e—06 .0009 0.999 0.0
+szlE-7 4.356e—08 —1.54e-08 2.99e—08 3.66e-08 1.00e—07 .009 1.000 0.0000126
+szlE-8 2.881e—08 —6.31e-10 4.69e—09 5.48e-09 1.00e—08 .04 0.899 0.101
+szlE-9 2.820e—08 -1.9le-11 4.98e-10 5.76e-10 1.00e—09 11 0.920 0.080
+szle-10 * —6.93e-13 4.95e-11 5.73e-11 1.00e-10 .24 0.951 0.049
+szle-11 * —5.25e-14 4.97e-12 5.75e-12 1.00e-11 47 0.964 0.034
+szlz-12 * 0 0 0 0 .92 0.985 .000209
+zFPle-1 0 2.82e—08 2.82e—08 6.58e—08 6.26e—06 .002 0 0
+ZEP1E-4 2.753e-11 2.82e—08 2.82e—08 6.6e—08 6.03e—06 .002 7.22e—06 2.3e-09
+ZEP1E-5 1.082e—08 1.74e-08 2.82e—08 6.49e—08 2.86e—-06 .005 0.022 0.000305
+ZEP1E-6 2.615e—08 2.04e-09 1.44e-08 2.52e—08 7.08e—07 .02 0.270 0.015
+ZEP1E-7 2.814e-08 3.99e-11 2.43e-09 3.5e-09 4.44e-08 .06 0.704 0.036
+zFP1E-8 * 2.99e-12 4.29e-10 5.72e-10 5.55e-09 12 0.854 0.035
+zFP1E-9 * 1.15e-13 5.9e-11 7.65e-11 6.94e-10 .20 0.915 0.030
+zFP1E-10 * 1.41e-15 3.84e-12 4.92e-12 4.32e-11 32 0.948 0.024
+zrP1E-11 * 6.69e-16 4.85e-13 6.19e-13 5.40e-12 41 0.960 0.021
+zFP1E-12 * 1.83e-17 6.1e—-14 7.76e-14 6.75e-13 51 0.967 0.018
+ZFPO * 1.17e-17 1.7e-17 1.62e-16 5.68e-14 .88 0.983 0.006
+
+mode, and no offset. Note that sz offers several additional error modes:
+fixed relative error (normalized by the data range), fixed PSNR (peak
+signal-to-noise ratio), and fixed point-wise relative error. See Di and
+Cappello (2016) and Tao et al. (2017) for more detailed information
+about sz.
+
+The zFp compressor is a transform method that was designed to
+facilitate random data access, but also can be used for error-bounded
+sequential compression, depending upon the specified parameters. zrp
+partitions d-dimensional arrays into blocks of 47 values and compresses
+each block independently via a floating-point representation with a
+single common exponent per block, an orthogonal block transform, and
+embedded encoding. We use zrp 0.5.3 in fixed-accuracy mode. Spec-
+ifying an absolute error tolerance of 0 indicates that the compressor
+should achieve lossless (if possible) or near lossless compression. While
+we use fixed-accuracy mode in this study, zFp can also be used in a
+fixed-rate mode (required for random access) or fixed-precision mode.
+See Lindstrom (2014) for more details on zrp.
+
+These two types of lossy compression approaches work differently,
+and their effectiveness depends on the characteristics or attributes
+of the data being compressed. For example, the work in Lindstrom
+(2017) contains an empirical analysis of error bounds from multiple
+compressors, including the two that we study in detail in this work. In
+addition, the work in Baker et al. (2017) investigates the properties
+of a predictive method (Fpzir, Lindstrom and Isenburg (2006)) and
+a transform method (speck, Islam and Pearlman (1998)) on CESM
+data with the goal of motivating the development of an automated
+multi-method approach. The authors find that transform methods are
+extremely effective in terms of data reduction and accuracy for many
+variables, but are unsurprisingly challenged by variables with abrupt
+value changes (i.e., not smooth) and ranges spanning many orders of
+magnitude, both of which are relatively common in CESM outputs.
+Predictive methods, on the other hand, are desirable for their general
+utility in terms of applicability to even the most challenging variables.
+
+2.3. Data for analysis
+
+We applied both sz and zrp to the 2D time-series data for TS
+and PRECT. For each file, we call the compressor on each time slice
+sequentially over time, meaning that each time slice is compressed
+independently. We note that both sz and zrp can typically achieve
+
+more data reduction (i.e., a smaller compression ratio) when applied to
+“larger” fields. For sz, the overhead associated with the Huffman tree is
+better mitigated with more data, and for zrp, higher dimensional data
+is better suited to distributing the per block overhead. Indeed, for these
+2D time-series, we could compress multiple time slices at once so as to
+operate on 3D data. However, this choice introduces complexity due
+to memory constraints: while we could compress several slices at once
+for this grid, it is unlikely that we could compress an entire time-series
+file with one call to the compressor for high resolution, long duration,
+or frequent temporal output. Therefore, some dividing between time
+slices is necessary, and to simplify our analysis, we compress each time
+slice independently. The data that we analyze results from applying
+compression, followed by reconstruction, to each variable’s time-series
+file. To simplify the comparison of sz and zFrp, we use both compressors
+in their fixed-accuracy modes as those are essentially equivalent, with
+the caveat that ¢ for zrp is converted to the nearest power of 2. We
+selected a range of ¢, where the characteristics of PRECT led us to
+extend the range to much tighter tolerances than needed for TS. We
+note that zrp’s fixed precision mode is similar to sz’s fixed relative error
+bound, but they differ by a scaling factor; also, sz does not have a fixed
+rate option, nor does zrp have a fixed PSNR or point-wise error mode.
+
+3. Exploratory analysis
+
+In this section, we briefly describe the original data fields, TS and
+PRECT, and give a global-level summary of the compression errors
+before our more detailed analyses in the following two sections.
+
+3.1. Daily surface temperature (TS)
+
+The daily TS values in our data range from 166 to 325 °K. Minimum
+TS values tend to be colder towards the poles and over land while
+maximum TS values tend to be warmer towards the equator but also
+over land (Fig. 1, top). Overall, TS values tend to be more variable in
+time at high latitudes and over land (Fig. 1, bottom right).
+
+Table 1 summarizes global characteristics of the quality of com-
+pression for both sz and zrp. We show mean errors to capture any
+systematic biases in the sign of the error, along with mean absolute
+errors (MAEs), root mean square errors (RMSEs), and maximum point-
+wise error (where the sensitivity to extreme errors increases from the
+A. Poppick et al.
+
+% rainy days
+oO
+p
+
+0 a a ae a
+100 200 300 100 200 #300
+
+day day
+
+Log10(Odds Ratio)
+
+, we
+os uw
+
+100 200 300
+day
+
+  
+
+ 
+
+Computers and Geosciences 145 (2020) 104599
+
+i.
+
+ 
+
+eo eding , _Loomed-in  ZFP
+
+  
+
+ 
+
+ 
+
+ 
+
+0.9 + |
+0.85;
+a
+100 200 300 100 200 300
+day day
+
+Fig. 4. Top, percentage of gridcells with positive rainfall by day. The right hand side is the same but excluding those error tolerances with zero days of positive rainfall. Bottom,
+log-odds ratios (base 10) comparing the compressed to the original output percentages (e.g., positive ratios mean that it rains more often in the compressed output).
+
+Time Series Lon O Lat 90 Tolerance 0.1
+
+error
+
+ 
+
+years
+
+ 
+
+log10(periodogram)
+
+ 
+
+0) 0.2 0.4
+frequency
+
+Fig. 5. Illustration of error distributions for sz (brown) and zrp (green) at an example gridcell at 90° latitude, 0° longitude for error tolerance ¢ = 0.1. Left, error time-series for
+first 3 years; middle, histogram of entire time-series; right, periodogram of the entire time-series. (For interpretation of the references to color in this figure legend, the reader is
+
+referred to the web version of this article.)
+
+first to the third of these metrics). We also show the data mean for
+reference, although arguably of less interest on its own, especially
+for TS. Finally, we list the achieved compression ratio (CR), which
+is the ratio of the size of the compressed data to the original data.
+
+Overall, these simple metrics indicate that, as expected, the quality
+of compression scales with e. For TS, the sz output becomes lossless
+at e = 10-* and zrp at e = 10-°. CR values for sz are smaller (more
+reduction) than for zep when e > 10%, but larger (less reduction) than
+A. Poppick et al.
+
+SZ
+
+overall Mean:-0.0015
+
+1.0
+-0.05 0) 0.05
+Overall Mean:8.1e-06
+0.1
+0.01
+
+-5 0 5
+
+«104
+
+Overall Mean:2.1e-06
+
+ 
+
+ 
+
+Computers and Geosciences 145 (2020) 104599
+
+ZFP
+
+Overall Mean: 0.0068
+
+ 
+
+ 
+
+-5 0 5
+
+x103
+verar ono 3e-05
+
+ 
+
+-5 0 5
+
+x 10%
+Overall Mean:6.9e-06
+
+ 
+
+ 
+
+x10°
+
+x10°>
+Overall Mean:4.9e-08
+
+ 
+
+x10°
+
+Fig. 6. Mean errors for surface temperature (TS). Left, sz; right, zrp, with error tolerances indicated on the left. Global mean errors are indicated in the plot titles.
+
+for zrp when ¢ < 107+. For a fixed e, zrp shows noticeably smaller MAEs
+and RMSEs than sz; however, zrp typically shows larger magnitude
+mean errors, indicating that zrp errors have a stronger systematic mean
+bias than do sz errors. The average zrp errors are positive at ¢ of 1.0,
+0.1, 10-%, and 10-4 and negative for 0.5 and 0.01. The overall e values
+chosen are much smaller than the scale of variation in the temperatures
+themselves; for example, the globally pooled TS standard deviation is
+about 8.6 °K, whereas the maximum global RMSE is about 0.57 °K
+(for sz e = 1.0). This implies that pointwise comparisons of the original
+and compressed output will appear very similar relative to the scale of
+variability in the data (i.e., the correlation between the original output
+and compressed output is nearly one when averaged globally and across
+time). Finally, because climate variables like surface temperature have
+strong seasonal cycles, we also investigate mean absolute compression
+errors globally by day of the year; for TS, there does not appear to be
+any strong seasonality in global average absolute error introduced by
+compression (Fig. 2).
+
+3.2. Daily average rainfall rate (PRECT)
+
+Daily average rainfall (PRECT) is recorded in units of m/s, so values
+are very small in an absolute sense. However, the dynamic range is
+relatively large: the minimum positive PRECT value is 1.2 x 10-°8,
+whereas the maximum value is 6.3 x 10~® (Fig. 3, top). Average and
+maximum rainfall tends to be larger in equatorial ocean locations.
+Except in desert regions, the probability of positive (i.e., above zero)
+rainfall is very high in CESM (Fig. 3 bottom right, approximately 98.5%
+when averaged globally): it is well understood that climate models have
+a so-called “drizzle” problem, generally overestimating the frequency
+of light rain events, e.g., Stephens et al. (2010) and Sun et al. (2006)
+and others. However, it is also the case that very small negative values
+are occasionally observed in about 30% of the gridcells (the minimum
+PRECT value is —1.1 x 107!9). While not physically meaningful, CESM
+does not prevent negative PRECT values in this model version (possibly
+A. Poppick et al.
+
+ 
+
+Computers and Geosciences 145 (2020) 104599
+
+ 
+
+Mean
+
+(b)
+
+«107
+
+Fig. 7. Zoomed-in plot of the mean errors of sz (left) and zrp (right) at e = 0.01 for surface temperature (TS).
+
+Table 3
+
+Left, North-South global mean contrast variances (log scale, base 10) by month (land and ocean means in parenthesis). For the compressed data, given
+the error tolerance and algorithm shown, ratio of the contrast variance of the compressed data to the original for the global mean.
+
+ 
+
+ 
+
+Month Original SZ ZFP
+1.0 0.1 1.0 0.1
+
+Jan 5.352 (11.23, 2.291) 1.116 (1.058, 1.263) 1.001 (1.001, 1.003) 1.001 (1, 1.003) 1.000 (1.000, 1.000)
+Feb 5.484 (11.44, 2.385) 1.113 (1.057, 1.252) 1.001 (1.001, 1.003) 1.001 (1.000, 1.003) 1.000 (1.000, 1.000)
+Mar 5.738 (11.80, 2.584) 1.108 (1.055, 1.234) 1.002 (1.001, 1.003) 1.001 (1, 1.003) 1.000 (1.000, 1.000)
+Apr 5.449 (11.05, 2.535) 1.114 (1.059, 1.240) 1.002 (1.001, 1.003) 1.001 (1.001, 1.003) 1.000 (1.000, 1.000)
+May 5.183 (10.67, 2.325) 1.119 (1.061, 1.259) 1.002 (1.001, 1.002) 1.001 (1.001, 1.003) 1.000 (1.000, 1.000)
+Jun 5.303 (11.16, 2.255) 1.114 (1.058, 1.259) 1.002 (1.001, 1.002) 1.001 (1.001, 1.003) 1.000 (1.000, 1.000)
+Jul 5.101 (10.58, 2.248) 1.117 (1.062, 1.252) 1.002 (1.001, 1.002) 1.001 (1.001, 1.003) 1.000 (1.000, 1.000)
+Aug 4.594 (9.471, 2.054) 1.132 (1.069, 1.285) 1.002 (1.002, 1.003) 1.001 (1.001, 1.003) 1.000 (1.000, 1.000)
+Sep 4.594 (9.462, 2.061) 1.135 (1.069, 1.292) 1.002 (1.002, 1.003) 1.001 (1.001, 1.003) 1.000 (1.000, 1.000)
+Oct 5.221 (10.61, 2.414) 1.120 (1.062, 1.253) 1.002 (1.001, 1.002) 1.001 (1.001, 1.003) 1.000 (1.000, 1.000)
+Nov 5.458 (11.17, 2.487) 1.115 (1.059, 1.246) 1.001 (1.001, 1.003) 1.001 (1.000, 1.003) 1.000 (1.000, 1.000)
+Dec 5.424 (11.27, 2.396) 1.115 (1.058, 1.254) 1.001 (1.001, 1.003) 1.001 (1.000, 1.003) 1.000 (1.000, 1.000)
+
+ 
+
+due to round-off error in contributing processes, but insignificant in
+terms of the overall budget).
+
+Table 2 summarizes global characteristics of compression for
+PRECT. In addition to the CR and global error metrics (mean error,
+MAE, RMSE, and maximum pointwise error), we list the mean PRECT
+value in the compressed output and the global probability of positive
+and negative rainfall (i.e., the proportion of days with positive or
+negative rainfall across all days and gridcells). We note that scien-
+tists studying rainfall in climate model output would normally set a
+meaningful, small positive threshold for rainfall; here we only show
+probabilities of positive and nonpositive events, to illustrate the behav-
+ior of the compression methods, but see Section 5 for a more detailed
+analysis at the gridcell level, including using a positive threshold for
+non-trace precipitation. Table 2 shows that the large e values here are
+not a good choice given the small magnitude of the PRECT values:
+globally, for « > 10-*, zrp sets PRECT to zero everywhere, while sz
+globally sets the values at large e to the PRECT value that it encounters
+first at each time step (because it is a predictive method). Both of
+these actions unsurprisingly result in very high data reduction, but large
+error. Note that in Table 2 for sz we have left out e = 1077, 1073, 1077,
+and 10-° as they are all equivalent to 10~!. Similarly « = 10-7, 107°,
+and 10-4 are equivalent to 10~! for zep.
+
+For smaller ¢, zFp preserves some rainy days but with a negative bias
+in the number (decreasing with decreasing ¢). By contrast, sz produces
+
+an abundance of rainy days for error tolerances equal to 10° and 10-7,
+but then produces too few until lossless compression occurs at 107).
+zFP is unable to achieve completely lossless compression on this data
+(see zfpO result in Table 2) due to its large dynamic range, although a
+recently released version of zFp (v0.5.5) claims to be able to do so.
+
+As with TS, we also investigate any potential global, seasonal biases
+in PRECT. Fig. 4 shows the percentage of gridcells with positive rainfall
+by day of the year, aggregating globally and across years, and the
+log-odds ratios comparing these percentages in the compressed output
+to the original output, the latter which is a summary of the relative
+propensity for positive rainfall events in the compressed vs. original
+output. The odds of rain are defined as w = p/(1 — p), where p is the
+probability of rain on that day (again aggregating globally and across
+years). Denoting the odds of rain under the compressed output as @,
+the odds ratio is @/w. For odds and odds ratios (but not for displaying
+the probabilities), the probability p is calculated adding one positive
+rainfall day and one nonpositive rainfall day to the data to avoid
+dividing by zero. Unlike for TS errors, there is a discernible seasonal
+pattern in errors in the probability of positive rainfall (as measured by
+the odds ratios). In general, errors are largest in magnitude in the first
+half of the year, which is also the period where rainfall is globally more
+likely.
+A. Poppick et al.
+
+SZ
+
+  
+
+Threshold:3.9 Sig:1.2%
+
+Z.
+
+ 
+
+ 
+
+ 
+
+      
+  
+
+ 
+
+ 
+
+h
+senslch
+-100 0 100
+Threshold:3.8 Sig:1.5%
+0.1
+-100 0 100
+0.01
+-100 -50 0 50 100
+Threshold:3.8 Sig:1.3%
+0.001
+-100 -50 0 50 100
+Threshold:na Sig:0%
+0.0001
+
+ 
+
+     
+  
+
+ 
+
+Computers and Geosciences 145 (2020) 104599
+
+ZFP
+
+ 
+
+ 
+
+ 
+  
+
+Threshold:2.6 Sig:94%
+KE EE oats —
+
+ 
+
+ 
+
+ 
+
+-50 0 50
+
+Fig. 8. Z-statistics associated with the mean surface temperature (TS) errors. Left, sz; right, zFp. Compression error tolerances are indicated on the left margin. The thresholds for
+Z-statistics considered significant at a false discovery rate of 1% are shown in the plot titles, along with the percentage of significant gridcells. Compare to mean errors (Fig. 6).
+
+4. Gridcell-level analysis: TS
+
+Gridcell-level errors can show detectable artifacts that are not read-
+ily apparent in the global summaries shown in the previous section,
+and patterns in gridcell-level errors can themselves produce artifacts
+in important quantities derived from the compressed output. In this
+section and the next, we examine compression errors at finer spatial and
+temporal scales. This section concerns the compression of TS, and we
+typically show results here for error tolerances 1.0, 10-!, 10-2, 107°,
+and 10~* (recalling that the output is lossless for sz at e = 10~* and for
+zrp at e = 107).
+
+We first discuss the nature of some temporal artifacts created by
+sz and zrp (e = 0.1) with an example gridcell at 90° latitude, 0°
+longitude (chosen arbitrarily as an example with salient features). Fig. 5
+
+contains the first three years of the error time-series at this gridcell,
+the histogram of daily errors, and their periodogram. The periodogram
+is the squared magnitude of the Fourier transform of the time-series
+and represents the amplitude of variability associated with oscillations
+with the corresponding frequency. At this gridcell, there is not a strong
+mean bias in the compressed output for either sz or zpr. The sz errors
+at this location do not show any obvious temporal patterns; however,
+zFp errors show seasonality and are positively correlated in time, both
+indicated by the periodogram, which has a spike at the frequency
+1/365 and also appears to decay with increasing frequency. The sz error
+distribution appears uniform on the interval (—0.1, 0.1), whereas the zrp
+errors appear approximately normally distributed and are substantially
+less variable. Note that the displayed error distributions (center plot)
+agree with the error distributions shown by Lindstrom for sz and zrp on
+a small test problem in Figure 2 of Lindstrom (2017).
+A. Poppick et al.
+
+SZ
+
+oaied SD:0.58
+
+1.0
+0.1
+-0.1 -0.05 O 0.05 0.1
+Pooled SD: = oess
+0.01
+
+-0.1  -0.05 0 0.05 0.1
+
+Pooled SD: 0.00057
+
+ 
+
+-0.1 -0.05 0
+
+Pooled SD:0
+
+ 
+
+ 
+
+ 
+
+0.05 0.1
+
+Computers and Geosciences 145 (2020) 104599
+
+ZFP
+
+Pooled SD:0.066
+
+-0.1 -0.05 O 0.05 0.1
+
+Pooled SD: 0. 00059
+
+  
+  
+  
+
+ 
+
+-0.1 -0.05 0 0.05 0.1
+
+ 
+
+Pooled SD:7.5e-05
+
+ 
+
+0.05 0O.1
+
+-0.1 -0.05 0
+
+Pooled SD: 3e-06
+
+ 
+
+ 
+
+Fig. 9. Ratio of the error variance for sz (left) and zrp (right) to the global pooled error variance for surface temperature (TS), shown on the log scale (base 10). Negative log
+ratios correspond to locations where the variance is smaller than the global pooled variance, and the opposite for positive values. Compression error tolerances are indicated on
+the left margin. The global pooled standard deviation is indicated in the title of each graph.
+
+In the following, we investigate the behavior of compression errors
+at each gridcell in terms of their gridcell-level mean and standard
+deviation across time, biases in the mean seasonal cycle, and artifacts in
+the fine-scale spatial and temporal variation in the compressed output
+itself.
+
+4.1. Mean errors
+
+Fig. 6 shows the mean compression errors at the gridcell level
+produced by zrp and sz at several error tolerances for daily TS data.
+In the sz output for e = 10-', 10-?, and 10-3, larger mean errors occur
+in isolated regions, for example the western coasts of Central and South
+America and in South Asia (see Fig. 7 for an example region in more
+
+detail). At e = 1, mean errors over the ocean appear to be strongly
+spatially correlated (i.e., smooth clusters of positive or negative values
+are apparent) but overall mean errors are small. In contrast, zFP mean
+errors show much stronger patterns. Notably, a 4 x 4 gridding pattern
+is apparent in the mean errors for all compression levels where zrp is
+not lossless, with periodic mean errors that are large in magnitude. The
+structure of this gridding is shown in more detail in Fig. 7. The large
+mean errors are mostly positive for the e’s shown except for e = 0.01
+(also mostly negative for e = 0.5, not shown). Whatever the dominant
+sign for the e of interest, there is a shift towards the extreme latitudes
+(especially southern) where the mean errors become close to zero and
+then reverse in sign.
+A. Poppick et al.
+
+Lon 0 Lat 90, SZ
+
+275
+
+~ Original
+
+—-— L.0
+—i—0.5
+
+—*«— le-l
+
+270
+265
+
+—<— le-2
+
+260
+rie e.
+
+TS
+
+250
+245
+240
+
+ 
+
+235 |
+
+100 200
+
+Day
+
+300
+
+Lon 0 Lat 90, SZ
+
+Mf
+WV i
+
+NN i
+
+1 )
+
+| Mm
+( i Aidsh Wf !
+"
+
+" hi i\ mn Hilt
+
+Error (standardized)
+
+ 
+
+-3 1 1 ‘
+100 200 300
+
+Day
+
+ 
+
+Computers and Geosciences 145 (2020) 104599
+
+Lon 0 Lat 90, ZFP
+
+275
+270
+265
+260
+255
+
+TS
+
+250
+245
+240
+
+ 
+
+235 |
+
+100 200
+
+Day
+
+300
+
+Lon 0 Lat 90, ZFP
+
+Error (standardized)
+
+ 
+
+ 
+
+Fig. 10. Left: seasonal cycles (left) for surface temperature (TS) at the 90° latitude, 0° longitude gridcell, where sz errors show a strong mean seasonal cycle (so that sz temperatures
+themselves have a biased mean seasonal cycle) and the error seasonal cycles (bottom) at this location (standardized). Right: for zFp at the same location.
+
+The artifacts in mean errors for zFp are much larger in magnitude
+than would be expected if the compression errors were mean zero
+and independent and identically distributed in time, as measured by
+the corresponding Z-statistics (Fig. 8). By contrast, the mean errors
+for sz do not appear large in magnitude by this metric, except in
+the aforementioned isolated regions for e < 0.01. The Z-statistic is
+defined here as é/(s,/ s/n), where é@ is the mean compression error
+at a gridcell, s, is the gridcell error standard deviation, and n is the
+number of time points. This measures the number of standard errors the
+mean bias is from zero, the standard error calculation (denominator)
+assuming that the errors are independent and identically distributed.
+Large Z-statistics indicate that the error is not mean zero and/or
+is not independent and identically distributed across time. Note that
+in cases where the errors are positively correlated in time, such as
+in the example location shown for zrp in Fig. 5, the true standard
+error will be larger than this value and therefore the true Z-statistic
+smaller than what we calculate. The percentage of gridcells with “sig-
+nificant” biases is displayed over each subplot (treating the errors as
+uncorrelated in time), controlling the false discovery rate at 1% using
+the Benjamini-Hochberg procedure (Benjamini and Hochberg, 1995).
+
+10
+
+The false discovery rate is the expected proportion gridcells declared
+“significant” (i.e., discoveries) that in fact do not show true mean
+biases. Controlling the false discovery rate is a way to address the
+“multiple testing” issue arising from the fact that we are testing at each
+gridcell.
+
+4.2. Error standard deviations
+
+In addition to spatial patterns of mean biases, spatial patterns of
+error variances would indicate locations where the compression is more
+vs. less successful, noting that the gridcell mean squared error is equal
+to the squared bias plus the error variance.
+
+Fig. 9 shows the log ratio of the error variance at a location divided
+by the global pooled variance. In this setting, where the time-series
+length is the same at each gridcell, the pooled variance is defined
+simply as the average of the gridcell-level variances. Negative log ratios
+correspond to locations where the local error variance is smaller than
+the global pooled error variance, the opposite for positive log ratios.
+Note that, given an error tolerance, global pooled variances are always
+larger in sz compared to zrp, similar to the MAEs and RMSEs shown
+A. Poppick et al.
+
+SZ
+
+1.0
+
+0.1
+-2 2
+1.3% sic
+
+0.01
+
+0.001
+
+0.0001
+
+ 
+
+Computers and Geosciences 145 (2020) 104599
+
+ 
+
+ 
+
+-2 Z
+
+24.2% Si
+
+   
+
+ 
+
+-3 S
+
+Fig. 11. Amplitudes of the error annual harmonic relative to the average periodogram value in a neighborhood of 50 frequencies around the annual frequency for surface
+temperature (TS) errors. Values are shown on the log scale (base 10). Left, sz; right, zrp (error tolerances in left margin). Locations where the annual harmonic amplitude is
+“significant” at a 1% false discovery rate are marked with a gray dot; the percentage of significant gridcells for a given error tolerance and algorithm is given in each plot title.
+The corresponding p-values are calculated respect to the F, 9) distribution, which is the null distribution if the spectrum is flat in this frequency window.
+
+in Table 1. For sz, similar to the mean biases shown in Fig. 6, there
+are not strong patterns in the gridcell error variance except in isolated
+regions for e < 0.1 where the error variance is substantially smaller
+than the global pooled error variance (which would therefore relatively
+enhance the effect of the mean biases shown there). By contrast, zrp
+shows the aforementioned gridding pattern. Additionally, there are
+strong differences in behavior between land and ocean when ¢ = 1 (and
+€ = 0.5, not shown), with land locations showing relatively larger error
+variances; for e < 0.1 this pattern largely disappears, but enhanced error
+variances are observed in northern gridcells and in the Southern Ocean.
+
+4.3. Biases in seasonality
+
+Variation in errors over time can be due in part to biases in the
+mean seasonal cycle. Fig. 10 shows the mean seasonal cycles at the
+
+same 90° latitude, 0° longitude gridcell featured in Fig. 5, along with
+the standardized seasonal cycle error (i.e., rescaled to have a standard
+deviation of 1) for sz and zrp errors. For both examples, the absolute
+bias in the seasonal cycle is small because the e is much smaller than
+the scale of the original seasonal cycle; however, the biases for zFp are
+strongly detectable relative to the error variability (although the sign of
+the bias is inconsistent across the varying e, as also seen in the overall
+mean errors in Fig. 6), consistent with the periodogram shown in Fig. 5.
+Note that while there is substantial variability in the estimated error
+seasonal cycle here, the seasonality is still strongly detectable (i.e., the
+error seasonal cycle does not look like white noise). In contrast, sz
+errors do not show detectable seasonality at this location.
+
+We investigate biases in mean seasonal cycles at each gridcell by
+examining at each gridcell the amplitude of the first seasonal harmonic,
+i.e., the value of the periodogram of the errors at the frequency 1/365
+A. Poppick et al.
+
+Original
+
+ 
+
+Ratio:1.116 (Land:1.058 Sea:1.263)
+
+   
+ 
+
+Ratio:1.001 (Land:1 Sea:1.003)
+
+Computers and Geosciences 145 (2020) 104599
+
+ZEP
+
+Ratio:1.001 (Land:1.001 Sea:1.003)
+
+ 
+ 
+     
+
+Fig. 12. January North-South (N-S) surface temperature (TS) contrast variances (log scale) for the original (top), sz (left), and zrp (right) by «. The global mean contrast variance
+is provided for the original, and its ratio to that of the original is listed for compressed data; land and ocean averages are also given.
+
+days“! (i.e., one cycle per year). Fig. 11 shows the size of that ampli-
+tude relative to the average value of the periodogram in a neighborhood
+around the annual frequency. There is not evidence of substantial error
+seasonality with sz, in contrast to zrp. Error seasonality in zFp is common
+in polar regions and (for e > 0.1) over oceans.
+
+4.4. Contrast variances
+
+The previous sections investigated patterns in the compression er-
+rors, whereas here and in the following section we investigate arti-
+facts in fine-scale variability in the actual compressed output. Contrast
+variances, i.e. average squared gradients, measure fine-scale spatial
+variability. Contrast variances are natural quantities to inspect for
+artifacts of compression because differences in temperatures between
+
+12
+
+adjacent gridcells are typically small, whereas raw temperatures are
+typically much more variable than e, which can mask artifacts of
+compression in the raw temperature fields. Furthermore, fine-scale
+spatial variability can be of interest in climate studies, so it would be
+important for compressed output to accurately reproduce this quantity.
+Contrast variances were also used in Guinness and Hammerling (2018)
+to assess quality of compression. The North-South contrast variances
+for January are shown in Fig. 12; the North-South contrast variance
+for month m, latitude L, and longitude / is defined here as
+
+86 D
+1
+cL. 0M) = a 2 DT sim d,y)—T,,,(m,d, y)y’, (1)
+
+where T, ;(m,d, y) is the temperature at that location in day d, month
+m, and year y, and D is the number of days in the month of interest.
+A. Poppick et al.
+
+Computers and Geosciences 145 (2020) 104599
+
+Original
+
+1.0
+
+ 
+
+0.1
+
+ 
+
+0.01
+
+0.001
+
+ 
+
+ 
+
+ 
+
+ 
+
+ 
+
+ 
+
+ 
+
+ 
+
+ 
+
+ 
+
+Fig. 13. Lag-1 correlations of the first differences of de-seasonalized surface temperature (TS) for the original, sz, and zrp by e¢. Negative values are a result of over-differencing
+
+and do not imply that the original series is negatively correlated in time.
+
+East-West contrast variances are similarly defined. For e = 1 (and
+€ = 0.5, not shown), sz compression shows an overall positive bias
+(especially over oceans) in contrast variances, importantly indicating
+increased fine-scale spatial variation, while zrp shows a gridding pat-
+tern, similar to the error behavior shown in Figs. 6-9. For e < 0.1,
+contrast variances are similar to those in the original output, indicating
+fidelity with the original output. While we show North-South January
+contrast variances, the comparison between compressed and original
+output across e¢ values is similar in other months (see Table 3 for
+a comparison of global means across each month) and for East-West
+contrast variances, although the pattern of East-West contrast variances
+in the original output is of course different from that of North-South
+contrast variances (not shown).
+
+4.5. Temporal correlations
+Finally, we investigate artifacts in the fine-scale temporal correla-
+
+tion structure of the TS data at the gridcell level. Temporal correlations
+in the raw TS field are affected both by temporal correlations in the
+
+13
+
+errors and also, e.g., by the overall error standard deviation. Fig. 13
+compares the temporal correlation structure in the original output to
+that in the compressed output. We show the lag-1 autocorrelations of
+the first differences of the de-seasonalized TS values. We first-difference
+and de-seasonalize the data as a naive way to remove temporal trends
+and seasonal cycles that would otherwise be confounded with other
+sources of temporal correlation. Both algorithms strongly suppress
+temporal correlation for « > 0.5, particularly over the ocean (where
+temporal correlation in the original output is strongest). The suppres-
+sion is stronger for sz than for zFp; however, zrp again additionally shows
+a noticeable spatial gridding pattern in the temporal correlations. For
+€ < 0.1, the temporal correlation structure in the zrp output is similar to
+that of the original, but the sz output only has fidelity with the original
+at « < 0.01.
+
+5. Gridcell-level analysis: PRECT
+
+The metrics we use to evaluate the quality of compression for PRECT
+are necessarily different from those for TS, in part because rainfall
+A. Poppick et al.
+
+«108
+
+Lat 44.76 Lon -93.75, SZ
+
+ 
+
+ 
+
+14 = Original
+
+—3— le-2
+12
+
+10
+
+PRECT
+
+ 
+
+-100, SZ
+
+T T
+
+- 10°8
+
+ 
+
+Lat -11.78 Lon
+
+T
+
+PRECT
+
+ 
+
+ 
+
+ 
+
+Time
+
+Computers and Geosciences 145 (2020) 104599
+
+x109°8 Lat 44.76 Lon -93.75, ZFP
+
+ 
+
+ 
+
+14 = Original
+
+—S— le-2
+—*— le-5
+—<— le-8
+—— le-11
+
+12
+
+10
+
+PRECT
+
+ZFP
+
+ 
+
+x10 Lat -11.78 Lon -100,
+
+PRECT
+
+ 
+
+ 
+
+Fig. 14. The first 50 days of precipitation rate (PRECT) in Minnesota (top) and in the Pacific (bottom). Left, sz; right, zrp. The compression error tolerance is indicated in the
+figure legend. Both methods produce absolute biases in PRECT as well as in number of rainy days, and can produce negative values.
+
+has a positive probability of being zero or near zero. Recall that the
+compressed PRECT output shows global biases in the percentage of
+days with positive rainfall and also contains excess days with negative
+PRECT values.
+
+To illustrate some of the biases at the gridcell level, Fig. 14 shows
+the first 50 days of PRECT values at two example locations in the
+original output and at various e values. Biases are readily apparent,
+particularly for the larger «, where PRECT is set to zero in zFp and
+positive but too small in sz. Both algorithms also produce negative
+PRECT values at small e values; however, zrFp appears to perform
+somewhat better at smaller e values at these two locations.
+
+To assess the bias in the number of rainy days produced by com-
+pression at each gridcell, we compare the odds of daily positive rain
+in the original and compressed output, and also the odds of daily rain
+above a small positive threshold (the latter more typically scientifically
+meaningful). The odds of daily rain and the odds ratio are calculated
+similarly to how described in Section 3.2, except that the probability of
+rain is calculated at the gridcell level across all days. Fig. 15 shows the
+odds of daily rain and odds ratio comparing original vs. compressed
+output for sz and zFp with multiple e« values (including the “lossless”
+mode of zrp, recalling that zFp does not achieve true lossless compres-
+sion for PRECT, while sz achieves lossless compression at e = 1077,
+not shown). There is a negative bias in the odds of rain under the
+
+14
+
+compressed output at all locations at all «. The odds of rainfall in sz
+are qualitatively similar to those in zrp for small ¢, except that the
+4 x 4 gridding used in the zrp algorithm is also apparent in that output.
+The locations where the bias is strongest are equatorial ocean gridcells
+and off the western coasts of continents, where the odds of rain in
+the original output are on the order of 100 times greater than in the
+compressed output, even for « = 107!!. In the median over the globe,
+odds of rain in the original output is about 1.9 times greater than in the
+zFP “lossless” output. Similarly, the odds of rain in the original output
+is about 26.7 times greater than in sz, in the median, at e = 107'!. At
+larger « values, zFp produces no rainfall whereas sz produces positive
+rainfall at all locations on nearly every day (and the few nonpositive
+rain days occur at every location simultaneously).
+
+Fig. 16 repeats Fig. 15 but instead using the odds of PRECT being
+greater than 0.1 mm/day (i.e., approximately 1.16x10~° m/s). The odds
+ratios for zrp in “lossless” mode are equal to one nearly everywhere
+using this threshold, so are omitted. For large e values, the odds ratios
+again show negative biases (i.e., more days with less than 0.1 mm
+rainfall); however, the compressed output shows greater fidelity with
+the original output for smaller ¢ values. For zrp, the odds of more than
+0.1 mm/day rainfall look similar to that in the original output for
+e < 1078 and sz shows fidelity at e = 107!'.
+
+The above concerns biases in the number of days with positive
+rainfall values. We are also interested in the biases in the PRECT values
+A. Poppick et al.
+
+Computers and Geosciences 145 (2020) 104599
+
+Original
+
+   
+
+lo
+
+10(odds)
+
+ 
+
+   
+
+  
+
+   
+
+“>
+| A
+SZ ‘X a ZFP
+-4 -2 2 4
+log10(odds) log10(odds ratio) log10(odds) log10(odds ratio)
+‘ ET 2 ~
+
+    
+
+0.01 CE
+
+ 
+
+le-05
+
+le-08
+
+le-11
+
+ 
+
+ 
+
+ 
+
+ 
+
+Fig. 15. Odds and odds ratio (compressed to original) for daily precipitation rate (PRECT) (in log base 10) for sz and zrp by e. Negative log-odds ratios correspond to locations
+where daily rainfall is less likely in the compressed output. (Note that at the tolerance 0.01, nearly all days in sz show positive rainfall and no days in zrp show positive rainfall.)
+
+themselves on these days. Fig. 17 shows the average PRECT error
+(absolute error, i.e. original-compressed value) over days where both
+the original and compressed output produce values above 0.1 mm,
+omitting the results for e = 0.01 (where PRECT values are essentially
+constant over the globe in the compressed output). PRECT errors on
+days with greater than 0.1 mm rainfall are on average negative for
+sz with « < 10-8 and positive for e = 10-°. Errors are comparatively
+much smaller for zp when e < 10-® but are bigger and negative when
+€ = 107; gridding is again apparent in the zrp errors.
+
+Finally, we note that a discontinuity at 0° longitude is noticeable
+in the sz plots at e = 10-® in Figs. 15-17. This discontinuity is a result
+of applying sz, a predictive approach, to the CESM data on a grid with
+boundaries at 0° and 360° longitude, whereas we have plotted the data
+such that 0° longitude is at the center of the grid. That this feature is
+most apparent at « = 10-® (and not 10-° or 1071") is due to the fact
+that the majority of PRECT values in this data are order 10~® or 107°.
+
+6. Conclusion
+
+We have explored the effects of sz and zFP compression on TS and
+PRECT from a historical run of CESM. The differences between the char-
+acteristics of the distributions of surface temperatures vs. precipitation
+call for different methods of evaluation.
+
+For TS, it appears that both algorithms can achieve good fidelity
+with the original output for modest ¢«. However, for larger e, both
+produce detectable artifacts that can impact important features of the
+
+15
+
+spatiotemporal structure. zFp appears to produce more artifacts in the
+temporal mean structure (e.g., mean biases and biases in seasonality),
+whereas sz appears to produce larger biases in the spatiotemporal corre-
+lation structure (e.g., enhancement of contrast variances and reduction
+of temporal correlations). Even at the highest « considered, errors
+are substantially smaller than natural temperature variability, which
+means that pointwise comparisons of the original and compressed
+output will make the compressed output look successful (i.e., high
+correlation between compressed and original output); however, small
+but detectable artifacts in errors can produce detectable (and possibly
+important) biases in fine-scale spatial and temporal correlations. These
+biases in small-scale spatial and temporal variation will typically not be
+captured by global measures, highlighting the importance of inspecting
+compressed output at multiple spatial and temporal scales.
+
+For PRECT, both algorithms inflate the frequency of days without
+positive rainfall even at very small e; however, when instead consider-
+ing the frequency of days with rainfall above a small positive threshold,
+there is good fidelity at smaller e values, especially for zFp. Mean biases
+in PRECT on days with rainfall above a small threshold are relatively
+small for small ¢ values, especially for zFp, but spatial patterns in biases
+are apparent. PRECT in general may be difficult to compress because
+rainfall has a positive probability of being zero on a given day, many
+very small values, but also a strongly skewed distribution of positive
+values with a large dynamic range.
+
+Lossy data compression is promising for reducing the storage re-
+quirements resulting from large climate model experiments; however,
+A. Poppick et al.
+
+Computers and Geosciences 145 (2020) 104599
+
+Original
+
+SZ
+
+  
+
+0.01
+
+     
+
+we
+
+le-05
+le-08
+
+le-1l
+
+ 
+
+2 O 2
+log10(odds ratio) log10(odds)
+‘ St -2
+
+ZEP
+
+log10(odds ratio)
+
+   
+  
+
+Fig. 16. Same as Fig. 15, but for odds of rainfall greater than 0.1 mm/day. The results for zrp in lossless mode are omitted here because the odds ratios are all equal to one.
+
+in order to ensure that minimal scientific information is lost due to
+compression, it is important to evaluate the quality of compression. Our
+work is an example of the type of analysis needed to instill confidence
+in climate scientists to use lossy compression. It is essential to employ
+analysis tools that focus on the characteristics relevant to the climate
+science, or more broadly, the numerical modeling community, which
+investigate more nuanced features than the metrics typically considered
+in the compression literature. We are in the process of developing
+an open source tool kit to make our analysis tools available and will
+encourage others to contribute further tools, if the need arises to in-
+vestigate additional features for different data sets. The insights gained
+from such focused analysis will allow user communities to effectively
+collaborate with compression algorithm development teams to address
+important issues that may arise.
+
+Computer code availability
+
+A software package was not developed as part of the presented
+work. Standard functionality from MATLAB® (including the Statistics
+and Machine Learning Toolbox) was used to perform the data analysis
+and generate the plots for this manuscript. These scripts are avail-
+able in a GitHub repository (https://github.com/pinarda/compression-
+analysis).
+
+CRediT authorship contribution statement
+
+Andrew Poppick: Determined the analysis plan, Carried out anal-
+yses, Prepared the manuscript. Joseph Nardi: Carried out analyses,
+
+Contributed to the manuscript. Noah Feldman: Carried out analyses,
+Contributed to the manuscript. Allison H. Baker: Produced the dataset
+analyzed, Contributed to the manuscript. Alexander Pinard: Carried
+out analyses, Improved code, Contributed to the manuscript. Dorit M.
+Hammerling: Conceptualized the study, Contributed to the analysis
+plan, Contributed to the manuscript.
+
+Declaration of competing interest
+
+The authors declare that they have no known competing finan-
+cial interests or personal relationships that could have appeared to
+influence the work reported in this paper.
+
+Data availability
+
+The original (uncompressed) CESM-LENS data used is available for
+download from the Climate Data Gateway at NCAR (formally known
+as the Earth System Grid) (Deser and Kay, 2020). In addition, we have
+made the reconstructed versions of the data that we analyzed with sz
+and zrp at various tolerances available (Baker and Hammerling, 2020).
+
+Acknowledgments
+
+We would like to acknowledge high-performance computing sup-
+port from Cheyenne (doi: 10.5065/D6RX99HX) provided by NCAR’s
+Computational and Information Systems Laboratory (CISL), sponsored
+by the National Science Foundation. We would also like to acknowledge
+support to Poppick, Nardi, and Feldman from the CISL Visitor Program.
+A. Poppick et al.
+
+SZ
+
+   
+
+Overall Mean:-2.9e-14
+
+ 
+
+le-11
+
+Computers and Geosciences 145 (2020) 104599
+
+ZEP
+
+Overall Mean:-2.4e-07
+
+   
+
+Overall Mean:5.7e-16
+
+aay to
+
+   
+
+ 
+
+y) 10°17
+
+Fig. 17. Average precipitation rate (PRECT) error over days where both the original and compressed output produce greater than 0.1 mm/day values.
+
+References
+
+Baker, A.H., Hammerling, D.M., 2020. A Statistical Analysis of Lossily Compressed
+CESM-LENS Data. UCAR/NCAR - DASH Repository, https://doi.org/10.5065/5sqy-
+zf23.
+
+Baker, A.H., Hammerling, D.M., Mickelson, S.A., Xu, H., Stolpe, M.B., Naveau, P.,
+Sanderson, B., Ebert-Uphoff, I., Samarasinghe, S., De Simone, F., Carbone, F.,
+Gencarelli, C.N., Dennis, J.M., Kay, J.E., Lindstrom, P., 2016. Evaluating lossy data
+compression on climate simulation data within a large ensemble. Geosci. Model
+Dev. 9 (12), 4381-4403.
+
+Baker, A.H., Xu, H., Dennis, J.M., Levy, M.N., Nychka, D., Mickelson, S.A., Edwards, J.,
+Vertenstein, M., Wegener, A., 2014. A methodology for evaluating the impact
+of data compression on climate simulation data. In: Proceedings of the 23rd
+International Symposium on High-Performance Parallel and Distributed Computing.
+In: HPDC 14, IEEE, pp. 203-214.
+
+Baker, A.H., Xu, H., Hammerling, D.M., Li, S., Clyne, J.P., 2017. Toward a multi-method
+approach: Lossy data compression for climate simulation data. In: Kunkel, J.M.,
+Yokota, R., Taufer, M., Shalf, J. (Eds.), High Performance Computing. Springer
+International Publishing, Cham, pp. 30-42.
+
+Benjamini, Y., Hochberg, Y., 1995. Controlling the false discovery rate: a practical and
+powerful approach to multiple testing. J. R. Statist. Soc. Ser. B (Methodol.) 57 (1),
+289-300.
+
+Bicer, T., Yin, J., Chiu, D., Agrawal, G., Schuchardt, K., 2013. Integrating online
+compression to accelerate large-scale data analytics applications. In: 2013 IEEE
+27th International Symposium on Parallel and Distributed Processing. IEEE, pp.
+1205-1216.
+
+Cappello, F., Di, S., Li, S., Liang, X., Gok, A.M., Tao, D., Yoon, C.H., Wu, X.-C.,
+Alexeev, Y., Chong, F.T., 2019. Use cases of lossy compression for floating-point
+data in scientific data sets. Int. J. High Perform. Comput. Appl. 33 (6), 1201-1220.
+
+17
+
+Deser, C., Kay, J., 2020. CESM1 CAM5 BGC large ensemble data. https://doi.org/10.
+5065/d6j101d1 Publication date: 2014-06-05, Revised: 2019-06-24.
+
+Di, S., Cappello, F., 2016. Fast error-bounded lossy HPC data compression with SZ. In:
+2016 IEEE International Parallel and Distributed Processing Symposium (IPDPS).
+IEEE, pp. 730-739.
+
+Gotschel, S., Weiser, M., 2019. Compression challenges in large scale partial differential
+equation solvers. Algorithms 12 (9), 197. http://dx.doi.org/10.3390/a12090197.
+
+Guinness, J.,. Hammerling, D.M., 2018. Compression and conditional emulation of
+climate model output. J. Amer. Statist. Assoc. 113 (521), 56-67.
+
+Hill, E.J., Robertson, J., Uvarova, Y., 2015. Multiscale hierarchical domaining and
+compression of drill hole data. Comput. Geosci. 79, 47-57.
+
+Htibbe, N., Wegener, A., Kunkel, J.M., Ling, Y., Ludwig, T., 2013. Evaluating lossy
+compression on climate data. In: Kunkel, J.M., Ludwig, T., Meuer, H.W. (Eds.),
+Supercomputing ISC 2013. Springer Berlin Heidelberg, Berlin, Heidelberg, pp.
+343-356.
+
+Hurrell, J., Holland, M., Gent, P., Ghan, S., Kay, J., Kushner, P., Lamarque, J.-F.,
+Large, W., Lawrence, D., Lindsay, K., Lipscomb, W., Long, M., Mahowald, N.,
+Marsh, D., Neale, R., Rasch, P., Vavrus, S., Vertenstein, M., Bader, D., Collins, W.,
+Hack, J., Kiehl, J., Marshall, S., 2013. The Community Earth System Model:
+A framework for collaborative research. Bull. Amer. Meteorol. Soc. 94 (9),
+1339-1360.
+
+Islam, A., Pearlman, W.A., 1998. Embedded and efficient low-complexity hierarchical
+image coder. In: Electronic Imaging’99. International Society for Optics and
+Photonics, pp. 294-305.
+
+Kay, J.E., Deser, C., Phillips, A., Mai, A., Hannay, C., Strand, G., Arblaster, J.M.,
+Bates, S.C., Danabasoglu, G., Edwards, J., Holland, M., Kushner, P., Lamarque, J.-
+F., Lawrence, D., Lindsay, K., Middleton, A., Munoz, E., Neale, R., Oleson, K.,
+Polvani, L., Vertenstein, M., 2015. The Community Earth System Model (CESM)
+large ensemble project: A community resource for studying climate change in
+A. Poppick et al.
+
+the presence of internal climate variability. Bull. Amer. Meteorol. Soc. 96 (8),
+1333-1349.
+
+Kidner, D., Smith, D., 2003. Advances in the data compression of digital elevation
+models. Comput. Geosci. 29 (8), 985-1002.
+
+Kuhn, M., Kunkel, J., Ludwig, T., 2016. Data compression for climate data.
+Supercomput. Front. Innov. 3 (1), 75-94.
+
+Li, H., Tuo, X., Shen, T., Henderson, M., Courtois, J.. Yan, M., 2017. An improved
+lossless group compression algorithm for seismic data in SEG-y and miniseed file
+formats. Comput. Geosci. 100.
+
+Lindstrom, P., 2014. Fixed-rate compressed floating-point arrays. IEEE Trans. Vis.
+Comput. Graphics 20 (12), 2674-2683.
+
+Lindstrom, P., 2017. Error distributions of lossy floating-point compressors. In: Joint
+Statistical Meetings 2017.
+
+Lindstrom, P., Chen, P., Lee, E.-J., 2016. Reducing disk storage of full-3D seismic
+waveform tomography (F3DT) through lossy online compression. Comput. Geosci.
+93, 45-54.
+
+Lindstrom, P., Isenburg, M., 2006. Fast and efficient compression of floating-point data.
+IEEE Trans. Vis. Comput. Graphics 12 (5), 1245-1250.
+
+18
+
+Computers and Geosciences 145 (2020) 104599
+
+Nardi, J., Feldman, N., Poppick, A., Baker, A.H., Hammerling, D.M., 2018. Statisti-
+cal Analysis of Compressed Climate Data. Technical Report NCAR/TN-547+STR,
+National Center for Atmospheric Research.
+
+Stephens, G.L., L’Ecuyer, T., Forbes, R., Gettelmen, A., Golaz, J.-C., Bodas-Salcedo, A.,
+Suzuki, K., Gabriel, P., Haynes, J., 2010. Dreary state of precipitation in global
+models. J. Geophys. Res.: Atmos. 115 (D24).
+
+Sun, Y., Solomon, S., Dai, A., Portmann, R.W., 2006. How often does it rain?. J. Clim.
+19 (6), 916-934.
+
+Tao, D., Di, S., Chen, Z., Cappello, F., 2017. Significantly improving lossy compression
+for scientific data sets based on multidimensional prediction and error-controlled
+quantization. In: 2017 JEEE International Parallel and Distributed Processing
+Symposium (IPDPS). IEEE, pp. 1129-1139.
+
+Woodring, J., Mniszewski, S.M., Brislawn, C.M., DeMarle, D.E., Ahrens, J.P., 2011.
+Revisting wavelet compression for large-scale climate data using JPEG2000 and
+ensuring data precision. In: Rogers, D., Silva, C.T. (Eds.), IEEE Symposium on Large
+Data Analysis and Visualization (LDAV). IEEE, pp. 31-38.
+
+Zender, C.S., 2016. Bit grooming: statistically accurate precision-preserving quantization
+with compression, evaluated in the netCDF operators (NCO, v4.4.8+). Geosci.
+Model Dev. 9 (9), 3199-3211.

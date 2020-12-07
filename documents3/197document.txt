@@ -1,0 +1,951 @@
+Zhang et al. BMC Bioinformatics (2020) 21:522 oe °
+https://doi.org/10.1186/s12859-020-03864-0 B M C B | O | nfo rm atl CS
+
+SOFTWARE Oy ela w Aka -s1 4
+
+Deep learning based DNA:RNA triplex a
+
+forming potential prediction
+
+Yu Zhang|, Yahui Long? and Chee Keong Kwoh! ©
+
+ 
+
+*Correspondence:
+
+asckkwoh@ntu.edu.sg Abstract
+
+noo oF omer Background: Long non-coding RNAs (IncRNAs) can exert functions via forming
+Nanyang Technological triplex with DNA. The current methods in predicting the triplex formation mainly rely
+University, Singapore 639798, on mathematic statistic according to the base paring rules. However, these methods
+Singapore have two main limitations: (1) they identify a large number of triplex-forming IncRNAs,
+
+Full list of author information or ; ; ; ; .
+is available at the end of the but the limited number of experimentally verified triplex-forming IncRNA indicates
+
+article that maybe not all of them can form triplex in practice, and (2) their predictions only
+consider the theoretical relationship while lacking the features from the experimentally
+verified data.
+
+Results: In this work, we develop an integrated program named TriplexFPP (Triplex
+Forming Potential Prediction), which is the first machine learning model in DNA:RNA
+
+triplex prediction. TriplexFPP predicts the most likely triplex-forming IncRNAs and
+
+DNA sites based on the experimentally verified data, where the high-level features
+
+are learned by the convolutional neural networks. In the fivefold cross validation, the
+average values of Area Under the ROC curves and PRC curves for removed redundancy
+triplex-forming IncRNA dataset with threshold 0.8 are 0.9649 and 0.9996, and these two
+values for triplex DNA sites prediction are 0.8705 and 0.9671, respectively. Besides, we
+also briefly summarize the cis and trans targeting of triplexes IncRNAs.
+
+Conclusions: The TriplexFPP is able to predict the most likely triplex-forming IncRNAs
+from all the IncRNAs with computationally defined triplex forming capacities and the
+potential of a DNA site to become a triplex. It may provide insights to the exploration
+of IncRNA functions.
+
+Keywords: Long noncoding RNAs, DNA:RNA triplex, Deep learning
+
+ 
+
+Background
+
+The advances in sequencing technologies enable the discovery of the vast amount of
+Long non-coding RNAs (IncRNAs). IncRNAs can serve as signals, decoys, guides, and
+scaffolds to carry out functions like chromatin states modulation and gene expression
+regulation. They act via the interactions with DNA, protein, and other RNA, in the way
+of coordinating regulatory proteins, localizing to target loci, shaping three-dimensional
+
+(3D) nuclear organization [1-3], etc.
+
+© The Author(s) 2020. Open Access This article is licensed under a Creative Commons Attribution 4.0 International License, which permits
+use, sharing, adaptation, distribution and reproduction in any medium or format, as long as you give appropriate credit to the original
+author(s) and the source, provide a link to the Creative Commons licence, and indicate if changes were made. The images or other third
+
+party material in this article are included in the article's Creative Commons licence, unless indicated otherwise in a credit line to the mate-
+rial. lf material is not included in the article's Creative Commons licence and your intended use is not permitted by statutory regulation or
+exceeds the permitted use, you will need to obtain permission directly from the copyright holder. To view a copy of this licence, visit http://
+creativecommons.org/licenses/by/4.0/. The Creative Commons Public Domain Dedication waiver (http://creativecommons.org/publi
+cdomain/zero/1.0/) applies to the data made available in this article, unless otherwise stated in a credit line to the data.
+
+ 
+
+ 
+Zhang et al. BMC Bioinformatics (2020) 21:522 Page 2 of 13
+
+One way for IncRNA to interact with DNA is to form triplex structures [4]. Triplex
+is a kind of direct RNA—DNA interaction mechanism, it is formed through the bind-
+ing of RNA sites and purine rich strand of duplex DNA under the forward or reverse
+Hoogsteen base-pairing rule. Some IncRNAs are proved to execute functions via form-
+ing DNA:RNA triplexes, for example, promoter associated IncRNA interacts with TTF-I
+to repress transcription of rRNA [5], FENDRR increases PRC2 occupancy at the triplex
+formation sites [6], MEG3 forms DNA-IncRNA triplex with TGF-f gene to modulate the
+gene activity [7], PARTICLE binds to MAT2A promoter CpG island as triplex to con-
+tribute to gene-silencing machineries [8], KHPS1 interacts with SPHK1 to anchor the
+IncRNA and associated effector proteins to the gene promoter [9], HOTAIR forms tri-
+plex with PCDH7 and HOXB2 to regulate adipogenic differentiation [10], MIRIOOHG
+acts via triplex formation to regulate p27 [11], and promoter and pre-rRNA antisense
+guides associated CHD4/NuRD to the rDNA promoter [12].
+
+Although the recent development of high throughput techniques, such as Chromatin
+Isolation by RNA Purification (ChIRP-seq) [13], capture hybridization analysis of RNA
+targets (CHART-seq) [14], RNA Antisense Purification (RAP-seq) [15], and chromatin
+oligo affinity precipitation (ChOP-seq) [7], has helped to generate the genome-wide map
+of IncRNA chromatin interactions for specific IncRNAs via deciphering their binding
+sites, most of them are implemented in crosslinked chromatin which contain RNA asso-
+ciated to DNA binding proteins. Therefore, they cannot provide reliable references for
+the studying of DNA:RNA triplex formation. To reveal the existence of the DNA:RNA
+triplex interactions in vivo, Cetin et al. [16] developed a method to map the genome-
+wide DNA:RNA triplexes by excluding the chromatin crosslinking . This method proved
+the physiological relevance of DNA:RNA triplex structures.
+
+Currently, the prediction of DNA:RNA triplex mainly relies on the base paring rules-
+related mathematic statistics. Triplexator is proposed to systematically identify the
+potential triplex forming sites of RNA and the targeting sites on DNA by taking the
+Hoogsteen and reverse-Hoogsteen base-pairing into account [17], Triplex-Inspector is
+designed to select sequence-specific ligands and targets by considering the gene loca-
+tion and genomic architecture [18], LongTarget is presented to detect motifs and bind-
+ing sites in forming triplex by considering non-canonical rules [19], and Triplex Domain
+Finder (TDF) is developed to predict triplexes and characterize IncRNA and the corre-
+sponding DNA targets [20].
+
+Although the above methods can identify potential triplexes according to the canoni-
+cal rules, they predict a large population of IncRNAs with triplex forming potential.
+However, the limited number of experimentally identified triplex-forming IncRNAs
+indicates that maybe not all of them can form triplex in practice. Besides, the computa-
+tional methods only calculate the theoretical triplex potential, while do not consider any
+in vivo or in vitro assays verified data.
+
+In this work, we have the following two aims: (1) predicting the most likely triplex-
+forming IncRNAs in practice from the IncRNAs owning triplex forming capabilities
+calculated by the computational methods, and (2) predicting the potential of DNA
+sites in forming triplex based on the experimentally verified data. For these purposes,
+we develop TriplexFPP (Triplex Forming Potential Prediction). It is the first machine
+learning program in DNA:RNA triplex forming potential prediction according to our
+Zhang et al. BMC Bioinformatics (2020) 21:522 Page 3 of 13
+
+knowledge. In triplex IncRNA prediction, the average values of Area Under the ROC
+(AUROC) and Area Under the PRC (AUPRC) for fivefold cross validation on removed
+redundancy dataset with threshold 0.8 are 0.9649 and 0.9996 separately. Besides, the
+average cross-validation AUROC and AUPRC values for the triplex DNA sites poten-
+tial prediction are 0.8705 and 0.9671 separately. The general good performances of Tri-
+plexFPP illustrate its effectiveness in triplex forming potential prediction, and could
+provide references to the IncRNA function exploration. Furthermore, we also briefly
+summarize the cis and trans targeting of triplexes IncRNAs, which may provide some
+insights to the exploration of IncRNA binding mechanisms.
+
+Implementation
+
+Dataset
+
+Triplex IncRNA prediction dataset
+
+The positive data for triplex IncRNA prediction is collected in 2 ways. On one hand, we
+extracted the IncRNAs according to the TriplexRNA regions (DNA:RNA triplex forming
+peaks in RNA) reported in the work of Sentiirk et al. [16] by considering both Solid Phase
+Reversible Immobilization-based paramagnetic bead size selection and immunopurifi-
+cation with anti-DNA antibody RNA separation in Hela S3 cell. We used GENCODE
+release 33 IncRNA annotation [21] to extract the IncRNAs that cover the TriplexRNA
+regions and obtained 476 unique samples in this way. We named these IncRNAs as tri-
+plexlncRNA. On the other hand, we also collected IncRNAs that are verified by either
+in vivo or in vitro assays to from triplexes with DNA from the peer-viewed publications.
+These IncRNAs are named as reported triplex IncRNA, including MEG3 [7], PARTICL
+[8], MIR1O0HG [11], FENDRR [22], and HOTAIR [10]. All the variants of the reported
+triplex IncRNA were taken into consideration. The total number of reported triplex
+IncRNA is 159.
+
+Since our goal is to predict the most likely triplex-forming IncRNAs in practice from
+the IncRNAs owning triplex forming capacities predicted by computational methods, we
+used TDF [20] to further filter the data. When evaluating the triplex forming potential of
+the above 635 IncRNAs with the whole gene promoters (except for chromosome Y and
+M) with TDF (default parameters), 104 of them do not contain DNA Binding Domains
+(DBDs) with powerful Triplex Forming Oligonucleotide (TFO) support. There are two
+possible explanations for the phenomenon of low triplex forming capacity obtained from
+TDF in collected positive data: i) for reported triplex IncRNA, each IncRNA gene may
+have multiple transcripts with splice variants, but maybe not all of their variants have
+the abilities to form the triplex with DNA, and ii) for triplexlncRNA, the overlap regions
+between R-Loop and TriplexRNA regions cannot be confirmed as triplex forming or not
+[16]. To assure the data reliability, we deleted the 104 IncRNAs with low triplex forming
+capacity and finally got 531 samples in the positive dataset.
+
+The negative samples are collected following the same filter rules as that of positive.
+After removing the IncRNAs in our original positive dataset from GENCODE annota-
+tion, we evaluated the triplex forming potential of all remaining IncRNAs with the whole
+gene promoters (except for chrY and chrM) by TDF. We only kept the IncRNAs with
+at least one powerful TFO supported DBD and at least 123 DNA Binding Sites (DBSs)
+(the smallest number of DBSs is 123 in positive data). From the qualified IncRNAs, we
+Zhang et al. BMC Bioinformatics (2020) 21:522 Page 4 of 13
+
+further removed one IncRNA with letter ‘N’ in its sequence and the variants of IncRNA
+MALAT1 which is reported to form RNA-RNA triplex [23]. Finally, the negative dataset
+contains 36,021 IncRNAs which have comparable triplex forming abilities as the positive
+data.
+
+We also prepared two more datasets with removed redundancies. We used the CD-
+HIT [24] to remove the redundancy in each class of the original dataset with threshold
+of 0.9 and 0.8 separately. The positive and negative data amounts in two removed redun-
+dancy datasets are 384 and 28,012, and 286 and 22,681, respectively.
+
+Triplex DNA sites potential prediction dataset
+
+To predict triplex-forming sites in DNA on the basis of experimental data, we adopted
+the TriplexDNA regions (DNA:RNA triplex forming peaks in DNA) obtained from [16]
+as positive data. These RNA-associated DNAs are enriched by an unbiased approach.
+After removing 5 samples containing the letter ’N’ in their sequences, the final positive
+dataset size is 2542. The negative data is selected as the random regions in promoters.
+We downloaded all ensembl annotated promoters [25], from which we generated 12,735
+regions (5 times amount of originally positive data). These regions were obtained by ran-
+domly selecting chromosomes (except chrY and chrM) and DNA regions with the same
+lengths as TriplexDNA. The sequence data for both positive and negative is extracted
+from the DNA minus strand.
+
+Feature extraction
+
+Two types of sequence-related feature extraction strategies are considered here: k-mer
+and kmerscore. Both two types of strategies have been successfully applied to classifi-
+cation problems in RNA [26, 27]. K-mer is a popular method to transform a sequence
+into a vector, it counts the frequencies of single or multiple nucleotide compositions in a
+sequence and represents the sequence into a 4 * dimensional vector. K-mer features can
+
+be calculated as
+
+Total number of k neighboring nucleic acids (i)
+
+kmer(i) = ake
+
+(1)
+where kmer(i) is the frequency of the ith nucleotide composition in all 4 * possibilities,
+and the denominator 1 — k + 1 represents the total number of all possible k neighbor-
+ing nucleic acids in a sequence with length nv. For example, in the 3-mer circumstance,
+k = 3, considering sequence S = AAAAC, whose n = 5, its frequencies under the nucle-
+otide composition of AAA and AAC are 2/3 and 1/3 separately, while the frequencies for
+other 3-mer compositions like AAG, et al. are 0.
+
+kmerscore is an overall measure of the k-mer nucleotide composition bias in a
+sequence, it is obtained from k-mer features. To calculate it, firstly, the k-mer features for
+all sequences need to be calculated, then the mean k-mer vectors from the positive and
+negative dataset are obtained from the corresponding k-mer features separately, which
+are represented as Myos (hj) and Myeg (hj), where i = 1,2,..., qk Finally, for a nucleotide
+sequence S = s1S2...S, with k-mer sequence S = Myhz...hy,_,%4 1, the kmerscore can be
+
+represented as
+Zhang et al. BMC Bioinformatics (2020) 21:522 Page 5 of 13
+
+—k+1
+uns Mneg (hj)
+
+kmerscore = —————— lo 2
+n—-k+1 d © Moyos (Hi)
+
+Model construction
+
+We developed an integrated machine learning program called TriplexFPP (Triplex Forming
+Potential Prediction) in triplex forming potential prediction. It consists of two individual
+models, including triplex IncRNA prediction model and triplex DNA sites potential predic-
+tion model.
+
+We adopted the 2-layer Convolutional Neural Network to construct the models, which
+can effectively learn the high-level features. The detailed description of the structure and
+parameters of the model can be found at section of Initial training of TriplexFPP below.
+As the positive dataset sizes and negative dataset sizes in triplex IncRNA prediction and
+triplex DNA sites prediction are imbalanced with ratios around 1:68 and 1:5 separately, to
+avoid the model bias, we applied the random down-sampling technique during the training
+process. The negative training data were randomly selected as the same amount as positive
+training data. Due to the extremely small positive dataset size in triplex IncRNA prediction,
+i.e. 531, we also applied oversampling on this dataset. Because the positive data in triplex
+IncRNA prediction are collected from two sources whose amounts are in a ratio around
+2.5 to 1 (triplexlncRNA to reported triplex IncRNA), to force the model to learn the global
+features for all positive data rather than the common features for the data from the major-
+ity type, i.e. triplexlncRNA, we assigned more weights to the weak type data, i.e. reported
+triplex IncRNA, during augmenting the positive data in the training process, and we named
+
+this practice as the weighted bagging strategy.
+
+Model evaluation
+
+To demonstrate the model performances, the evaluation criteria of accuracy (Acc), sensi-
+tivity (Sn), specificity (Sp), and AUROC are used. Besides, criteria in evaluating imbalance
+data are also adopted, including AUPRC, F1-score, and harmonic mean (Hm). The equa-
+
+tions for calculating the above criteria are listed below.
+
+TP + TN
+Accuracy (Acc) = ——_—__—___—_ (3)
+TP+ TN + FP+ FN
+
+Sensitivity (Sn) iP 4
+ensitivity (Sn) = ————-
+
+» TP + EN 4)
+Specificity (Sp) = fr 5
+pecificity P) = NL EP (5)
+
+2 x Sn x Sp
+Harmonic mean of Sn and Sp (Hm) = ————_— (6)
+
+Sn + Sp
+2 x PRE x Sn TP
+F1-score = —————_——.,_ where PRE = ————~ (7)
+PRE + Sn TP + FP
+Zhang et al. BMC Bioinformatics (2020) 21:522 Page 6 of 13
+
+where EN, FP, TN, and TP denote the number of false negative, false positive, true nega-
+
+tive, and true positive, respectively.
+
+Results
+
+Initial training of TriplexFPP
+
+Each input sequence is represented into a fix-length 90-dim vector by con-
+sidering both kmer (k=1,2,3, number of feature = 84) and  kmerscore
+(k = 1 —6, number of feature = 6) features. The influences of the k-mer and kmerscore
+features to TriplexFPP can be found at Additional file 1: Fig. S1. We use the mean k-mer
+feature values from training data to calculate the kmerscore features of both training and
+test data in the corresponding split to exclude any information from test data.
+
+The parameters in TriplexFPP, such as the number of convolutional layer, the kernel
+size, the activation function, etc. are determined according to the corresponding random
+split datasets in two individual models. Each time we change the value of one parameter
+while keeping other parameters fixed, and then select the one that achieves the highest
+value of Sn as the final choice for that parameter. The setting of the parameters and the
+corresponding performances for triplex IncRNA prediction model and triplex DNA sites
+prediction model are shown in Additional file 1: Figs S2 and S3 separately. The detailed
+architectures and parameters for TriplexFPP can be found in Fig. 1.
+
+Evaluation of triplex IncRNA prediction
+
+In this section, we evaluate the triplex IncRNA prediction model in TriplexFPP regard to
+its ability in predicting the most likely triplex-forming IncRNA from the IncRNAs own-
+ing triplex forming capability predicted by the computation methods.
+
+We first visualize the nucleotide compositions of IncRNA sequences in our positive
+dataset (triplexlncRNA and reported triplex IncRNA) and negative dataset (Additional
+file 1: Fig. $4). The nucleotide compositions for the reported triplex IncRNAs and the
+negative IncRNAs are more consistent, from which nucleotide A and T taking up heavier
+percentages; whereas the triplexIncRNA follows a different pattern, whose sequences are
+
+ 
+
+( >)
+Loss: mean squared error
+@ Optimizer: adam
+=> Batch size: 256
+@
+_{toerinet IncRNA convib
+_ prediction / Input = Filternum=20 ‘Filter num = 20 0.2 2
+Kernelsize=2 Kernel size =2
+Strides = 1 Strides = 1
+Activation = ‘relu’ Activation = ‘relu’ | Flatten
+
+TriplexFPP -
+
+ 
+
+ 
+
+| Dropout
+| Dense
+( Triplex DNA ~ = —o_ | = fp =
+\ site prediction
+@
+Loss: mean squared error
+
+Optimizer: adam
+Batch size: 256
+
+nN
+
+Input =‘ Filternum=20 ‘Filter num = 20
+Kernel size=8 Kernel size = 2
+Strides = 2 Strides = 1
+Activation = ‘relu’ Activation = ‘relu’
+
+Fig. 1 The architecture of TriplexFPP. TriplexFPP is composed of two models, the corresponding model
+architecture and parameters are shown
+
+ 
+
+ 
+Zhang et al. BMC Bioinformatics (2020) 21:522 Page 7 of 13
+
+mainly CG rich. Because the amount of triplexlncRNA is larger than that of reported tri-
+plex IncRNA in our positive dataset, to ensure the model to learn the high-level features
+for all positive data rather than the sequence composition features of triplexlncRNA,
+we assign more weights to the reported triplex IncRNA when augmenting the positive
+data in the training process. We triple the positive training data with the weighted bag-
+ging strategy, where two-thirds of them is bagged from the original positive training
+data directly and one-third of them is extra bagged from the reported triplex IncRNA.
+We compare our method with baseline models like Deep Neural Network (NN), Sup-
+port Vector Machine (SVM), Random Forest (RF), and Gradient Boosting. The param-
+eters for the NN model are determined as the ones with the best Sn value among several
+choices on random split training and test datasets, and the parameters for other baseline
+models are determined as the optimal ones by cross-validated grid-search over a param-
+eter grid based on the criteria of Recall. The candidate parameters and the final deter-
+mined parameters for each baseline model are recorded in Additional file 1: Table S1.
+The box and whisker plots for fivefold cross validation are demonstrated for all models
+in Fig. 2a, where the negative training data are randomly selected as the same amount of
+augmented positive training data from the 4 training folds in each validation.
+
+With the mission of finding the most likely triplex-forming IncRNAs in practice,
+although Gradient Boosting method realizes the best Acc and Fl-score values, its Sn
+values mainly concentrate between 87.74 and 92.45%. Conversely, the Sn values for CNN
+model range from 93.40 to 97.17%, concentrating at a high-value region, which indicates
+its superiority to baseline models on the model performance. Besides, the overall high
+values of other evaluation metrices in CNN model, e.g. 98.35% of average Acc, 0.9926
+of average AUROC, 0.9999 of average AUPRC, 0.992 of average Fl-score, and 0.969 of
+average Hm, further illustrate the effectiveness of our CNN model in TriplexFPP in the
+IncRNA triplex forming potential prediction.
+
+ 
+
+(— >)
+a 1.00 _ 0.98
+, => fa] 1.0000 ;
+0.99 0.96 0.99 0.995 0.995 0.97
+- a ’ m 0.9999 — 7 °
+
+0.94 0.96
+
+0.98 0.98 0.990 0.990 ,
+oo , 0.9998 ++ 0.95
+
+0.97 Bw 0.97
+
+0.985 , 0.985 =
+0.90 : 0.9997 0.94
+0.96 006 0.980
+
+’ 0.980 0.9996 0.93
+0.88 .
+0.975
+0.95 0.95 0.92
+0.86 0.975 0.9995
+
+0.970 0.91
+
+=
+
+0.84 0.970 0.9994 0.965 0.90
+
+Acc Sn Sp AUROC AUPRC Fl-score Hm
+
+GradientBoosting
+NN
+
+0.950
+
+DG
+
+0.925
+
++
+0.900
+
+0.875
+
+M28 without removing redundancy
+0.850 M53 remove redundancy with th=0.9
+[5 remove redundancy with th=0.8
+
+ 
+
+0.825
+
+Acc Sn Sp AUROC AUPRC F1-score Hm
+Fig. 2 Evaluation of IncRNA triplex prediction model in TriplexFPP. a The box and whisker plot of the fivefold
+cross validation for CNN and 4 baseline modes (SVM, RF, Gradient Boosting, and NN). b The comparisons of
+the fivefold cross validation performances among data without removing redundancy, removing redundancy
+with threshold 0.9, and removing redundancy with threshold 0.8
+
+ 
+
+ 
+Zhang et al. BMC Bioinformatics (2020) 21:522 Page 8 of 13
+
+However, one issue for the above fivefold cross validation is that the high perfor-
+mance may be caused by the high data similarity between training and test. In our posi-
+tive dataset, the 531 samples relate to 135 genes (Additional file 1: Figure $5), where 57
+genes owning two or more variants. The different variants from the same IncRNA gene
+can share high sequence composition similarities, thereby leading to a good prediction
+result. To evaluate whether the model is powerful enough in predicting IncRNA tri-
+plex forming potential, we further execute fivefold cross validation on the datasets with
+removed redundancy and carry out the leave-out validation.
+
+We compare the performances of CNN model on datasets without removing redun-
+dancy, removing redundancy with threshold of 0.9, and removing redundancy with
+threshold of 0.8. The results are demonstrated in Fig. 2b. Although the average perfor-
+mances on the data with removed redundancy are slightly lower than that of without
+removing redundancy, the values in evaluation matrices on the removed redundancy
+datasets remain at high levels. For example, in removed redundancy datasets with
+threshold of 0.9, the AUROC and AUPRC values range from 0.9637 to 0.9880 and 0.9993
+to 0.9998 separately; in removed redundancy datasets with threshold of 0.8, the AUROC
+and AUPRC values range from 0.9497 to 0.9809 and 0. 9994 to 0.9998 separately.
+
+For the leave-out validation, we select four IncRNAs with the most amounts of vari-
+ants as the test data, including MIR100HG, PVT1, LINC00963, and MEG3. Their vari-
+ants amounts are 87, 73, 52, and 46, respectively. The four IncRNAs follow different data
+sources, PVT1 and LINC00963 belong to triplexlncRNA, and MIRIOOHG and MEG3
+belong to reported triplex IncRNA. In each leave-out validation, we select one IncRNA
+and use all of its variants as positive test data, while using all the remaining positive
+IncRNAs as the training data. The training and test process are repeated 5 times, each
+time the negative training data are randomly selected as the same amount with positive
+training data from one of the fivefold cross validation split above, and the negative test
+data are the above fivefold cross validation test data.
+
+When leaving IncRNA PVT1 and LINC00963 out, our model predicts all their variants
+correctly as positive. The average AUROC values for PVT1 and LINC00963 are 0.9996
+and 0.9968 separately. However, when leaving IncRNA MIR100HG and MEG3 out, their
+average AUROC values are 0.6594 and 0.3220 separately, which are a bit low. One pos-
+sible reason for the different performances between triplexlncRNA and reported triplex
+IncRNAs is that, in triplexlncRNA, we adopt the variants which are overlapped with
+experimentally verified triplex forming regions; whereas in the reported triplex IncRNA,
+we adopt all the variants of that gene, however, maybe not all of these variants could
+form triplex in practice. Interestingly, when we only use six kmerscore features to train
+leave-out model for MEG3, its average AUROC value could increase to 0.7610, but this
+phenomenon is not found when leaving MIR100HG out.
+
+Evaluation of triplex DNA sites potential prediction
+
+We use the fivefold cross validation to evaluate the performance of triplex DNA sites
+potential prediction model in TriplexFPP, and compare it with other baseline models
+(Fig. 3a). The determination of the parameters for baseline models in predicting tri-
+plex DNA sites follows the same procedure as that of triplex IncRNA prediction. The
+
+candidate parameters and the final determined parameters for each baseline model
+Zhang et al. BMC Bioinformatics (2020) 21:522 Page 9 of 13
+
+ 
+
+ 
+
+ 
+
+(— >)
+
+a 0.970 ’ mm CNN = positive
+
+0.880 ° lam SVM mn i
+
+0.875 0.968 GE RF negative
+
+0.966 10 GradientBoosting
+
+0.870 . = NN
+
+0.865 0.964
+
+0.860 0.962
+
+0.855 0.960
+
+0.850 0.958
+
+0.845 + 0.956 ° -0.5 0.0 0.5 1.0
+
+AUROC AUPRC predicted probability score
+
+Fig. 3 Evaluation of triplex DNA sites potential prediction model in TriplexFPP. a The box and whisker plot
+of fivefold cross validation for CNN and baseline models. b The visualization of the distribution for predicted
+probability score of the first fold validation data
+
+ 
+
+NX S
+
+are recorded in Additional file 1: Table $2. The overall performance of CNN is better
+than that of baseline models, whose average AUROC and AUPRC values are 0.8705 and
+0.9671 separately; whereas for baselines methods, the average values of AUROC located
+in the scope of 0.8635 to 0.8667, and the average values of AUPRC are from 0.9642 to
+0.9660, respectively. We then visualize the predicted probability scores of CNN model
+in each fold (Fig. 3b and Additional file 1: Fig. S6). Although some samples are wrongly
+predicted, the predicted probability scores for most positive data concentrate at around
+value of 1. This phenomenon indicates that our model can predict most data correctly
+with high confidence.
+
+Besides, the region of 649—708 in HOTAIR sequence is verified to form DNA:RNA tri-
+plex [10], our model correctly predicts this site as the triplex forming type. Overall, with
+the limited data, our results demonstrate that TriplexFPP can effectively distinguish the
+in vivo assay defined triplex-forming DNA sites from those background sites with only
+nucleotide sequence features as the input.
+
+TriplexFPP model interpretation
+
+Take the first fold validation in two models in TriplexFPP as examples, we plot the
+average feature values for each class in the format of heatmap before training (original
+features), trained after one CNN layer, and trained after two CNN layers in Fig. 4 and
+Additional file 1: Fig. S7. The kmerscore features (the first six features in original fea-
+tures) show obvious differences in two classes, which indicate that the nucleotide com-
+positions have different preferences with regard to the positions in positive and negative
+data. The kmerscore features also lead to different convolution values after trained with
+only one CNN layer. However, for the remaining features, the differences of their convo-
+lutional values between two classes do not show noticeable differences until trained after
+2 CNN layers.
+
+In cis/in trans triplex-forming IncRNA: an exploration
+
+The IncRNA can form triplex structures with DNA both in cis and in trans, but if differ-
+ences exist between cis and trans targeting of triplexes IncRNAs remains unknown [28].
+In this work, we explore the cis and trans targeting of triplexes IncRNAs following two
+
+data sources.
+Zhang et al. BMC Bioinformatics (2020) 21:522
+
+ 
+
+0
+
+1
+
+2
+
+3
+
+4
+
+5
+
+6
+
+7
+
+8
+
+0.25
+0.20
+0.15
+0.10
+0.05
+0.00
+—0.05
+0.200
+0.175
+0.150
+0.125
+0.100
+0.075
+0.050
+0.025
+- 0.000
+
+I I I I
+8 10 12 14 16 18 8 10 12 14 16 18
+
+10 8 6 4 2 0
+
+12
+
+  
+
+14
+
+ 
+
+0.200
+
+0.175
+
+0.150
+
+0.125
+
+ 
+
+0.100
+0.075
+0.050
+0.025
+
+st
+l I I l I l l I l I - 0.000
+0 2 4 6 8 10 12 14 16 18 0 2 4 6 8 10 12 14 16 18
+
+positive negative
+Fig. 4 The average feature values in each class of triplex IncRNA prediction model. Top: original features (the
+90-dim features are reshaped to 9*10), middle: features after trained with one CNN layer (x-axis: filter, y-axis:
+convolution values the 1st to the 15th), and bottom: features after trained with two CNN layers (x-axis: filter,
+
+ 
+
+ 
+
+ 
+
+y-axis: convolution values the 1st to the 15th); left: positive data, right: negative data
+
+From the TDF results between each triplexlncRNA and TriplexDNA, 238 IncRNAs in
+triplexlncRNAs show both in cis and in trans interactions with DNA, whose in cis bind-
+ing numbers range from 1 to 2450; whereas the other 141 IncRNAs only show in trans
+interactions with DNA (Additional file 1: Fig. $8). Moreover, for a certain IncRNA gene,
+its variants may show different binding patterns. Among all 130 genes related to triplexl-
+ncRNAs, 26 genes contain variants either belong to the type of in cis and in trans inter-
+actions or only in trans interactions (Additional file 1: Figs. S9 and S10).
+
+Besides, for those reported triplex IncRNA, we collect their binding information from
+the published work in Additional file 1: Table S3 [7, 8, 10, 11, 23, 29]. According to the
+
+Page 10 of 13
+Zhang et al. BMC Bioinformatics (2020) 21:522 Page 11 of 13
+
+corresponding experiments, the IncRNA HOTAIR, MEG3, and MIR100HG show in
+trans binding, and PARTICLE and FENDRR show in cis binding.
+
+Discussion
+
+LncRNA can exert functions via interacting with DNA. Among all kinds of interactions,
+DNA:RNA triplex formation is still less understood to us due to the limited number of
+validation assays. Although varieties of canonical rule-based computational methods
+have been developed to predict the triplex forming potential for ncRNA and DNA sites,
+they identify a large number of IncRNAs which can form triplex. However, the limited
+number of experimentally verified data indicates that maybe not all of them can form
+triplex in practice. Besides, those computational methods only theoretically calculate the
+triplex potential, while do not consider any in vivo and in vitro verified data.
+
+Trained with the data obtained from in vitro and in vivo assays, our newly developed
+program, namely TriplexFPP, exhibits good prediction performances. Its triplex IncRNA
+prediction model works effectively by achieving high average scores of evaluation matri-
+ces in the fivefold cross validation. For example, in the removed redundancy datasets
+with threshold 0.8, the average cross fold validation value of Acc, AUROC, AUPRC,
+fl-score, and Hm are 95.28%, 0.9649, 0.9996, 0.976, and 0.904, respectively. Besides, the
+triplex DNA sites potential prediction model in TriplexFPP also works effectively. In the
+fivefold cross validation, its average AUROC and AUPRC values are 0.8705 and 0.9671
+separately. And most data are predicted correctly with high confidences.
+
+We also summarized the cis and trans targeting of triplexes IncRNAs following the dif-
+ferent data sources collected in this work, which may provide some insights to the explo-
+ration of IncRNA cis and trans binding mechanisms.
+
+However, one limitation for this work is that the positive data amount is small. And
+also, some data in our negative class may belong to the positive but are not yet verified.
+Therefore, we expect more data to be explored to help implementing this tool. Besides,
+a small fraction IncRNA in our collected data may belong to the R-Loop forming type,
+
+which may influence the results somehow.
+
+Conclusion
+
+We proposed a deep learning based program in DNA:RNA triplex formation prediction,
+namely TriplexFPP. TriplexFPP predicts the most likely triplex-forming IncRNAs from
+all the IncRNAs with computationally defined triplex forming capacities, and it also pre-
+dicts the potential of a DNA site to become a triplex. TriplexFPP narrows the scope of
+possible IncRNAs in forming triplex compared to those mathematic statistic methods.
+We expect the TriplexFPP can provide insights and references to help to decipher the
+codes of the IncRNA functions.
+
+Availability and requirements
+
+Project name: TriplexFPP.
+
+Project home page: https://github.com/yuuuuzhang/TriplexFPP
+Operating system(s): Platform independent
+
+Programming language: Python
+Zhang et al. BMC Bioinformatics (2020) 21:522 Page 12 of 13
+
+Other requirements: python3, tensorflow 1 (>=1.12)
+License: GNU General Public License v3.0
+Any restrictions to use by non-academics: Not applicable.
+
+Supplementary information
+Supplementary information accompanies this paper at https://doi.org/10.1186/s12859-020-03864-0.
+
+ 
+
+Additional file 1. Supplementary materials (Supplementary Tables S1-S3, Supplementary Figures S1—S10). .
+
+ 
+
+Abbreviations
+
+TriplexFPP: Triplex forming potential prediction; AUROC: Area under the ROC; AUPRC: Area under the PRC; Acc: Accuracy;
+Sn: Sensitivity; Sp: Specificity; Hm: Harmonic mean; DBD:: DNA binding domain; TFO: Triplex forming oligonucleotide;
+DBS: DNA binding site; NN: Deep neural network; SVM: Support vector machine; RF: Random forest.
+
+Acknowledgements
+We would like to thank Prof. lvan G. Costa and Chao-Chung Kuo for clarifying our questions regarding to their work.
+
+Authors’ contributions
+ZY, LY, and CKK designed the experiments and wrote the manuscript. ZY implemented the algorithm and do the analy-
+ses. All authors have read and approved the final manuscript.
+
+Funding
+
+Publication costs are founded by A*STAR-NTU-SUTD Al Partnership [RGANS1905], Singapore Ministry of Education Aca-
+demic Research Fund Tier 1 [2020-T1-001-130(RG15/20)], and Singapore Ministry of Education Academic Research Fund
+Tier 2 [MOE2019-T2-2-175]. The funding bodies played no role in the design of the study and collection, analysis, and
+interpretation of data and in writing the manuscript.
+
+Availability of data and materials
+The datasets used in this work can be found at https://github.com/yuuuuzhang/TriplexFPP_data, and the code can be
+found at https://github.com/yuuuuzhang/TriplexF PP.
+
+Ethics approval and consent to participate
+Not applicable.
+
+Consent for publication
+Not applicable.
+
+Competing interests
+The authors declare that they have no competing interests.
+
+Author details
+' School of Computer Science and Engineering, Nanyang Technological University, Singapore 639798, Singapore. * Col-
+lege of Computer Science and Electronic Engineering, Hunan University, Changsha 410000, China.
+
+Received: 10 July 2020 Accepted: 9 November 2020
+Published online: 12 November 2020
+
+References
+1. Mercer TR, Mattick JS. Structure and function of long noncoding RNAs in epigenetic regulation. Nat Struct Mol Biol.
+201 3;20(3):300.
+
+2. Guttman M, Rinn JL. Modular regulatory principles of large non-coding RNAs. Nature. 2012;482(7385):339-46,
+
+3. Engreitz JM, Ollikainen N, Guttman M. Long non-coding RNAs: spatial amplifiers that control nuclear structure and
+gene expression. Nat Rev Mol Cell Biol. 2016;17(12):756.
+
+4. Antonov |, Medvedeva YA. Purine-rich low complexity regions are potential RNA binding hubs in the human
+genome. F1000Research. 2018;2018:7.
+
+5. Schmitz KM, Mayer C, Postepska A, Grummt I. Interaction of noncoding RNA with the rDNA promoter mediates
+recruitment of DNMT3b and silencing of rRNA genes. Genes Dev. 2010;24(20):2264-9,
+
+6. Grote P Herrmann BG. The long non-coding RNA Fendrr links epigenetic control mechanisms to gene regulatory
+networks in mammalian embryogenesis. RNA Biol. 2013;10(10):1579-85.
+
+7. _MondalT, Subhash S, Vaid R, Enroth S, Uday S, Reinius B, Mitra S, Mohammed A, James AR, Hoberg E, Moustakas A.
+MEG3 long noncoding RNA regulates the TGF-8 pathway genes through formation of RNA-DNA triplex structures.
+Nat Commun. 2015;24(6):7743.
+
+8. O'Leary VB, Ovsepian SV, Carrascosa LG, Buske FA, Radulovic V, Niyazi M, Moertl S, Trau M, Atkinson MJ, Anastasov N.
+PARTICLE, a triplex-forming long ncRNA, regulates locus-specific methylation in response to low-dose irradiation.
+Cell Rep. 2015;11(3):474-85.
+Zhang et al. BMC Bioinformatics (2020) 21:522 Page 13 of 13
+
+20.
+
+21.
+
+22.
+
+23.
+
+24.
+
+25,
+
+26.
+
+2/.
+
+28.
+
+29,
+
+Postepska-Igielska A, Giwojna A, Gasri-Plotnitsky L, Schmitt N, Dold A, Ginsberg D, Grummt |. LncRNA Khps1
+regulates expression of the proto-oncogene SPHK1 via triplex-mediated changes in chromatin structure. Mol Cell.
+2015;60(4):626-36.
+
+Kalwa M, Hanzelmann S, Otto S, Kuo CC, Franzen J, Joussen S, Fernandez-Rebollo E, Rath B, Koch C, Hofmann
+
+A, Lee SH. The IncRNA HOTAIR impacts on mesenchymal stem cells via triple helix formation. Nucl Acids Res.
+2016;44(22):10631-43.
+
+. Wang S, Ke H, Zhang H, MaY, Ao L, Zou L, Yang Q, Zhu H, Nie J, Wu C, Jiao B. Ln>cRNA MIR100HG promotes cell prolif-
+
+eration in triple-negative breast cancer through triplex formation with p27 loci. Cell Death Dis. 2018;9(8):1-1.
+
+Zhao Z, Senturk N, Song C, Grummt |. IncRNA PAPAS tethered to the rDNA enhancer recruits hypophosphorylated
+CHD4/NuRD to repress rRNA synthesis at elevated temperatures. Genes Dev. 2018;32(11-12):836-48.
+
+Chu C, Qu K, Zhong FL, Artandi SE, Chang HY. Genomic maps of long noncoding RNA occupancy reveal principles
+of RNA-chromatin interactions. Mol Cell. 201 1;44(4):667-78.
+
+Simon MD, Wang Cl, Kharchenko PV, West JA, Chapman BA, Alekseyenko AA, Borowsky ML, Kuroda MI, Kingston RE.
+The genomic binding sites of a noncoding RNA. Proc Natl Acad Sci. 2011;108(51):20497-502.
+
+Engreitz JM, Pandya-JJones A, McDonel P, Shishkin A, Sirokman K, Surka C, Kadri S, Xing J, Goren A, Lander ES, Plath
+
+K. The Xist IncRNA exploits three-dimensional genome architecture to spread across the X chromosome. Science.
+2013;341(6147):1237973.
+
+Senturk Cetin N, Kuo CC, Ribarska T, Li R, Costa IG, Grummt |. Isolation and genome-wide characterization of cellular
+DNA: RNA triplex structures. Nucl Acids Res. 2019;47(5):2306-21.
+
+Buske FA, Bauer DC, Mattick JS, Bailey TL. Triplexator: detecting nucleic acid triple helices in genomic and transcrip-
+tomic data. Genome Res. 2012;22(7):1372-81.
+
+Buske FA, Bauer DC, Mattick JS, Bailey TL. Triplex-inspector: an analysis tool for triplex-mediated targeting of
+genomic loci. Bioinformatics. 2013;29(15):1895-7.
+
+He S, Zhang H, Liu H, Zhu H. LongTarget: a tool to predict IncRNA DNA-binding motifs and binding sites via Hoogs-
+teen base-pairing analysis. Bioinformatics. 2015;31(2):178-86.
+
+Kuo CC, Hanzelmann S, Senturk Cetin N, Frank S, Zajzon B, Derks JP, Akhade VS, Ahuja G, Kanduri C, Grummt |, Kurian
+L. Detection of RNA-DNA binding sites in long noncoding RNAs. Nucl Acids Res. 2019;47(6):e32.
+
+Frankish A, Diekhans M, Ferreira AM, Johnson R, Jungreis |, Loveland J, Mudge JM, Sisu C, Wright J, Armstrong J,
+Barnes |. GENCODE reference annotation for the human and mouse genomes. Nucl Acids Res. 2019;47(D1):D766-73.
+Navarro C, Cano C, Cuadros M, Herrera-Merchan A, Molina M, Blanco A. A mechanistic study of IncRNA Fendrr
+regulation of FoxF1 lung cancer tumor supressor. In: International conference on bioinformatics and biomedical
+engineering 2016 Apr 20 (pp. 781-789). Springer, Cham.
+
+Ageeli AA, McGovern-Gooch KR, Kaminska MM, Baird NJ. Finely tuned conformational dynamics regulate the pro-
+tective function of the IncRNA MALAT1 triple helix. Nucl Acids Res. 2019;47(3):1468-81.
+
+Fu L, Niu B, Zhu Z, Wu S, LiW. CD-HIT: accelerated for clustering the next-generation sequencing data. Bioinformat-
+ics. 2012;28(23):3 150-2.
+
+Hunt SE, McLaren W, Gil L, Thormann A, Schuilenburg H, Sheppard D, Parton A, Armean IM, Trevanion SJ, Flicek P
+Cunningham F. Ensembl variation resources. Database. 2018;1:2018.
+
+Zhang Y, Jia C, Fullwood MJ, Kwoh CK. DeepCPP: a deep neural network based on nucleotide bias information and
+minimum distribution similarity feature selection for RNA coding potential prediction. Brief Bioinform. 2020. https://
+doi.org/10.1093/bib/bbaa039.
+
+Zhang Y, Jia C, Kwoh CK. Predicting the interaction biomolecule types for IncRNA: an ensemble deep learning
+approach. Brief Bioinform. 2020. https://doi.org/10.1093/bib/bbaa228.
+
+Mishra K, Kanduri C. Understanding long noncoding RNA and chromatin interactions: what we know so far. Non-
+coding RNA. 2019;5(4):54.
+
+Li Y, Syed J, Sugiyama H. RNA-DNA triplex formation by long noncoding RNAs. Cell Chem Biol. 2016;23(1 1):1325-33.
+
+ 
+
+ 
+
+ 
+
+ 
+
+Publisher’s Note
+
+Springer Nature remains neutral with regard to jurisdictional claims in published maps and institutional affiliations.
+
+ 
+
+Ready to submit your research? Choose BMC and benefit from:
+
+e fast, convenient online submission
+
+thorough peer review by experienced researchers in your field
+
+rapid publication on acceptance
+
+support for research data, including large and complex data types
+
+gold Open Access which fosters wider collaboration and increased citations
+
+® maximum visibility for your research: over 100M website views per year
+
+At BMC, research is always in progress.
+
+Learn more biomedcentral.com/submissions > BMC
+
+ 
+
+ 
+
+ 
