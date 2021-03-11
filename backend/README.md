@@ -2,17 +2,17 @@ pip install flask
 
 For Linux and Mac:
 
-$ export FLASK_APP=_init_.py
+$ export FLASK_APP=__init__.py
 $ export FLASK_ENV=development
 $ flask run
 For Windows cmd, use set instead of export:
 
-> set FLASK_APP=_init_.py
+> set FLASK_APP=__init__.py
 > set FLASK_ENV=development
 > flask run
 For Windows PowerShell, use $env: instead of export:
 
-> $env:FLASK_APP = "_init_.py"
+> $env:FLASK_APP = "__init__.py"
 > $env:FLASK_ENV = "development"
 > flask run
 
