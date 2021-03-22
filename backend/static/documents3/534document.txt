@@ -1,0 +1,2038 @@
+Data Science and Engineering (2020) 5:433-447
+https://doi.org/10.1007/s41019-020-00135-z
+
+-)
+
+Check for
+updates
+
+GARG: Anonymous Recommendation of Point-of-Interest in Mobile
+Networks by Graph Convolution Network
+
+Shiwen Wu'?® - Yuanxing Zhang? : Chengliang Gao? - Kaigui Bian? - Bin Cui’?
+
+Received: 27 February 2020 / Revised: 3 June 2020 / Accepted: 2 July 2020 / Published online: 29 July 2020
+© The Author(s) 2020
+
+Abstract
+
+The advances of mobile equipment and localization techniques put forward the accuracy of the location-based service (LBS)
+in mobile networks. One core issue for the industry to exploit the economic interest of the LBSs is to make appropriate point-
+of-interest (POI) recommendation based on users’ interests. Today, the LBS applications expect the recommender systems
+to recommend the accurate next POI in an anonymous manner, without inquiring users’ attributes or knowing the detailed
+features of the vast number of POIs. To cope with the challenge, we propose a novel attentive model to recommend appropri-
+ate new POIs for users, namely Geographical Attentive Recommendation via Graph (GARG), which takes full advantage of
+the collaborative, sequential and content-aware information. Unlike previous strategies that equally treat POIs in the sequence
+or manually define the relationships between POIs, GARG adaptively differentiates the relevance of POIs in the sequence
+to the prediction, and automatically identifies the POI-wise correlation. Extensive experiments on three real-world datasets
+demonstrate the effectiveness of GARG and reveal a significant improvement by GARG on the precision, recall and mAP
+metrics, compared to several state-of-the-art baseline methods.
+
+1 Introduction reviewing service and check-in service, which greatly facili-
+
+tate the process for people to acquire the information and
+
+In the past decade, the advance of mobile computing tech-
+niques has led to the widespread popularity of location-
+based service (LBS) in mobile networks. Many companies
+have launched LBS applications over mobile devices such
+as electronic map service, online ride-hailing service, online
+
+b<} Bin Cui
+bin.cui @pku.edu.cn
+
+Shiwen Wu
+wushw. 18 @pku.edu.cn
+
+Yuanxing Zhang
+longo @pku.edu.cn
+
+Chengliang Gao
+gaochengliang @pku.edu.cn
+Kaigui Bian
+
+bkg @pku.edu.cn
+
+' Room 1326, Science Building No.1, Peking University, No.5
+YiHeYuan Road, Haidian District, Beijing, China
+
+National Engineering Laboratory for Big Data Analysis
+and Applications, Peking University, Beijing, China
+
+3 Key Lab of High Confidence Software Technologies (MOE),
+Department of Computer Science, Peking University,
+Beying, China
+
+to access the wanted service. Among all of LBS applica-
+tions, one of the key techniques is the next Point-of-Interest
+(POI) recommendation that seeks to accurately predict the
+POI where a user is interested in or she/he may visit in the
+future[1].
+
+The spatial information (1.e., the located latitude—longi-
+tudes) and temporal information (i.e., timestamps) play a
+very important role in the next POI recommendation in the
+LBS applications when compared to the recommendation
+for common items[2, 3]. Note that people’s trajectories in a
+short period are always within a small region, and they tend
+to focus on several main POIs (e.g., home and company) in
+many daily scenarios. Typically, there are three most practi-
+cal features in the POI recommendation in LBS applications.
+
+1. The content information helps identify the correlation
+among users such as attributes[4, 5], and the correlation
+among POIs such as distances[6], such that the recom-
+mendation can be conducted upon the correlations or
+similarities of users and POIs.
+
+2. The collaborative information contributes to the fac-
+torization-based POI recommendation strategies, which
+
+Q) Springer
+434
+
+locate the possibly interesting POIs by the historical
+implicit feedback[7, 8].
+
+3. The sequence information captures the users’ moving
+patterns and their preferences[9], where the spatial-tem-
+poral features can be appended for task-aware optimiza-
+tion[ 10-12].
+
+The advances of localization and navigation techniques have
+helped in acquiring the high-precision position of users and
+a huge mass of “check-in” data[13], which facilitate the data
+analysis regarding the above three features. For instance, a
+typical way is to extract a user’s moving patterns, identify
+their travel interests via the session of latitude—longitude
+traces, and showcase the sequence of POIs that the user
+has visited, from the set of “check-in” data[ 14]. Then, it is
+feasible to learn descriptive embeddings for modeling the
+geographical attributes[15] and to take advantage of the
+advanced recurrent neural networks[16] for exploiting the
+sequence information for next POI recommendation.
+
+However, many state-of-the-art recommender systems
+do not work well for the next POI recommendation task,
+when certain important data is missing (e.g., missing the
+data of various moving patterns), which raises four types
+of challenges.
+
+1. Lack of User Attributes For privacy concerns, many
+LBS applications do not require users to log in or reg-
+ister specific attributes. Instead, the server allocates a
+unique ID to each client and stores the records in cook-
+ies.
+
+2. Lack of POI Labels There can be a vast number of POIs
+that may attract users, while it is not possible to obtain
+comprehensive labels for all the POIs. For instance, the
+label of a POI can be a restaurant, shopping mall, office
+building, hospital, etc.
+
+3. Discontinuous Mobility Traces People travel from one
+POI to another, whereas the mobility traces only expose
+partial observations of the entire trajectory.
+
+4. Various Mobility Patterns. People have various mobil-
+ity patterns due to their different capabilities of traveling
+over distance (e.g., travel within a small region, or over
+a wide range). It is necessary to learn the mobility pat-
+terns and infer the user preferences within the sessions
+of observations.
+
+These four challenges are common in the anonymous LBS
+applications, and thus the anonymous recommendation of
+POI should be addressed to provide the next POI for users.
+
+In this paper, we propose the Geographical Attentive
+Recommendation via Graph (GARG) for the task of the
+anonymous recommendation of POI, which combines the
+state-of-the-art attention mechanism and the graph con-
+volution network (GCN) to address the above challenges.
+
+Q) Springer
+
+S. Wu et al.
+
+Specifically, we implement a collaborative preference mod-
+ule in GARG to learn the embeddings as the user attributes
+over the collaborative information. Besides, GARG employs
+a geographical preference module to investigate the content-
+aware information and overcome the lack of labels, where
+GCN is leveraged upon the content information, 1.e., dis-
+tance, between each pair of POIs to adaptively identify the
+correlations. Beyond that, we utilize a gated recurrent unit
+(GRU) network with attention mechanism in the geographi-
+cal preference module to tackle the discontinuous observa-
+tions and recognize the mobility patterns via the sequence
+information. Overall, we make the following contributions
+in this work.
+
+e Data-Driven Approach We observe from the real-world
+check-in data that people have their own mobility pat-
+terns and they tend to visit a series of POIs within a cer-
+tain area.
+
+e Automatic Identification of Geographical Influence
+Previous works design different functions over distances
+between paired POIs to model the influence of historical
+POIs on the objective. GARG automatically learns POI
+correlation from location data and mass of check-ins.
+
+e Efficiently Capture Users’ Current Activity Area
+Users’ check-ins cover a long range of time. Some might
+move to another city and some might temporarily travel
+far away. GARG can adaptively differentiate the contri-
+bution of historical POIs and efficiently recognize users’
+current activity areas.
+
+We conduct evaluations over three real-world datasets with
+various moving patterns to compare the performance of
+GARG with several state-of-the-art POI recommendation
+strategies. Experimental results confirm that GARG makes a
+remarkable improvement in the precision and recall metrics,
+while the fine-grained analyses indicate that the modules of
+GARG all contribute to the recommendation task. Further-
+more, GARG can be easily embedded into existing mobile
+applications for improving customer satisfaction owing to
+its generality and efficiency.
+
+The rest of the paper is organized as follows. Related
+works are introduced in Sect. 2. In Sect. 3, we analyze the
+characteristics of data from three LBS applications and
+point out the aspects to be considered in the next POI rec-
+ommendation. Section 4 presents the overview of the GARG
+architecture and explains the rationality of each compo-
+nent. Experimental results and conclusions are provided in
+Sects. 5 and 6, respectively.
+GARG: Anonymous Recommendation of Point-of-Interest in Mobile Networks by Graph Convolution... 435
+
+2 Related Work
+
+Due to the widespread use of recommender systems in
+mobile LBS applications, researchers have proposed efficient
+recommendation strategies using either the implicit feedback
+or the sequences of POIs.
+
+POI Recommendation by Implicit Feedback Some POI
+recommender systems equally treat the POIs in the historical
+traces of users as the implicit feedback and attempt to learn
+the embeddings via reconstruction of these implicit feed-
+back records[17]. Based on the naive probabilistic matrix
+factorization methods[18], many works focus on involving
+extended features for improvement on accuracy. Regarding
+learning the user embeddings, existing works are conducted
+under the assumption that users may present similar inter-
+ests with those sharing the same attributes[19]. In terms of
+the POI embeddings, the most significant issue is to model
+the geographical similarity or influence[8, 20] between each
+pair of POIs. Besides, UCF+G[21], Rank-GeoFM[22] and
+GeolE[6] assume that POIs with close distance share strong
+correlation, and retrieve the geographical influence by the
+manually defined functions over distances. Moreover, due to
+the spatial-clustering phenomenon in the POI recommenda-
+tion, researchers pay attention to inferring users’ activity
+areas from their historical behavior. MGMPFM[23] utilizes
+the multi-center Gaussian model to learn regions of activity,
+GeoMF[24] introduces activity vectors of users and influ-
+ence vectors of POIs to augment factorization model and
+Geo-ALM[25] fuses users’ preferences for the POIs and the
+regions that the POIs belong to. Recent works consider the
+user-POI interactions, POI-POI relations and other infor-
+mation such as social relationship, in the view of graphs.
+HRec[26] leverages social relationship to enhance user rep-
+resentations and adopts graph learning approach to learn
+the user/POI representations from three graphs. JUGE[27]
+jointly learns the embedding from six graphs of the user-
+POI-Time period relationships. However, these methods
+fail to learn the sequence information and may lose efficacy
+when the attribute features are absent.
+
+POI Recommendation by Sequence Recently, many
+researchers notice the importance of sequence information
+for recommending POIs[15, 28, 29]. In addition to the con-
+text information contained in the sequence, time interval
+and spatial transformation should not be ignored as well.
+Some researchers try to model spatio-temporal context and
+sequence information by augmenting traditional matrix
+factorization[30]. STELLAR[31] extends matrix factoriza-
+tion by time vectors to explicitly model the POI-time inter-
+actions. Inspired by the great success of the sequence to
+sequence model in the natural language processing, there
+have been efforts resorted to the recurrent neural networks.
+ST-RNN[32] adapts RNN structure to model local temporal
+
+and spatial contexts with time-specific transition matrices
+for different time-intervals and distance-specific transition
+matrices for different geographical distances. Beyond the
+legacy long-short term memory (LSTM)[33] network, ST-
+LSTM[12] proposes a new recurrent cell with time-aware
+and space-aware gates owing to spatio-temporal charac-
+teristics. TMCA[34] introduces the attention mechanism
+to learn the weights over each POI in the traces and pro-
+duces the prediction under the consideration of some POIs
+with high weights. Further, GT-HAN[35, 36] adopts the
+attention mechanism to capture the geographical relations
+and employs bi-LSTM to capture sequence dependence.
+Some works utilize side information, such as comments, to
+enhance the user/POI representations. NEXT[29] incorpo-
+rates meta-data information, time interval and visit time, and
+leverages the DeepWalk method to encode such knowledge.
+MMR[37] employs graph embedding technique to learn
+embeddings from heterogeneous graph, and adopts LSTM
+with attention to capture sequence pattern. Although these
+strategies are adept at representing the sequences, a major
+issue is that they do not make full use of the collaborative
+information to identify the POI-wise correlation.
+
+The GARG proposed in this paper fills this gap via a com-
+prehensive consideration of both the collaborative informa-
+tion and the sequence information, and therefore the perfor-
+mance can be further improved.
+
+3 Measurements and Observations
+over Anonymous LBS Datasets
+
+In this section, we discuss the characteristics of data from
+LBS applications and show the aspects to be considered in
+the POI recommendation. Previous works have pointed out
+the “clustering phenomenon” that people tend to visit places
+concentrated in a region especially within a short period. In
+addition, many users routinely revisit familiar places while
+exploring new places in their living area simultaneously.
+Moreover, users’ preference for POIs is a unity of common
+and personality.
+
+Anonymous LBS Datasets We use three real-world data-
+sets to investigate the user behaviors and mobility patterns
+within the LBS applications.
+
+© Gowalla'[{14] records the traces of users on POIs from 7
+main categories, 1.e., Community, Entertainment, Food,
+Nightlife, Outdoors, Shopping and Travel. It can be
+
+ http://www.yongliu.org/datasets/.
+
+Q) Springer
+436
+
+10.0
+
+75
+
+5.0
+
+pdf (%)
+
+2.5
+
+0.0 0.2 0.4
+
+Fig. 1 Distribution of trajectory similarity on Gowalla
+
+20
+xs
+on
+go)
+10
+0 01 02
+Sim.
+
+Fig. 2 Distribution of trajectory similarity on Foursquare
+
+inferred that the dataset tends to describe users’ interests
+via the sessions of traces.
+
+e Foursquare’[38] contains check-in traces in New York,
+which is originally used for studying the spatial-temporal
+regularity of user activity in LBS networks.
+
+e Brightkite*[2] was proposed to analyze users’ mobility
+patterns, exposing that users move back and forth among
+a few of POIs.
+
+The last two datasets expose users’ habits more than their
+interests; meanwhile, Foursquare tends to have a shorter
+average distance of POI traces than Brightkite. These three
+datasets are the most commonly used anonymous datasets
+for POI-recommendation, where the user attributes are not
+provided and the annotations to POIs are not available in
+all datasets.
+
+Observation 1 There are clustering effects among
+users’ POI trajectories. The basic assumption behind col-
+laborative filtering is that users with similar preferences
+might be interested in similar items. We adopt the Jaccard
+similarity coefficient as depicted by Eq. | to measure the
+similarity of users’ trajectories:
+
+[Py Py, |
+
+iP, uP, | (1)
+
+Sim(u,, Uj) =
+
+* https://sites.google.com/site/yangdingqi/home/foursquare-dataset.
+3 https://www.cs.cornell.edu/~arb/data/spatial-Brightkite/index.html.
+
+D) Springer
+
+S. Wu et al.
+
+10
+
+pdf (%)
+
+0.2 0.4
+Sim.
+
+Fig.3 Distribution of trajectory similarity on Brightkite
+
+0.15
+
+Similarity
+oS
+>
+
+0.05
+
+ 
+
+0 10 20 30 40
+Distance
+
+Fig.4 Correlation of distance and similarity of POI trajectories
+between users
+
+where P,, 1s the set of POIs visited by user u;. For each user,
+we take the average similarity to five users with the most
+similar POI trajectories (highest Jaccard similarity coeffi-
+cient values) as the user-specific similarity index. Figures 1,
+2 and 3 depict the distribution of the similarity on three
+datasets, respectively, indicating that for each user, we can
+always find users with relatively similar trajectories. There-
+fore, collaborative filtering works to some degree for infer-
+ring the POIs which users would be potentially interested in.
+Besides, we take a further look at the correlation between
+similarity and distance between the estimated activity center.
+We take the average latitude and longitude of visited POIs
+as users’ activity center and calculate the geographical dis-
+tance between centers. Given the latitude and longitude of
+two points P, (/ng,, lat,), P.(ing,, lat,), the distance between
+them is calculated as follows[21]:
+
+— (90.0 — lat,) x —~, — (90.0 — lat,) x —2—
+1 = ( at)X Teog? P2 = a) X Te 9
+6,=!l x _7 5 6, =1 x _7
+P= MS1* Teg Q7 72 ~ 'M52* 7 a0 0
+dist(P,,P,) = R, X arccos (sin d, sin d, cos (8, — 8,) + cos d, cos dp)
+
+(2)
+GARG: Anonymous Recommendation of Point-of-Interest in Mobile Networks by Graph Convolution... 437
+
+1.0
+0.063 0.12 0.13 0.19 0.19 0.2 0.23 0.24 0.26 0.26
+
+   
+ 
+ 
+   
+
+0.1 0.18 0.24 0.26 0.35 0.29
+0.8
+0.14 0.22 0.28
+0.17 0.25 0.32 0.37 Kievé 0.37 0.56 RIKS}
+0.6
+0.2 i 0.35 ; et 0.37
+
+0.22 0. ).38 : ROD
+
+Frequency
+
+0.4
+
+ 
+
+0.24 0.33. 0.63
+
+0.26 H a A
+
+- 0.2
+0.27 0.3 - Bee 0.66
+0.29 : 0.73 t Rs
+
+- 0.0
+
+0.055 0.12 0.14 0.16 0.28 0.14 0.2 0.24 0.17 0.11
+
+Expected frequency of 10 POIs
+
+Fig.5 The column-wise cumulative probabilities of the most fre-
+quently visited 10 POIs from 10 randomly selected users. Each row
+represents the data of a selected user, and each column corresponds
+to one of the POIs. The expected frequency of 10 POIs under uniform
+distribution assumption is also given in the last row
+
+where R, is the radius of earth, i.e., 6371km. As shown
+in Fig. 4, it is reasonable to infer that users with higher
+similarity might live in the same neighborhood with high
+probability.
+
+Observation 2 Users tend to present revisiting behaviors
+and various mobility patterns. The decisions of people can
+be categorized into exploration and exploitation. Regard-
+ing general items such as movies, people hardly watch one
+movie repeatedly but tend to explore new ones. On the con-
+trary, we find out that most people not only try to explore
+unvisited places but also frequently revisit familiar places.
+
+We randomly select 10 users from the Foursquare data-
+set and depict the cumulative probabilities of their most
+frequently visited 10 POIs in Fig. 5 by columns. We also
+
+Fig.6 Repeat visiting behaviors Campus —
+to familiar POIs Building =
+Bakery -
+
+Drugstore / Pharmacy -
+Home (private) -
+Airport -
+
+Train Station -
+Medical Center -
+
+Diner -
+
+Clothing Store -
+Outdoors & Recreation -
+Office -
+
+Theater -
+
+Park -
+
+Coffee Shop -
+
+Stadium -
+
+Bar -
+
+Restaurant -
+
+Food & Drink Shop -
+
+Other Places — Wm iil I!
+
+present the expected frequency (probability) of 10 POIs if
+users would visit POIs in a uniform distribution, as shown
+in the last row of Fig. 5. Results reveal a big gap between
+the cumulative probabilities of 10 POIs under real-world
+scenario and uniform distribution, indicating that users tend
+to have revisiting behaviors in real life.
+
+Observation 3 There are usually main interests within the
+POI trajectories, while the POI trajectories are usually moni-
+tored discretely and partially. Different users have their own
+preferences in visiting different kinds of places. We analyze
+users’ visiting frequency of different types of POIs. We ran-
+domly sample 100 users from Foursquare dataset and summa-
+rize the number of visiting times to different types of places.
+Figure 6 shows the proportion of different types of places vis-
+ited by users, respectively. For simplification, we only keep
+the 19 most popular types and categorize the remaining into
+“Other Places”. For example, we can see that some users might
+be students or teaching staffs since they always go to campus
+and some might be in the habit of exercising for their frequent
+visit to the stadium. It is worth noting that not all users fre-
+quently go back home according to the check-ins. The reason
+might be that the LBS application only captures users’ partial
+trajectories, which raises the difficulty of extracting users’
+mobility patterns and inferring sequence behavior.
+
+4 Anonymous Recommendation of POI
+by GARG
+
+Based on the three observations in Sect. 3, we introduce a
+novel recommender system, named Geographical Attentive
+Recommendation via Graph (GARG) for addressing the chal-
+lenges in recommending POIs in anonymous LBS applica-
+tions. GARG consists of two modules: (1) the collaborative
+preference module learns the interest-aware embeddings and
+attempts to model the general user/POI preference via the col-
+laborative information; and (2) the geographical preference
+
+1.0
+|
+
+0.6
+
+\EEEWREE HIME T gy
+
+D) Springer
+438
+
+I ee ee ee el
+
+ 
+
+S. Wu et al.
+
+Yup = Vip =o
+
+meme ee my
+
+ 
+
+ 
+
+o
+
+7 Geographical
+
+Preference Module | Sequence
+
+representation —
+
+  
+  
+
+BC CN, )
+Qj C;
+
+Attention layer
+l= “4
+
+GRU layer
+
+Embedding layer
+
+ 
+
+g
+Two-layer GCN “By
+
+sen —*Ccn,,
+
+q Pizza P
+
+it aan 2
+
+mcm eee
+
+ 
+
+|
+|
+‘
+
+LQ |
+
+Restaurant
+
+Collaborative
+, Preference Module ,
+
+@
+
+eee
+
+ 
+
+—— ee ee ee eee ee ee
+
+Fig.7 The architecture of GARG, consisting of a collaborative preference module and a geographical preference module
+
+module manages the sequential and the content-aware infor-
+mation for identifying location-based geographical correlation
+among POIs. Figure 7 presents an overview of GARG, and the
+detailed design will be presented in this section.
+
+4.1 Problem Statement
+
+Suppose the set of users and POIs on the LBS platform are
+denoted by U and P, respectively. For each POI p € P, the
+only accessible feature is the geographical coordinates 6,
+of latitude and longitude. We can then retrieve the physical
+distance d,,,, between POI p and POI p’ and construct the
+adjacency matrix Ap based on the distance between each pair
+of POIs. Let H,, = [x1,%,..., xy | represent the sequence of
+POIs visited by user u € U with length N,, in a chronologi-
+cal order. A POI recommender system is expected to rec-
+ommend several POIs for each user u which she/he will be
+interested in but has not visited yet.
+
+4.2 Embedding Layer
+
+We are going to project the user preferences into latent space
+of dimensionality h, where each user u € U corresponds to
+an embedding vector g, € R”. Meanwhile, we transform the
+POIs into embeddings from the same latent space, and thus
+we could measure similarity and correlation between users
+and POIs or between pairs of POIs by dot-product. Specifi-
+cally, we build two sets of embeddings for the POIs, namely
+the preference embeddings, denoted as l, for p € P, and the
+geographical influenced embeddings, denoted as g, for
+p € P, to capture the collaborative aspect and the content
+aspect of POIs. Therefore, the historical POI sequence H,,
+
+D) Springer
+
+can be transformed into a sequence of embeddings
+EF, = [ho by> Le |
+
+4.3 Collaborative Preference Module
+
+Many works regard the users’ check-in records as implicit
+feedback, and they assume that if user u once visited POI p,
+the probability that u is interested in p is quite high. Under
+this assumption, the POI recommendation task turns into a
+classic recommendation problem, 1.e., to learn representa-
+tive user embeddings and POI embeddings for the optimal
+implicit feedback reconstruction. Specifically, we map the
+users and POIs into embeddings of the latent vectors, 1.e., ¢,
+and /,, to represent the user w’s characteristics and POI p’s
+features, respectively. We keep the embeddings normalized,
+and we leverage the inner product of q,, and /, to measure the
+general preference of user u to POI p without explicitly tak-
+ing spatio-temporal constraint into consideration, named as
+the collaborative preference. Let Yop denote the collaborative
+preference between user u and POI p, which is computed by
+
+C _
+Vip = Iu lp: (3)
+
+4.4 Geographical Preference Module
+
+Sequence information in POI recommendation. The col-
+laborative information generates the latent feature vectors
+of users and POIs based on the user-POI visiting history,
+which only records the preference/interaction frequency of
+users on POIs. However, the schemes have not taken user
+mobility patterns on POIs into account. Besides, the order
+GARG: Anonymous Recommendation of Point-of-Interest in Mobile Networks by Graph Convolution... 439
+
+of POIs users visited contains rich information about the
+correlation/similarity between POIs. Owing to the mobility
+patterns of the individual user or the private user interests,
+POIs appearing under similar contexts usually tend to be
+more similar. Furthermore, we observe that the latest activ-
+ity area of users would be an essential factor for reducing
+the number of candidate POIs, as people may not frequently
+visit POIs far away.
+
+Learning sequential features by GRU. To take full
+advantage of the sequence information, we apply the recur-
+rent neural network to extract sequence information and
+recurrently propagate the evidence for inferring the users’
+mobility patterns and interests. Specifically, we leverage the
+advanced gated recurrent unit (GRU) network to tackle the
+sequential data, 1.e.,
+
+c; = GRU(c_1, 1,307"), (4)
+
+where c, stands for the cell state at the i-th position of the
+sequence, and O°" represents the trainable parameters of
+the GRU cell with dimensionality of h. We could then evalu-
+ate the preference of user u to POI p from the sequential
+aspect by the dot-product.
+
+Learning sequence representations by attention. How-
+ever, aS we do not have access to the explicit attitudes of
+a user to POIs from the implicit feedback sequence, some
+POIs in the sequence may not have strong correlation with
+the prediction of future POIs, such as the POIs that impose
+negative impression to the user, or the POIs that the user just
+visited by chance. The naive GRU network cannot identify
+and skip the impact of these irrelevant POIs. Inspired by
+the great success of the neural translation techniques[39],
+we adopt the attention mechanism over the GRU network to
+extract the information behind the sequence. The attention
+mechanism assigns various weights to the POIs at different
+positions and computes the weighted sum of the outputs of
+all positions to be the representation of the sequence. We use
+GRU to capture the sequential behavior at first, as depicted
+by Eq. (4). GARG further adopts an item-level attention
+mechanism with parameter W“ to analyze to what extent
+the output of the last position of GRU attend to the outputs
+at the other positions, and probe into the important POIs for
+the prediction.
+
+Ty7A
+c, Wey, 6)
+Qa; =
+Ny
+Di Cy WAcy,
+N,
+Sy = QaiC; (6)
+
+Il
+—
+
+where s, indicates the sequence representation, and a;
+(i € {1,2,...,N,}) stands for the weight at each position.
+The rationale behind this design is that we assume the most
+recent POI will roughly limit the mobility regions of the
+user, while some of the previous POIs implicitly depict her
+mobility pattern and interest.
+
+Content-aware correlation between POIs. Intuitively,
+people are likely to know the POIs around those they once
+visited and the premise for users to visit new POIs is to
+know those places. Hence, people within the region would
+have a high probability of visiting them one after another. It
+is essential to pay attention to POIs’ influential power and
+model the potential strong correlation with their neighbors.
+As we only have access to the latitude—longitude of these
+POIs, the most significant factor to model the correlation
+between pairs of POIs is the distance. We could construct
+the geographical graph and extract the adjacent measure-
+ment matrix Ap by the distances, where each element of Ap
+is computed by:
+
+2
+
+Cae
+PP !
+Ay _ exp(— > )P 4 DP and dy =e€
+
+(7)
+
+0 otherwise
+
+where the distance d,,,, is calculated by Eq. 2, and the o and
+€ are thresholds to control the scope and degree of influence,
+the closer the distance, the greater the influence. Assuming
+that the content-aware correlation is negatively correlated
+to the distance, many researchers have manually proposed
+mapping relations to compute the influence[6, 12]. How-
+ever, they ignore the fact that the attributes of the POIs,
+which can be represented by the sequential features and the
+collaborative embeddings, also determine the correlation
+between POIs.
+
+Learning Content-Aware Correlation by GCN To take
+full advantage of the content-aware correlation and the col-
+laborative information of POIs, we use the advanced Graph
+Convolutional Network (GCN)[40] to model the geographi-
+cal influence of the neighboring POIs for each POI p € P.
+GCN in GARG is built upon the adjacent measurement
+matrix Ap, and learns the geographical features by integrat-
+ing the knowledge from neighboring POIs. Each layer of
+GCN propagates the knowledge from each POI to its one-
+hop neighbors (1.e., the corresponding adjacent value greater
+than zero). Regarding the k-th layer of the GCN, it main-
+tains trainable parameter W“ and generates the output G™,
+following:
+
+G® = ReLU(D-2AD-iG* W), (8)
+
+where A = Ap + Ip, 1s the adjacent matrix with added self-
+connections, I P| is the identity matrix, and D is a diagonal
+
+matrix, Dyp = Der App: Note that the embeddings of the
+
+Q) Springer
+440
+
+GCN component G is initialized by the preference embed-
+dings. Empirically, the correlation between pairs of POIs
+decays along with the length of the propagation route in the
+geographical graph between them. In this paper, we apply
+a two-layer GCN for GARG to capture the content-aware
+correlation, namely g, € G® for p € P. Therefore, instead
+of merely using the sequence information, we could measure
+the preference of user u to POI p by combining the sequence
+information of the historical check-ins and the content-aware
+correlation, namely
+
+Vip = Sul 8p- (9)
+
+4.5 Optimization
+
+To measure the intention that user u would like to visit a
+target POI p, we take both the collaborative preference and
+geographical preference into account, namely
+Yup = Nip + BY ny» (10)
+where f is a trainable factor to find the balance between
+these two types of preferences. Under various scenarios, f
+would be different to cope with the sequences in the datasets.
+We apply negative sampling to prevent overfitting on the
+historical sequences and enhance the representing capabil-
+ity of the embeddings. We organize the loss function as the
+negative likelihood:
+
+(1o8(6(),))) + log = o6,9)))
+
+CUM) =~ Qe dy OIF,
+
+ucU peH,
+(11)
+where p represents one negative randomly sampled POI rela-
+tive to the existing POIs at each position of the sequence
+H,, and o(-) is the sigmoid function. Considering that the
+negative sampling strategies do impact the performance of
+the model, we investigate the different sampling methods in
+Sect. 5.4. We adopt the Adam algorithm to adjust the learn-
+ing rate for minimizing this likelihood objective function. To
+prevent overfitting, during each iteration, we re-sample the
+negative samples randomly and construct the negative set.
+We pretrain the embeddings of users and POIs with matrix
+factorization method. In this paper, we fix the dimensionality
+of all latent embeddings, 1.e., h, as 128.
+
+4.6 Analytical Results
+We then analyze the outputs of GARG to show whether the
+
+prediction of GARG is feasible. Specifically, we find that
+GARG can precisely identify the preferences of users, and
+
+Q) Springer
+
+S. Wu et al.
+
+yield the POIs that are reachable by the users. The analytical
+results are mainly two-fold:
+
+Proposition 1 Given two POIs that are identical except for
+distance, GARG recommends the one near the users’ recent
+activity area.
+
+Proof User u’s preference score for POI p is the combination
+of general preference and geographical preference. Under
+the assumption that the two POIs are identical other than
+distance, the general preference part Yop should be equal.
+Considering the geographical preference part, the sequence
+representation s,, attentively aggregates the sequence infor-
+mation from u’s historical trajectories which reflects her
+recent activity area, while the g, =f (p' € N,,) integrates the
+POIs from its neighborhood. Thus, the geographical prefer-
+ence score should be higher if p belongs to the w’s recent
+activity area. oO
+
+Proposition 2 GARG falls into sequence model category but
+fuses geographical information.
+
+Proof The classical sequence model combines general pref-
+erence and sequential preference. FPMC[41] consists of the
+inner product of user and item factors (capturing general
+preference) and the inner product of previous and next item
+factors (capturing sequential dynamics). NARM[42] only
+concentrates on sequential preference and utilizes GRU
+with attention mechanism to capture sequence information.
+If the coefficient 6 approximates positive infinity and the
+adjacent matrix is an identity matrix, GARG degenerates
+into NARM. If the adjacent matrix is an identity matrix and
+all the attention is on the last POI, GARG degenerates into
+FPMC. However, GARG enjoys the benefits of GCN and
+attention over GRU to fully capture sequence and geographi-
+cal preference. oO
+
+5 Evaluation
+5.1 Setups
+
+Datasets. We use the three real-world datasets introduced
+in Sect. 3 to examine the performance of GARG. Following
+the data preprocessing approach deployed by[6], we filter out
+the users and items with less than 40 records for Gowalla; for
+Foursquare, we filter out those with less than 10 records; for
+Brightkite, we filter out the users with less than 40 records
+and the items with less than 10 records. The preprocessed
+datasets are split into training set, validation set and test set
+with the proportion of 8:1:1 by the check-in timestamps.
+As illustrated in Sect. 4.4, the adjacent measurement
+matrix depends on the threshold o and € to control the scope
+GARG: Anonymous Recommendation of Point-of-Interest in Mobile Networks by Graph Convolution... 441
+
+and degree of influence. For the Gowalla and Brightkite
+dataset, the threshold o and € are set to be 10 and 0.5, respec-
+tively, inspired by the parameter setting in[43]. Since POIs
+visited by users in Foursquare tend to concentrate in a more
+narrow area, we set o to be 5 (Table 1).
+
+Baseline methods As there have been many POI recom-
+mending strategies for specific LBS applications, we select
+several state-of-the-art methods to compare the performance
+with GARG in our settings. For the recommendation by
+implicit feedback, we run or reproduce the following eight
+strategies: (1) UCF+G[21] fuses user preference and geo-
+graphical influence by combining a user-based collaborative
+filtering approach and a power-law function of distance to
+capture check-in probability. (2) MGMPFM[23] combines a
+probabilistic factor model and a multi-center Gaussian model
+to learn regions of activity. (3) GeoMF[24] integrates geo-
+graphical influence by modeling users’ activity regions and
+pre-defined POIs’ influence areas. (4) RankGeoFM[22] is a
+ranking-based MF model which uses two latent matrixes to
+represent user preference and users’ geographical preference,
+respectively, and includes the geographical influence of neigh-
+boring POIs. (5) GeoIE[6] differentiates the impact between
+each pair of POIs on bi-directions and embeds users and POIs
+into latent space to calculate similarities between users and
+POIs. (6) SAE-NAD[8] deploys self-attentive mechanism
+to encode the session for maximizing the utilization of col-
+laborative information. Regarding the recommendation by
+sequence information, we examine the performance of: (7)
+ST-LSTM[12] modifies the LSTM cell by integrating the
+spatial gate via distance and the temporal gate via time differ-
+ence between two consecutive POIs. (8) TMCA[34] applies
+the attention mechanism over the recurrent neural network
+to learn the session-level representation for capturing users’
+mobility patterns. (9) GT-HAN[35, 36] models the geographi-
+cal relations by leveraging attention mechanism and employs
+bi-LSTM to capture sequence dependence. (10) NEXT[29]
+models the influence of the last POI on the next move based on
+the time interval and adopts DeepWalk mechanism to pretrain
+the POI embeddings. These baseline methods are fine-tuned
+on the validation set to ensure a fair comparison, and the per-
+formance on the test set will be reported.
+
+Evaluation Criteria We evaluate the performance of the
+model and the baselines in terms of three kinds of criteria.
+
+e Recall@K: The recall metric measures in what propor-
+tion the recommendation of K POIs covers the ground
+truths of the POIs that the users would visit.
+
+e Precision@K: The precision metric indicates the propor-
+tion of correct recommended POIs where the users would
+visit within the K recommendations.
+
+e mAP@K: Mean average precision (mAP) is the mean of
+the average precision scores for each recommendation
+of K POIs. Suppose the recommended POI with rank k
+
+ 
+
+—*k— GARG
+—> GT-HAN
+0.151 UCF+G
+STLSTM
+—@- TMCA
+—@ GeoMF
+EE GeolE
+-@ RankGeoFM
+——~SAE-NAD
+
+—¢ NEXT
+—k— MGMPFM
+0.05; —_____+
+
+1 5 10 20
+K
+
+ 
+
+ 
+
+ 
+
+ 
+
+Fig.8 Pre@K of the compared methods on Gowalla
+
+ 
+
+0.15;
+
+—*k— GARG
+> GT-HAN
+
+UCF+G
+STLSTM
+0.10) -¢ ta
+—@- GeoMF
+EL GeolE
+—@ RankGeoFM
+—+— SAE-NAD
+0.05; — NEXT
+
+—k— MGMPFM
+
+Rec@K
+
+ 
+
+ 
+
+ 
+
+ 
+
+ 
+
+ 
+
+ 
+
+ 
+
+Fig.10 mAP@K of the compared methods on Gowalla
+
+Table 1 Statistics of the datasets
+
+Dataset #User #POI #Check-in Density
+Gowalla 2151 5119 274037 1.141%
+Foursquare 1043 3908 80297 0.9981%
+Brightkite 2281 4273 305302 0.5547%
+
+is the correct predicted POI with k’-th highest rank (k’ is
+set to zero if it is not a correct prediction), the precision
+score of this POI would be £. Then, the mAP score can
+be defined as: E[- Yh, —}
+
+Specifically, we set K to 1, 5, 10, 20 to measure the
+performance.
+
+Q) Springer
+442
+
+ 
+
+ 
+
+ 
+
+ 
+
+ 
+
+Fig.11 Pre@K of the compared methods on Foursquare
+
+ 
+
+0.08:
+—k— GARG
+—>— GT-HAN
+~ 0.06; UCF+G
+&) STLSTM
+—§—TMCA
+—@ GeoMF
+HEL GeolE
+
+oo RankGeoFM
+0.02; —\— SAE-NAD
+— NEXT
+—k— MGMPFM
+
+1 5 10 20
+
+3
+ze 9.04
+
+ 
+
+ 
+
+ 
+
+Fig.12 Rec@K of the compared methods on Foursquare
+
+ 
+
+—k— GARG
+0.06; > GT-HAN
+UCF+G
+STLSTM
+—- TMCA
+—@ GeoMF
++L GeolE
+-@ RankGeoFM
+—|— SAE-NAD
+~~ NEXT
+_—*— MGMPFM — ——____ a
+
+  
+ 
+   
+     
+ 
+
+ 
+
+ 
+
+ 
+
+Fig. 13 mAP@K of the compared methods on Foursquare
+
+5.2 Performance of GARG
+
+We compare the performance of GARG with the other state-
+of-the-art methods based on three kinds of criteria on the
+three datasets.
+
+Geographical correlation captured by GARG. As
+shown in Figs. 8,9, 10, 14, 15 and 16, GARG improves
+the performance remarkably compared to the baselines on
+the Gowalla and Brightkite datasets. Specifically, the Gow-
+alla dataset exposes rich check-in histories of users among
+nearby POIs, where the GCN can accurately capture the geo-
+graphical correlation between pairs of POIs, which helps
+GARG perform best on all three metrics. In contrast, the
+strategies simply based on implicit feedback or sequence
+information do not work well, as they could not adaptively
+model the geographical influence. Meanwhile, the users
+in the Brightkite dataset tend to move back and forth from
+
+Q) Springer
+
+S. Wu et al.
+
+ 
+
+ 
+  
+    
+
+—k— GARG
+
+—>— GT-HAN
+
+UCF+G
+
+0.06; STLSTM
+v —@- TMCA
+—@ GeoMF
+© iL GeolE
+
+oo RankGeoFM
+& 0.04, —— SAE-NAD
+
+—& NEXT
+—k—- MGMPFM
+
+ 
+
+ 
+
+ 
+
+Fig. 14 Pre@K of the compared methods on Brightkite
+
+ 
+
+ 
+
+ 
+
+ 
+
+0.15)
+—k— GARG
+—>— GT-HAN
+Ww | UCF+G
+@ 0-10 STLSTM
+oO —@- TMCA
+o& —@ GeoMF
+a iL GeolE
+0.05; -@ RankGeoFM
+—— SAE-NAD
+— NEXT
+—*k— MGMPFM
+1 5 10 20
+K
+
+Fig.15 Rec@K of the compared methods on Brightkite
+
+—*k— GARG
+—> GT-HAN
+UCF+G
+0.061 STLSTM
+Y —@- TMCA
+©) —@ GeoMF
+A. +L GeolE __
+< —@-_ RankGeoFM
+S 0.04; —1~ SAE-NAD 4
+—4++ NEXT
+
+—k—_ MGMPFM
+
+ 
+
+        
+ 
+
+ 
+
+ 
+
+ 
+
+Fig.16 mAP@K of the compared methods on Brightkite
+
+several regions. The GRU network in GARG is capable of
+identifying the moving patterns, and thus improves the accu-
+racy of GARG by targeting the POIs from specific regions.
+
+Collaborative Preference Correlation Captured by
+GARG In addition to geographical correlation, the col-
+laborative preference correlation plays an important role in
+preference representation. On the Foursquare dataset, GARG
+performs similarly with UCF+G, while it outperforms the
+other baselines, as plotted in Figs. 11, 12 and 13. We exam-
+ine the results and find that the distances between POIs of
+the Foursquare dataset are far less than the other datasets.
+Geographical information on the Foursquare dataset seems
+to have less value, which is consistent with the result in
+Sect. 5.4. In this scenario, the collaborative preference mod-
+ule of GARG captures the user interests and recommends
+the POIs that the users are most likely to visit. Thus, we see
+that some matrix factorization-based strategies (UCF+G,
+GARG: Anonymous Recommendation of Point-of-Interest in Mobile Networks by Graph Convolution... 443
+
+X Previously visited Pols
+X Recently visited Pols
+
+¥% True positive
+
++. True negative
+
+Y False positive
+
+Now
+
+OW
+San Antonio
+
+' ge 4
+
+ 
+
+fie3
+
+Austin
+/ 1)
+
+Fig.17 The prediction of GARG with ground truths over a mobility
+
+pattern of narrow activity area
+
+°C
+Phoenix
+
+Tucson FI Paso
+X Previously visited Pols
+Recently visited Pols
+
+¥* True positive
+
+A. True negative
+
+Y False positive
+
+ 
+
+United States
+
+X... City Y
+
+x
+Dallas
+©
+
+x
+
+¥
+
+Ns
+‘Yaustin ¥
+° Houston
+
+c
+San Antonio
+
+Fig. 18 The prediction of GARG with ground truths over a mobility
+
+pattern of broad activity area
+
+GeoMEF) perform quite well compared to their performance
+on the other two datasets (Figs. 14, 15 and 16).
+
+In all, the comparison over the three datasets confirms the
+efficiency and accuracy of the proposed GARG.
+
+Toronto
+al 7
+- Mississauga Rochester Nb
+aa Londc o
+Madisor Milwaukee ee adon PButfak °
+hee Detroit
+ck c Cc ‘
+arR f Chicago 1 Arbor! y
+| a ( wee Toleéo_@leveland
+Naperville c New York
+Cc
+
+Peoria >
+o Pittsburgh Philadelphia
+
+a
+C Columbus
+Indianapolis
+St. Louis
+C
+
+Louisville
+Fvancville .
+
+Norfolke Virginia Beach
+
+Nashville Greensboro
+a
+
+Charlotte
+Co
+
+\X Previously visited Pols
+
+| > Recently visited Pols
+
+¥* True positive
+
+A. True negative
+
+| Y False positive Savannah
+
+ 
+
+ 
+
+Fig.19 The prediction of GARG with ground truths over a mobility
+pattern of changed activity area
+
+5.3 Case Study
+
+We sample several cases from the dataset with results pro-
+vided by GARG for demonstration. Figures 17, 18 and 19
+show three typical scenarios labeled with the historical
+check-ins (divided into recently visited POIs and the previ-
+ously visited POIs), the true-positive cases, true-negative
+cases and the false-positive cases. Specifically, the user of
+Fig. 17 visited POIs in a narrow range all the time and the
+POIs recommended by GARG are also concentrated on that
+small area; the user of Fig. 18 has a wide activity area and
+GARG recommends distributed POIs with high precision;
+the user of Fig. 19 has obviously changed her activity area,
+while GARG realizes this scenario benefiting from the GRU
+with attention mechanism and the POIs recommended by
+GARG are all around her new activity areas. These examples
+further illustrate that GARG 1s able to capture both collabo-
+rative information and sequence information successfully
+and it has the capability to automatically recognize different
+scenarios.
+
+5.4 Fine-Grained Analyses of GARG
+
+Efficiency of the Modules in GARG In this section, we fur-
+ther analyze the rationality of GARG structure by examining
+the contribution of each component in GARG. We compare
+the performance of GARG by removing the collaborative
+preference module (denoted as GARG w/o CP), removing
+the GRU (denoted as GARG w/o GRU) and removing GCN
+(denoted as GARG w/o GCN), respectively. To ensure the
+
+D) Springer
+[1 GARG w/o CP
+
+21 [= GARG w/o GRU
+So
+
+&} [=] GARG w/o GCN
+vo
+
+=
+
+Ss §
+
+>
+
+2
+
++
+
+—
+
+s 4
+
+Pre@5 Pre@20 Rec@5 Rec@20 mAP@5 mAP@20
+Metrics
+
+Fig. 20 Efficiency of modules in GARG on Gowalla
+[—] GARG wio CP
+
+[1 GARG w/o GRU
+[1 GARG w/o GCN
+
+nN
+
+N
+
+Metric Value (%)
+_
+
+Pre@5 Pre@20 Rec@5 Rec@20 mAP@5 mAP@20
+Metrics
+
+Fig.21 Efficiency of modules in GARG on Foursquare
+
+LC] GARG w/o CP
+(|) GARG w/o GRU
+C1 GARG w/o GCN
+-_) GARG
+
+Metric Value (%)
+o nn
+
+_
+
+ 
+
+Pre@5 Pre@20 Rec@5 Rec@20 mAP@5 mAP@20
+Metrics
+
+Fig. 22 Efficiency of modules in GARG on Brightkite
+
+comparability, we adopt the same hyper-parameter setting
+for three methods. Results are shown in Figs. 20, 21 and
+22. It is evident that GARG outperforms the other three
+architectures, indicating that (1) the collaborative informa-
+tion and sequence information can complement each other,
+(2) GRU with the attention mechanism adaptively captures
+the mobility pattern contained in sequence, (3) and GCN
+component automatically models the geographical influence.
+Overall, this ablation study (by removing some “feature” of
+the model to see how that affects performance) confirms the
+ability of GARG to fully integrate the content-aware infor-
+mation and sequence information.
+
+Parameter Sensitivity In this section, we study the influ-
+ence of the variable , which is the dimension of the latent
+
+D) Springer
+
+ 
+
+ 
+
+S. Wu et al.
+
+Metric Value (“%)
+
+ 
+
+Pre@5 Pre@20 Rec@5 Rec@20 mAP@5 mAP@20
+Metrics
+
+Fig. 23 Influence of latent factor dimensions in GARG on Gowalla
+
+Metric Value (%)
+
+ 
+
+Pre@5 Pre@20 Rec@5 Rec@20 mAP@5 mAP@20
+Metrics
+
+Fig. 24 Influence of latent factor dimensions in GARG on Foursquare
+
+Metric Value (“%)
+eo
+
+_
+
+ 
+
+Pre@5 Pre@20 Rec@5 Rec@20 mAP@5 mAP@20
+Metrics
+
+Fig. 25 Influence of latent factor dimensions in GARG on Brightkite
+
+embeddings, hidden state of GRU cells and the transfor-
+mation matrices. In our experiment, h is set to be 32, 64,
+128 and 256, respectively. Figures 23, 24 and 25 report the
+performance of GARG for the different values of / on the
+three datasets, respectively. The results demonstrate that the
+performance in all evaluation metrics has similar behavior
+with the varying value of h. For the Gowalla and Bright-
+kite datasets, the performance increases with the increase of
+the / at the beginning, then achieves the best performance
+when fh = 128. For the Foursquare dataset, the performance
+achieves best at h = 256. Overall, we fix the parameter
+h = 128.
+
+Impact of Different RNN Cells RNN mechanism
+is widely adopted to capture transition pattern from the
+GARG: Anonymous Recommendation of Point-of-Interest in Mobile Networks by Graph Convolution...
+
+LL] GARG w/ RNN
+[>| GARG w/ LSTM
+L] GARG
+
+Metric Value (%)
+
+Pre@5 Pre@20 Rec@5 Rec@20 mAP@5mAP@20
+Metrics
+
+Fig. 26 Impact of RNN cells on Gowalla
+
+L | GARG w/ RNN
+[=| GARG w/ LSTM
+
+N
+
+Metric Value (%)
+_
+
+Nn
+
+ 
+
+ 
+
+ 
+
+Pre@S5 Pre@20 Rec@5 Rec@20 mAP@5 mAP@20
+Metrics
+
+Fig.27 Impact of RNN cells on Foursquare
+
+L_] GARG w/ RNN
+[55) GARG w/ LSTM
+
+ 
+
+Metric Value (%)
+
+ 
+
+Pre@5 Pre@20 Rec@5 Rec@20 mAP@5mAP@20
+Metrics
+
+Fig.28 Impact of RNN cells on Brightkite
+
+sequence data. There are three common RNN cells, Le.,
+vanilla RNN, LSTM and GRU. LSTM employs gating mech-
+anism to alleviate the vanishing gradient problem, and GRU
+can be considered as a variant of LSTM. In order to study
+the effect of these three RNN cells, we replace the GRU cell
+used in GARG with vanilla RNN (denoted as GARG w/
+RNN) and LSTM (denoted as GARG w/ LSTM), respec-
+tively, and keep all other settings the equal. Figures 26, 27
+and 28 show that the performance of the model with GRU
+cells is usually better than that of vanilla RNN and LSTM
+cells.
+
+Negative Sampling Strategy The negative sampling
+techniques have impact on the modeling performance. We
+investigate three negative sampling strategies, 1.e., random
+
+ 
+
+L] Importance
+[S5) Adversarial
+[-] Random
+
+Metric Value (%)
+
+ 
+
+ 
+
+Pre@5 Pre@20 Rec@5 Rec@20 mAP@5mAP@20
+Metrics
+
+Fig.29 Impact of negative sampling strategy on Gowalla
+
+L_] Importance
+[45] Adversarial
+
+N
+
+N
+
+Metric Value (%)
+—
+
+ 
+
+Pre@5 Pre@20 Rec@5 Rec@20 mAP@5 mAP@20
+Metrics
+
+Fig.30 Impact of negative sampling strategy on Foursquare
+[-] Importance
+
+[ Adversarial
+L Random
+
+ 
+
+a
+N
+
+_
+
+Metric Value (%)
+CO
+
+ 
+
+ 
+
+Pre@5 Pre@20 Rec@5 Rec@20 mAP@5mAP@20
+Metrics
+
+Fig.31 Impact of negative sampling strategy on Brightkite
+
+sampling, importance sampling and adversarial sampling.
+Random sampling assigns equal weights to the POIs except
+the positive sample to be the negative sample corresponding
+to the positive one. Importance sampling uses the frequency
+of the POIs being visited on the training set as the impor-
+tance of the POIs. The negative samples in the adversarial
+sampling[44] are generated by the generator. Figures 29,
+30 and 31 show the performance of GARG with different
+negative sampling methods. It can be seen that the impor-
+tance sampling gets the poorest performance, because the
+embeddings of some unpopular POIs cannot be sufficiently
+learned. The random sampling outperforms than the adver-
+sarial sampling on the Gowalla and Brightkite dataset while
+the adversarial sampling perform better on the Foursquare
+
+Q) Springer
+
+445
+446
+Gowalla
+Foursquare
+Brightkite
+Fig.32 The average attention signals on three datasets
+
+dataset. Overall, the random sampling method is compa-
+rable. We believe the reason is that the random sampling
+assigns equal probability for each embedding to be trained,
+and thereby it is efficient in our setting.
+
+Attention Visualization We visualize the mean attention
+signals of the three datasets on the 20 recently visited POIs,
+as illustrated in Fig. 32. The higher the attention signal, the
+more contribution of this POI to the sequence representation.
+The result is consistent with our expectation that the latest
+visited POI is the most relevant POI to future predictions.
+Meanwhile, the non-zero attention on the previous POIs
+indicates the necessity of attention mechanism for modeling
+sequence information. Besides, there exist obvious differ-
+ences among the three datasets, which supports our state-
+ment in Sect. 5.2. For the Foursquare dataset, the attention
+signals tend to be distributed more evenly, and the reason
+might be that the POIs are distributed in a narrow area. For
+the Brightkite dataset, the back-and-forth mobility pattern
+might explain the larger average attention signals on the last
+three POIs compared to the attention signals on Gowalla.
+
+6 Conclusion
+
+Mobile LBS applications have facilitated our daily life,
+while the data sparsity problem and the lack of POI labels
+significantly degrade the performance of the common POI
+recommender systems. In this paper, we propose the GARG,
+which combines the collaborative, sequential and content-
+aware information to provide accurate POI recommenda-
+tion for anonymous mobile LBS applications. Specifically,
+GARG employs a collaborative preference module to learn
+the user embeddings via reconstructing the historical implicit
+feedback check-ins. Besides, GARG applies a Geographi-
+cal Preference module by a GRU network to capture the
+sequence information and a GCN which adapts to learning
+the content-aware correlation between POIs. Evaluations over
+three real-world check-in datasets with various mobility pat-
+terns demonstrate the improvement of GARG compared to
+the state-of-the-art POI recommender systems. GARG can be
+flexibly embedded into existing mobile applications owing
+to its outstanding generality and automatic learning ability.
+
+Author Contributions This work is done by three students under the
+guidance of two professors. The third author conducts experiments of
+
+Q) Springer
+
+S. Wu et al.
+
+some baseline methods and the rest of the work is almost equally done
+by the first two authors.
+
+Funding The work is supported by National Natural Science Founda-
+tion of China (NSFC) (No. 61832001, 61702016, 61702015), National
+Key R&D Program of China (No. 2018YFB1004403), PKU-Baidu
+Fund 2019BD006, Beijing Academy of Artificial Intelligence (BAAD),
+and PKU Tencent joint research Lab.
+
+Availability of data and materials We conduct experiments on the
+three public datasets, of which the accessible links are attached in the
+footnote.
+
+Open Access This article is licensed under a Creative Commons Attri-
+bution 4.0 International License, which permits use, sharing, adapta-
+tion, distribution and reproduction in any medium or format, as long
+as you give appropriate credit to the original author(s) and the source,
+provide a link to the Creative Commons licence, and indicate if changes
+were made. The images or other third party material in this article are
+included in the article’s Creative Commons licence, unless indicated
+otherwise in a credit line to the material. If material is not included in
+the article’s Creative Commons licence and your intended use is not
+permitted by statutory regulation or exceeds the permitted use, you will
+need to obtain permission directly from the copyright holder. To view a
+copy of this licence, visit http://creativecommons.org/licenses/by/4.0/.
+
+References
+
+1. Yin H, Cui B, Zhou X, Wang W, Huang Z, Sadiq S (2016) Joint
+modeling of user check-in behaviors for real-time point-of-interest
+recommendation. ACM Trans Inf Syst (TOIS) 35(2):1-44
+
+2. Cho E, Myers SA, Leskovec J (2011) Friendship and mobility:
+user movement in location-based social networks. In: SIGKDD.
+ACM, pp 1082-1090
+
+3. Yin H, Cui B (2016) Spatio-temporal recommendation in social
+media. Springer, Berlin
+
+4. Yin H, Cui B, Chen L, Hu Z, Zhang C (2015) Modeling loca-
+tion-based user rating profiles for personalized recommenda-
+tion. ACM Trans Knowl Discov Data (TKDD) 9(3):1-41
+
+5. Yang C, Bai L, Zhang C, Yuan Q, Han J (2017) Bridging col-
+laborative filtering and semi-supervised learning: a neural
+approach for poi recommendation. In: SIGKDD. ACM, pp
+1245-1254
+
+6. Wang H, Shen H, Ouyang W, Cheng X (2018) Exploiting poi-
+specific geographical influence for point-of-interest recommenda-
+tion. In: ICAI, pp 3877-3883
+
+7. Xie M, Yin H, Wang H, Xu F, Chen W, Wang S (2016) Learning
+graph-based poi embedding for location-based recommendation.
+In: CIKM. ACM, pp 15-24
+
+8. MaC, Zhang Y, Wang Q, Liu X (2018) Point-of-interest recom-
+mendation: Exploiting self-attentive autoencoders with neighbor-
+aware influence. In: CIKM. ACM, pp 697—706
+
+9. Zhang J-D, Chow C-Y, Li Y (2014) Lore: Exploiting sequential
+influence for location recommendations. In: Proceedings of the
+22nd ACM SIGSPATIAL international conference on advances
+in geographic information systems. ACM, pp 103-112
+
+10. Yuan Q, Cong G, Ma Z, Sun A, Thalmann NM (2013) Time-aware
+point-of-interest recommendation. In: SIGIR. ACM, pp 363-372
+
+11. Yin H, Zhou X, Cui B, Wang H, Zheng K, Nguyen QVH (2016)
+Adapting to user interest drift for poi recommendation. TKDE
+28(10):2566—2581
+GARG: Anonymous Recommendation of Point-of-Interest in Mobile Networks by Graph Convolution...
+
+12.
+
+13.
+
+14.
+
+15.
+
+16.
+
+17.
+
+18.
+
+19.
+
+20.
+
+21.
+
+22.
+
+23.
+
+24.
+
+25.
+
+26.
+
+27.
+
+28.
+
+Zhao P, Zhu H, Liu Y, Li Z, Xu J, Sheng VS (2019) Where to go
+next: A spatio-temporal Istm model for next poi recommendation.
+In: AAAI
+
+Guo L, Zhang D, Wang Y, Wu H, Cui B, Tan K-L (2018) Co2:
+inferring personal interests from raw footprints by connecting the
+offline world with the online world. ACM Trans Inf Syst (TOIS)
+36(3):1-29
+
+Liu Y, Wei W, Sun A, Miao C (2014) Exploiting geographical
+neighborhood characteristics for location recommendation. In:
+CIKM. ACM, pp 739-748
+
+Zhao S, Zhao T, King I, Lyu MR (2017) Geo-teaser: Geo-temporal
+sequential embedding rank for point-of-interest recommendation.
+In: WWW. International World Wide Web Conferences Steering
+Committee, pp 153-162
+
+Kong D, Wu F (2018) HST-LSTM: a hierarchical spatial-tempo-
+ral long-short term memory network for location prediction. In
+IJCAI, pp 2341-2347
+
+Liu B, Fu Y, Yao Z, Xiong H (2013) Learning geographical prefer-
+ences for point-of-interest recommendation. In: SIGKDD. ACM,
+pp 1043-1051
+
+Mnih A, Salakhutdinov RR (2008) Probabilistic matrix factoriza-
+tion. In: NIPS, pp 1257-1264
+
+Park M-H, Hong J-H, Cho S-B (2007) Location-based recommen-
+dation system using bayesian user’s preference model in mobile
+devices. In: Ubicomp. Springer, Berlin, pp 1130-1139
+
+Zhao S, King I, Lyu MR (2013) Capturing geographical influence
+in poi recommendations. In: International Conference on Neural
+Information Processing. Springer, pp 530-537
+
+Ye M, Yin P, Lee W-C, Lee D-L (2011) Exploiting geographical
+influence for collaborative point-of-interest recommendation. In:
+SIGIR. ACM, pp 325-334
+
+Li X, Cong G, Li X-L, Pham T-AN, Krishnaswamy S (2015)
+Rank-geofm: A ranking based geographical factorization method
+for point of interest recommendation. In: SIGIR. ACM, pp
+433-442
+
+Cheng C, Yang H, King I, Lyu MR (2012) Fused matrix factori-
+zation with geographical and social influence in location-based
+social networks. In: AAAT
+
+Lian D, Zhao C, Xie X, Sun G, Chen E, Rui Y (2014) Geomf:
+joint geographical modeling and matrix factorization for point-of-
+interest recommendation. In: SIGKDD. ACM, pp 831-840
+
+Liu W, Wang Z-J, Yao B, Yin J (2019) Geo-alm: Poi recommenda-
+tion by fusing geographical information and adversarial learning
+mechanism. In: Proceedings of the 28th International Joint Con-
+ference on Artificial Intelligence. AAAI Press, pp 1807-1813
+Su Y, Li X, Zha D, Tang W, Jiang Y, Xiang J, Gao N (2019)
+HREC: heterogeneous graph embedding-based personalized
+point-of-interest recommendation. In: International conference
+on neural information processing. Springer, pp 37-49
+Christoforidis G, Kefalas P, Papadopoulos A, Manolopoulos Y
+(2018) Recommendation of points-of-interest using graph embed-
+dings. In: 2018 IEEE 5th international conference on data science
+and advanced analytics (DSAA). IEEE, pp 31-40
+
+Debnath M, Tripathi PK, Elmasri R (2016) Preference-aware suc-
+cessive poi recommendation with spatial and temporal influence.
+
+29.
+
+30.
+
+31.
+
+32.
+
+33.
+
+34.
+
+35.
+
+36.
+
+37.
+
+38.
+
+39,
+
+40.
+
+4].
+
+42.
+
+43.
+
+44.
+
+447
+
+In: International conference on social informatics. Springer, pp
+347-360
+
+Zhang Z, Li C, Wu Z, Sun A, Ye D, Luo X (2020) Next: a neural
+network framework for next poi recommendation. Front Comput
+Sci 14(2):314—-333
+
+Zhou F, Yin R, Zhang K, Trajcevski G, Zhong T, Wu J (2019)
+Adversarial point-of-interest recommendation. In: The world wide
+web conference, pp 3462-3468
+
+Zhao S, Zhao T, Yang H, Lyu MR, King I (2016) Stellar: spatial-
+temporal latent ranking for successive point-of-interest recom-
+mendation. In: 30th AAAI conference on artificial intelligence
+Liu Q, Wu S, Wang L, Tan T (2016) Predicting the next location:
+a recurrent model with spatial and temporal contexts. In: 30th
+AAAI conference on artificial intelligence
+
+Hochreiter S, Schmidhuber J (1997) Long short-term memory.
+Neural Comput 9(8):1735—1780
+
+Li R, Shen Y, Zhu Y (2018) Next point-of-interest recommenda-
+tion with temporal and multi-level context attention. In: ICDM.
+IEEE, pp 1110-1115
+
+Liu T, Liao J, Wu Z, Wang Y, Wang J (2020) Exploiting geo-
+graphical-temporal awareness attention for next point-of-interest
+recommendation. Neurocomputing
+
+Liu T, Liao J, Wu Z, Wang Y, Wang J (2019) A geographical-
+temporal awareness hierarchical attention network for next point-
+of-interest recommendation. In: Proceedings of the 2019 on inter-
+national conference on multimedia retrieval, pp 7-15
+
+Li L, Liu Y, Wu J, He L, Ren G (2019) Multi-modal representation
+learning for successive poi recommendation. In: Asian conference
+on machine learning, pp 441-456
+
+Yang D, Zhang D, Zheng VW, Yu Z (2015) Modeling user activity
+preference by leveraging user spatial temporal characteristics in
+LBSNS. IEEE Trans Syst Man Cybern Syst 45(1):129-142
+Luong M-T, Pham H, Manning CD (2015) Effective approaches to
+attention-based neural machine translation. arXiv preprint arXiv
+:1508.04025
+
+Kipf TN, Welling M (2016) Semi-supervised classification with
+graph convolutional networks. arXiv preprint arXiv: 1609.02907
+Rendle S, Freudenthaler C, Schmidt-Thieme L (2010) Factorizing
+personalized markov chains for next-basket recommendation. In:
+Proceedings of the 19th international conference on World wide
+web. ACM, pp 811-820
+
+Li J, Ren P, Chen Z, Ren Z, Lian T, Ma J (2017) Neural attentive
+session-based recommendation. In :Proceedings of the 2017 ACM
+on conference on information and knowledge management. ACM,
+pp 1419-1428
+
+Yu B, Yin H, Zhu Z (2017) Spatio-temporal graph convolutional
+networks: A deep learning framework for traffic forecasting. arXiv
+preprint arXiv:1709.04875
+
+Wang J, Yu L, Zhang W, Gong Y, Xu Y, Wang B, Zhang P, Zhang
+D (2017) Irgan: A minimax game for unifying generative and
+discriminative information retrieval models. In: Proceedings of
+the 40th international ACM SIGIR conference on research and
+development in information retrieval, pp 515-524
+
+Q) Springer

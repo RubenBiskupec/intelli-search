@@ -1,0 +1,918 @@
+Simulation Modelling Practice and Theory 105 (2020) 102143
+
+ 
+
+a
+
+Contents lists available at ScienceDirect
+
+SIMULATION
+MODELLING
+PRACTICE
+
+AND THEORY
+
+    
+
+Simulation Modelling Practice and Theory
+
+FS
+
+ 
+
+VIER journal homepage: www.elsevier.com/locate/simpat
+
+ 
+
+Continuous fields: Enhanced in-vehicle anomaly detection using
+
+Check for
+
+machine learning models ates
+
+ 
+
+Florian Fenzl**, Roland Rieke“, Yannick Chevalier’, Andreas Dominik’,
+Igor Kotenko“
+
+* University of Applied Sciences Mittelhessen, Giessen, Germany
+
+> Paul Sabatier University, IRIT, Toulouse, France
+
+© Fraunhofer Institute for Secure Information Technology, Darmstadt, Germany
+4ITMO University, St. Petersburg, Russia
+
+ 
+
+ 
+
+ 
+
+ARTICLE INFO ABSTRACT
+
+Keywords: The attack surface of a modern vehicle increases with its connectivity. A strategy to prevent
+Controller area network security attacks or at least to identify such attacks and to mitigate their effects is therefore imperative. The
+Intrusion detection detection of indications for intrusive behavior in an in-vehicle network is an important aspect of a
+
+Anomaly detection
+Machine learning
+Automotive security
+Security monitoring
+
+holistic security concept. The structure of the payload of in-vehicle messages with respect to the
+encoded sensor values is in general confidential. Therefore, most researchers consider the
+structure of the in-vehicle messages to be bit- or byte-fields. However, this may hide anomalies
+which are characterized by correlations between sensor values transferred by the in-vehicle
+messages.
+
+In this work, we evaluate the influence of accuracy of the model of the payload structure with
+respect to the actual sensor values on the results of different intrusion detection methods. In
+particular, we analyze if an improved alignment is helpful to detect anomalies introduced by
+stealthy intrusions.
+
+In order to cover conceptually different modeling and reasoning techniques, we adapted a
+deep learning approach as well as a characteristic functions based intrusion detection approach
+to utilize such message streams. An important aspect is that the explainability of the results is
+better compared to deep learning systems.
+
+We further developed a set of test vectors based on log files of a vehicle enriched by different
+intrusions. In particular, we included simulations of stealthy intrusions which mask certain
+sensor values within the respective messages. The effectiveness of the developed methods is
+demonstrated by various experiments.
+
+ 
+
+1. Introduction
+
+The automotive industry is facing new challenges in protecting customers from cybersecurity attacks due to the extreme con-
+nectivity which is required by automated driving. Connectivity does not only require new interfaces between the control functions
+within vehicles but also between vehicles and their operating environment [1]. These connections open up new ways for attackers to
+access safety relevant subsystems within a car. Attacks based on remote injection of malicious messages to safety critical Electronic
+
+* Corresponding author at: Fraunhofer Institute for Secure Information Technology, Darmstadt, Germany.
+E-mail address: roland.rieke@sit.fraunhofer.de (R. Rieke).
+
+https://doi.org/10.1016/j.simpat.2020.102143
+
+Received 2 March 2020; Received in revised form 9 June 2020; Accepted 25 June 2020
+
+Available online 27 June 2020
+
+1569-190X/ © 2020 The Authors. Published by Elsevier B.V. This is an open access article under the CC BY license
+(http://creativecommons.org/licenses/BY/4.0/).
+F. Fenzl, et al. Simulation Modelling Practice and Theory 105 (2020) 102143
+
+Control Units (ECUs) to trigger physical actions, e.g. steering and braking, have already been demonstrated in [2,3], as well as for
+modern electric cars in [4]. Aside from the manipulation of the vehicles physical behavior, there is also a risk for access or ma-
+nipulation of information displayed to the driver (e.g. speedometer). Thus it is very important to improve security of in-vehicle
+networks. As long as there are no effective means to prevent specific attacks, in particular, concerning new attack techniques that
+were unknown at the time of development, it is imperative to detect new threats and address vulnerabilities affecting released
+vehicles [1]. For the detection of such threats, the classification models should be as accurate as possible, due to false alarms leading
+to unnecessary degradation of vehicle usability. The models should be as resource-efficient as possible, and should not require
+hardware changes. Finally, the anomaly classification results should be explainable in order to assess possible countermeasures.
+
+In order to address these requirements, in our previous work [5] we proposed a logical analysis method as an alternative to a deep
+neural network based method, where both could probably be applied in embedded systems inside vehicles. We aim for better
+accuracy, faster and more resource-efficient characterization of messages, portability to embedded systems, as well as transparency
+and explainability of the detection models.
+
+The main contribution of this work is the design and implementation of a continuous field classification (CFC) algorithm building
+on previous results of Markovitz et al. [6] to compute an alignment of Controller Area Network (CAN) bus payload. We adapted two
+conceptually different machine learning methods from our previous work [5] and evaluated the influence of input data models on
+accuracy of these in-vehicle anomaly detection models. We further developed a set of test vectors based on log files of a vehicle
+enriched by different intrusions including simulations of stealthy intrusions, which only mask certain sensor values within specific
+CAN messages and are therefore difficult to detect. The effectiveness of the proposed methods is demonstrated by a comparative
+study of the behavior of the two detection models with respect to input structured in byte boundaries versus structured by the method
+from [6] and the optimized CFC algorithm. This approach is aimed to generate generic intrusion detection models, that do not rely on
+information only available to manufacturers. Therefore this kind of approach might enable third party intrusion detection systems for
+a wide variety of vehicles or assist in research for the classification of malicious messages in data for non-automotive areas.
+
+The structure of the paper is as follows. Section 2 gives an overview on the background and related work. Section 3 introduces
+attack simulation for model training and testing. Section 4 describes our approach to model input analysis by CFC in detail. Section 5
+outlines results from tests with deep neural networks. Section 6 presents the principles of the characteristic functions approach and
+the results of various detection setups. Section 7 discusses these outcomes. Finally, Section 8 concludes this paper.
+
+2. Background and related work
+
+Despite the trend to use Automotive Ethernet in recent in-vehicle architectures, CAN bus is still in use and can be utilized to attack
+modern vehicles [4]. The standardized automotive open system architecture (AUTOSAR) specified a module for secure onboard
+communication (SecOC) to check the authenticity of protocol data units. SecOC adds a message and freshness value to each frame.
+Due to the limited frame size of 8 byte in classical CAN, only a very small part of the MAC and freshness value can be used in cases
+where the payload does not use the whole frame. The MAC could also be sent in an extra frame, however, this is not accepable in
+many cases because of the impact on the busload. SecOC also has subtle problems with synchronisation on CAN [7]. Thus, SecOC is of
+limited use on classical CAN bus [8], and in fact we have not found any SecOC artifacts in the log files which we used for our work.
+
+As a result of this not yet adopted authentication of ECUs, it is possible to launch impersonation attacks, where one ECU — which is
+already controlled by an attacker — sends messages that utilize an ID of another ECU. Most current research approaches on the
+detection of such ECU impersonating attacks use some kind of physical fingerprinting by voltage or timing analysis with specific
+hardware [9,10]. Said approaches seek to mitigate the problem of CAN message authentication and thus are complementary to the
+work presented here.
+
+The detection of specification violations is another possibility to detect attacks. The work on specification based intrusion de-
+tection methods uses, for example, checks for formality, protocol and data range [11], a specific frequency sensor [12], a set of
+network based detection sensors [13], or state machines [14]. These methods can not detect attacks that act within the specified
+ranges but they have the advantage to avoid false positives.
+
+In order to detect message insertions where malicious packages are inserted outside their usual frequency Taylor et al. [15]
+implemented a method using One-Class Support Vector Machines (OCSVM) and Song et al. [16] proposed a lightweight intrusion
+detection system based on small time differences, while Wei et al. utilize LSTM [17].
+
+In case the attacker acts within the given specifications and does not attract attention by obvious frequency manipulation,
+methods for detection of sequence context anomalies can possibly be applied. These methods comprise OCSVM [18], neural net-
+works [19], hidden Markov models [20,21], process mining [22] or time series analysis [23], Hamming distance between payloads of
+two consecutive messages with same CAN ID [24], transition matrix [25] for valid ID sequences, and characteristic functions [5]
+focused on the validity of payload values and changes in said values. We also adapted the latter approach of Chevalier et al. [5] for
+this work.
+
+Comparisons of different Machine Learning (ML) algorithms for intrusion detection within CAN data are given in [26] and [27].
+LSTM, Gated Recurrent Units (GRU) and Markov models are used in [26], while OCSVM, SVM, sequential neural networks and LSTM
+are used in [27]. Surveys on intrusion detection systems for in-vehicle networks are provided in [28] and [29].
+
+Because the content structure and semantics of the CAN payload is usually kept secret, most methods mentioned above view the
+payload as unstructured sequence of 8 bytes [23] or 64 bits. In order to overcome this problem, [6] and [30] implemented methods
+for field classification to reverse engineer information from CAN messages. In this work, we adapted and enhanced the approach
+proposed by Markovitz et al. [6] for more continuous field classification.
+F. Fenzl, et al. Simulation Modelling Practice and Theory 105 (2020) 102143
+
+3. Attack simulation for model training and testing
+
+Each CAN data frame contains its own ID, the length of data in bytes and 0 to 8 bytes of data. The data is not necessarily byte
+aligned and does not contain a fixed amount of distinct values. In case a data base CAN (DBC) file is available, a recorded log file can
+be split into the different sensor values occurring therein. The formats for all CAN bus values values are not standardized and differ
+from one vehicle to another, especially in between manufacturers. Since this information could assist intruders in finding exploits and
+gaining access to otherwise locked systems, DBC files and the accurate division of data are often kept secret. Due to this a multitude of
+intrusion detection approaches such as Chevalier et al.[5] or Taylor et al.[31] utilize a byte-wise or bit-wise view on the data. This
+may lead to a distortion of the data and might make it harder to detect intrusions. Therefore, a reverse engineering approach for
+message interpretation is evaluated as a focus of this work.
+
+For our research we use an approximately 10 minutes long log file recorded from a Renault Zoe electric car. This log file was
+recorded in an urban environment with mixed sections of driving up to about 30km/h and standing still. All in all this log contains 1
+million messages with 110 different IDs being used. The original data set contains no intrusions and was previously used in process
+mining [22], for machine learning methods using neural networks [27] and characteristic functions [5].
+
+In the following we will reference and use two specific IDs from the recorded log file as examples and targets for directed attacks.
+These IDs, 0x5d7 and 0x29a, contain a set of interesting sensor values, such as the vehicle's speedometer or revolutions per minute
+for the wheels, as well as additional values with different behaviours.
+
+For this approach we only utilize the messages payload and do not observe irregularities for other metadata, such as the time-
+stamp.
+
+3.1. Intrusion generation mechanism
+
+For training and testing we implemented an intrusion generation mechanism that supports three different methods of intrusion.
+
+The most basic intrusion method is a denial of service type, where messages with a small, dominant ID are introduced in high
+quantities to the CAN bus. Due to the priority-based scheme of the CAN these dominant messages suppress valid messages from other
+ECUs [32]. This type of intrusion may send random values, fixed values or a mixture of both on either a random ID, specific ID target
+or range of IDs. Messages introduced in this way will be uniformly distributed within a previously set time span.
+
+Another type of intrusion is a targeted manipulation of messages from a specific ID over the course of a given time span. The
+message ID will not be changed, but the payload will be manipulated. It is possible to keep some bytes, while changing others to fixed
+values or randomizing them. A possible scenario for an manipulation intrusion would be to change the information displayed to the
+driver. This is considered in our testing scenarios later on through the manipulation of the sensor values for speedometer and
+revolutions per minute.
+
+The last possible type of intrusion is the deletion of messages for a specific ID or range of IDs over a given time span. This type of
+intrusion is hard to detect using rule based intrusion detection, but also difficult to introduce by an actual intruder. For our testing
+scenarios later on we disregard this type of intrusion completely, due to the fact that both approaches tested are unable to classify
+deletion reliably.
+
+The manipulation and generation of an intrusion messages’ payload is performed byte-wise. The actual decoded sensor values of a
+message are not necessarily byte-aligned. For testing purposes and due to CANs high vulnerability to this type of intrusion [32] we
+primarily used versions of the denial of service intrusion method with different types of generated data. An exemplary excerpt of an
+intruded log file can be seen in Table 1. Intrusions are tagged with a -1 value in the type field, where normal messages show a 1.
+
+3.2. Test vectors
+
+The direct modification of any data streams within a vehicle, either by integrating new intrusion detection tools or by inserting
+attack messages, may damage the vehicle and risk physical hazards, e.g., high voltage, or airbag explosives, which may harm the life
+and limb of researchers [33]. Thus, for our work we used log files taken from an electric car as described above and composed a set of
+synthetic logs with different inserted attack messages in order to test against different scenarios.
+
+Stationary In addition to the main log used in training a second log has been recorded on standing vehicle. This log file is 188.3s
+long in total and contains 355,957 messages in total. There were no intrusions applied to this log file.
+
+Fuzzy A randomized denial of service intruder. Over the course of the log file a total of 32.000 messages with randomized IDs
+between 0 and 2046. For these introduced messages all bits are randomly set.
+
+Table 1
+Exemplary log file excerpt introduced with one randomized denial of service intruder. p1 to p8 are the respective bytes of the message payload.
+Time ID pl p2 p3 p4 po p6 p7 ps type
+45.185064 0x5da7 0 180 0 182 96 689 0 3041 1
+45.205041 Ox5da7 0 181 24 182 96 692 0 3282 1
+45.211704 Ox5da7 0 209 79 179 218 740 71 3238 -1
+45.225042 Ox5da7 0 180 40 182 0 695 0 3546 1
+45.241933 Ox5da7 119 231 196 11 101 244 0 16 -1
+F. Fenzl, et al. Simulation Modelling Practice and Theory 105 (2020) 102143
+
+Payload A denial of service intruder similar to Fuzzy. Instead of using a randomized identifier, for each message an identifier
+previously observed in the log file is used.
+
+Speed An intrusion directed only at ID 0x5d7 (1495). Over the course of 50s, in between second 100 and 150, a manipulation
+intrusion is introduced, targeted at the first and second byte. Those bytes are set to 0 while the remaining payload is left unchanged.
+In total 500 messages are manipulated.
+
+RPM _Front_Left An intrusion directed only at ID 0x29a (666). Over the course of 50s, in between second 400 and 450, a ma-
+nipulation intrusion is introduced targeted at the fourth and fifth byte. Those bytes are set to 0 while the remaining payload is left
+unchanged. In total 2500 messages are manipulated.
+
+The last two intrusions target two sensor values directly. These intrusions mask the actual values for revolutions per minute for
+the front left wheel as well as the speed value displayed to the driver. This intrusion is inspired by the Speedometer intrusion on a Ford
+vehicle done by Miller and Valasek [2].
+
+4. Model input analysis by field classification
+4.1. Continuous Field Classification
+
+The approach developed in this work is a modified version of the field classification method described by Markovitz et al. [6]. In
+this approach fields are divided into three different classes with clear division:
+
+Constant The value of the field does not change throughout the log file.
+
+Multi-Value The field shows only a small amount of different values throughout the log file. The maximum number of allowed
+unique values was set to 16. The maximum number of 16 was selected by comparing test results during earlier phases of im-
+plementation and testing.
+
+Sensor The field is not classified as Constant or Multi-Value due to containing more than 16 unique values.
+
+For classification at first a set of all possible fields is created. With a data length of 64 bits there are (64 + 1)*64/2 = 2080 possible
+fields [6]. We did limit the maximum length of a field to a configurable parameter | to prevent the classification of too large fields.
+The maximum size of a field for testing purposes was set to 16 bits.
+
+The next step is to count unique values for each field. Values are always determined in an big-endian ordering, converted directly
+to integer values. For reasons of performance and simplicity the possibility of a field being of little-endian ordering or stored as a
+floating point number is disregarded.
+
+In addition to the unique value count we decided to also count the absolute differences in between two consecutive field values.
+These values are later used in our addition to the scoring system.
+
+Afterwards all fields will be typed and scored accordingly. Constant and Multi-Value fields are scored equal to the length of the
+field. The score for Sensor fields according to the original implementation is calculated using the following formula
+
+k?/2! (1)
+
+Field Classification
+where k is the number of unique values and I is the length of the field.
+In our modified version we multiply this score with an additional factor as follows
+
+_{i1
+k 2/2) D/ = D? 1/3
+f CE | | (2)
+
+Continuous Field Classification
+
+with n being the number of messages, D is the list of differences between two messages, D is the sum of all differences and D; is the
+difference between the messages i and i — 1. In the following we refer to this modified approach as Continuous Field Classification.
+
+By scaling each individual change in between values and comparing the scaled delta to the non-scaled value, we are able to
+determine how continuous the change within the field behaves. Fields with a high number of anomalous values and therefore
+anomalous changes in between two consecutive values will decrease the score, whereas continuous, slowly scaling values are re-
+warded. The constant factors of the formula have been determined during the test phase.
+
+After scoring and classification, a maximum number of m non-overlapping fields with the highest scores is chosen. The maximum
+number of fields was set to 8 for testing. Should there be less than 8 fields classified that cover the complete 64 bit then empty zero
+value fields will be added to the classified data for simplicity. The classified types of fields obtained from the classification are not
+further used in the our method of intrusion detection. The main focus lies on the split of bits proposed by the field classification.
+
+4.2. Field alignment evaluation
+
+Using the original and the Continuous Field Classification algorithm two alignment files were generated from a clean version of
+the recorded log. In Fig. 1a and 1 b the splittings of the fields of the messages with ID 0x5d7, which is used in our Speed test vector,
+and ID 0x29a, which is used in our RPM Front Left test vector, are shown. For the field classification algorithm the original
+scoring method [6] and our Continuous Field Classification method are separately depicted. The last row of the tables shows for
+comparison the field separation retrieved from a DBC file which was extracted from the open source software project CanZE[34].
+F. Fenzl, et al. Simulation Modelling Practice and Theory 105 (2020) 102143
+
+ 
+
+(a) Payload Structure of CAN ID 0x29a (b) Payload Structure of CAN ID 0x5d7
+
+Fig. 1. Comparison of field alignments from field classification methods Fc and CFC with field alignments from CanZE [34] DBC file for two
+exemplary Identifiers.
+
+The numbers displayed in each segment are the fields width in bits, whereas the upper row corresponds to a byte-alignment where
+every segment is 8 bits wide. Each row is 64 bits wide in total, the complete length of a message payload with big-endian ordering.
+Fields marked with * in the DBC field alignment are not assigned to any sensor in the DBC file and are assumed to be unused. The
+maximum length of a field was limited to 16. Multi-Value fields are set to have a maximum of 16 unique values.
+
+In Fig. 1a the field classification and DBC alignments for ID 0x2 9a (666) are visualized. The DBC alignment is separated into three
+larger 16 bit wide fields and two smaller, one 4 bit and one 8 bit long fields, with an unused 4 bit wide field in between the three
+larger and two smaller fields. The field classification with the previously described parameters yields 8 separate fields in both cases,
+Field Classification (FC) and Continuous Field Classification (CFC), with width differences in the leftmost field, as well as in the sixth
+field from the left. Using the modified scoring method the leftmost field is classified as 1 bit smaller and the sixth field is 1 bit larger.
+
+The distinctions of the one byte difference within the alignments are visualized in Fig. 2. For the original scoring method values
+above a certain threshold are cut off, whereas the modified function does yield a more continuous course. The alignments for ID
+0x5d7 (1495) are visualized in Fig. 1b. There are seven fields classified with the CFC method and eight fields using the FC scoring
+method. The data from the CFC alignment will further be padded with an additional zero value field. According to the DBC file the
+data contains three different fields with a total of 15 bits unused. The leftmost field is 16 bits long followed by a 28 bit wide field. The
+subsequent 6 bits are unused as well as the rightmost 9 bits with a 5 bit wide field in between. The visualization of the second left DBC
+alignment with 28 bits width from Fig. 1b is shown in Fig. 3a. The CanZE DBC file labels this field as the vehicles Odometer value.
+The curve is monotonically increasing over the entire time period with 111 unique values between 9819 and 9929. This log file does
+contain approximately 5000 messages. As seen in the CFC alignment within this bit range three fields were classified. The 16 bit long
+alignment is not shown in the corresponding plot due to it being a single value field. Both 9 bit long fields to the left of said single
+value field are shown in the bottom row.
+
+With the smaller alignments seen in Fig. 3 the misclassification of the field might only show a relatively small impact on the
+training in total. The left 9 bit field does show similar characteristics to the original 28 bit field where it is monotonically increasing
+with the same set of possible change values in between two consecutive messages of either O or 1. For the second 9 bit field the
+looping behavior might have a higher effect on training. With byte alignments this problem would have been the same because the
+byte alignments show a similar curve for the respective part of the payload.
+
+5. Deep learning
+5.1. Detection models
+
+Deep Learning models were created with the Keras library using the Tensorflow backend [35,36]. The model consists of an input
+layer, two hidden layers with 25 neurons each and a single output neuron. Initial weights were normally distributed (see Fig. 4).
+
+ReLU (rectified linear unit) was used as activation function for the hidden layers, which is a computationally cheap method that
+evaluates to zero for all negative values and identity for positive values. Activation of the output neuron is modified with a sigmoid
+
+ 
+
+800
+
+600
+g g
+
+o 7 400
+> >
+
+200
+
+0
+
+100 200 300 400 500 100 200 300 400 500
+time time
+(a) Field Classification (b) Continuous Field Classification
+
+Fig. 2. Different alignments of the second field from Fig. 1a.
+F. Fenzl, et al. Simulation Modelling Practice and Theory 105 (2020) 102143
+
+9920 400
+214
+9900
+212 300
+oO vo ov
+5 7680 2 210 = — p5
+g > > 200
+9860 208
+9840 206 100
+204
+9820 0
+100 200 300 400 500 100 200 300 400 500 100 200 300 400 500
+time time time
+(a) CanZE DBC file [34] (b) Continuous Field Classification
+
+Fig. 3. Exemplary field from ID 0x5d7 (1495) where a large has been split into smaller fields through the Continuous Field Classification method.
+Both those fields are located in a similar area as the decoded field above.
+
+Input Layer Hidden Layer Hidden Layer Output Layer
+
+ky
+
+     
+
+Itp
+
+ 
+
+ 
+
+ 
+
+Fig. 4. Neural network structure; epochs: 20, batch size: 100, validation split: 0.2.
+
+activation function to limit the model output to a range between 0 an 1.
+
+The model was then compiled using binary cross-entropy as the loss function and the Adam [37] optimizer. Binary cross-entropy
+is the most commonly used method of performance measurement for models with a classification purpose and binary output va-
+lues [38], whereas Adam provides first-order gradient-based optimization [37]. Parameters for the Adam optimizer were left as
+default in the Keras [36] implementation.
+
+A vector containing the messages payload split into eight fields is used as model input. In addition, we utilize the previous
+messages payload from the same ID formatted in the same way, as well as the messages identifier. For this portion of the training data
+the previous message of the same ID is chosen regardless of whether it is an intrusion or valid message. Additionally a set of all valid
+messages concatenated with the previous valid messages is used as training data. This is done to not only train on an intruded log but
+also on a clean log file. Other information from the message such as the Data Length Code (DLC) or the time stamp are disregarded for
+this test.
+
+Table 2
+
+Training results of standard neural network approach using byte alignments, as well as alignments from the Field Classification and Continuous Field
+Classification method; Train./Val. Size - number of messages in training/validation data; Train./Val. Acc. - accuracy of the model for respective data;
+Time - total training time.
+
+Alignment Train. Size Val. Size Train. Acc. Val. Acc. Time
+
+Byte-Aligned 1,697,585 424,397 0.9967 0.9965 4m48s
+Field Classification 1,697,585 424,397 0.9928 0.9929 4m41s
+Continuous Field Classification 1,697,585 424,397 0.9934 0.9934 4m33s
+F. Fenzl, et al. Simulation Modelling Practice and Theory 105 (2020) 102143
+
+accuracy accuracy
+validation accuracy , validation accuracy
+
+accuracy
+validation accuracy
+
+loss
+validation loss
+
+loss loss
+validation loss , validation loss
+
+  
+
+0 5 10 15 20 0 5 10 15 20
+epoch epoch epoch
+(a) Byte-alignment (b) FC (c) CFC
+
+Fig. 5. Training process of neural network approach for different alignments.
+
+5.2. Model construction
+
+Results for the deep learning method after 25 epochs of training are shown in Table 2. The training data contains ~ 1.100.000
+messages, 96.000 of which are introduced intrusion messages. All messages were preprocessed to match the input format of the
+model and then shuffled and split in an 80/20 ratio for training and validation. The predicted accuracy of the model is above 99
+percent for training as well as for validation. The models trained contain 1776 trainable parameters.
+
+The progress of training is further visualized in Fig. 5. Both accuracy values for validation and training data already reach their
+approximate maximum value before the fifth epoch and increase only slightly afterwards. After epoch 5 both loss and validation loss
+are close to zero with slight fluctuations.
+
+5.3. Intrusion detection
+
+For the following tables not only the results for the field classification alignments are shown but also for the CanZE[34] DBC
+alignments. These results are only for comparison and will not be further discussed, unless they vary significantly. This is due to the
+fact that the primary goal of this approach is to create a method to classify fields and intrusions without access to a DBC file.
+
+Results from the machine learning approach are shown in Table 3.
+
+As all intrusion scenarios are introduced to the same log file, with the exception of the Stationary scenario, most results will show
+similar numbers for true negative values, which should give a value of 1012991 in combination with the respective false positive result.
+
+The Stationary log file was classified noticeably better using the Continuous Field Classification approach. However, a high
+
+Table 3
+Results of intrusion detection using the deep learning method. TP/FP/TN/FN: true/false positives/negatives; Precision (Positive Predictive Value)
+PPV = TP/(TP + FP); Recall (True Positive Rate) TPR = TP/(TP + FN); Accuracy ACC = (TP + TN)/(TP + TN + FP + FN).
+
+Test file Alignment TP FP TN FN ACC PPV TPR
+Stationary Byte 0 12,091 343,866 0 96.60 0 NA
+DBC 0 6082 349,875 0 98.29 0 NA
+FC 0 14,287 341,679 0 95.99 0 NA
+CFC 0 1342 354,624 0 99.62 0 NA
+Fuzzy Byte 30,383 612 1,012,379 1617 99.79 98.03 94.95
+DBC 30,275 409 1,012,582 1725 99.79 98.67 94.61
+FC 31,212 158 1,012,833 788 99.91 99.5 97.54
+CFC 31,254 227 1,012,764 746 99.91 99.28 97.67
+Payload Byte 30,691 1885 1,011,106 1309 99.70 94.21 95.91
+DBC 24,206 1691 1,011,300 7794 99.09 93.47 75.64
+FC 26,264 1006 1,011,985 5736 99.35 96.31 82.08
+CFC 25,303 1046 1,011,945 6697 99.26 96.03 79.07
+Speed Byte 0 549 1,011,942 500 99.90 0 0
+DBC 0 336 1,012,155 500 99.92 0 0
+FC 0 107 1,012,384 500 99.94 0 0
+CFC 0 177 1,012,314 500 99.93 0 0
+RPM Front Left Byte 0 547 1,009,944 2500 99.7 0 0
+DBC 0 336 1,010,155 2500 99.72 0 0
+FC 1807 105 1,010,386 693 99.92 94.51 72.28
+CFC 2210 177 1,010,314 290 99.95 92.58 88.4
+F. Fenzl, et al. Simulation Modelling Practice and Theory 105 (2020) 102143
+
+number of false positives is observed. This may result from the fact that messages show values that are not included in the training log
+file and in consequence cannot be classified by the model.
+
+For the Fuzzy and Payload the intrusion false positive rates decreased for both field classification approaches in comparison to the
+byte aligned approach. However, the false negative rates increased significantly for the Payload intrusion when using field classi-
+fication alignments.
+
+The targeted Speed intrusion could not be classified with any of the different data alignments.
+
+None of the messages for the RPM Front Left intrusion were detected using byte alignments. Using the alignments from Field
+Classification, as described by the true positive rate, about 70% of the introduced intrusion messages were classified correctly and
+using the CFC alignments up to about 88% of the messages could be detected correctly.
+
+6. Characteristic functions
+6.1. Detection models
+
+The characteristic functions approach proposed in our previous work [5] first divides the messages from a log file into classes
+separated by ID. Afterwards a set of characteristics divided into three different categories is calculated.
+
+As a first step the unique values for each byte field are counted, where each 8 bit wide field can contain between 1 and 256
+different values. We removed the 8 bit restraint for a fields width, so fields may now contain up to 2” unique values, where n is the
+length of the fields in bits. This has been done in order to classify reverse engineered fields from our Continuous Field
+Classification approach.
+
+A field is classified as an Automatic Field should the number of unique values k be within a certain threshold. From those fields a
+rule set for concrete values is derived. The threshold is determined by the length I of a field, as shown in the following equation
+
+k2/2' <1 (3)
+
+Automatic Field Threshold
+
+This formula was necessary due to the removal of the 8 bit field length restraint. For the original implementation the threshold
+was set to /256 = 16 for 8 byte-long fields, which is the same with the formula shown, with the exception that the formulas threshold
+is scales dynamically.
+
+Physical Values are evolving messages with a small set of unique changes between two messages. To evaluate rules for this type of
+field the absolute differences in a fields value between each two consecutive messages within the log file are calculated and counted.
+There are also 256 possible differences between two consecutive values. In respect to the lifted restrictions of possible unique values
+and to the length of a field, the number of possible differences between two values also increases to 2”. Fields are classified as Physical
+Values if a field contains up to 256 = 16 unique differences. Fields with too many different unique values are to be classified as
+Automatic Field and too many unique differences for a Physical Value are classified as Random value with no rules built for them. A field
+can be an Automatic Field and a Physical Value at the same time.
+
+The original implementation utilized, in addition to the 8 byte long payload fields, the messages floating point time stamp value.
+For the evaluation in this paper the time stamp is disregarded.
+
+6.2. Model construction
+
+The characteristic functions approach utilizes a clean, non-intruded version of the recorded log file as training data. An exemplary
+rule model from the training for ID 0x5d7 is shown in Table 4. The analysis and evaluation for these rules did use less than 1 second
+for training.
+
+In this example there are three single value fields, specifically bytes 3, 4 and 8 with values 0, 2 and 118 respectively. Said bytes
+are classified as Automatic Fields. In addition to those three single value fields there are three other fields with 16 or less unique
+values. The first bytes shows a value range in between 0 and 12, the 5th byte does assume values between 101 and 108 and the 6th
+bytes corresponds to all multiples of 16 within the number range of a byte except for 0. For the two remaining bytes a higher number
+of different values has been observed, where the second byte showed every possible value.
+
+Table 4
+Rules generated from characteristic functions approach for ID 0x5d7 (1495) using byte aligned data. p1 to p8 are rules for the respective fields of
+the messages payload.
+
+Rule pl p2 p3 p4 ps p6 p7 ps8
+Unique Values 13 256 1 1 8 16 32 1
+Accepted Values 0,..., 12 * 0 2 101,..., 108 16, 32, 48, 64, 80, 96, 112, 128, 144, 160, 176, 192, 208, 224, 240 * 118
+Unique Changes 3 147 1 1 2 2 44 1
+Accepted Changes 0, 1, 255 * 0 0 0, 1 0, 16 * 0
+F. Fenzl, et al. Simulation Modelling Practice and Theory 105 (2020) 102143
+
+Single value fields are automatically classified as Physical Values, due to them having only the possible difference value of 0.
+
+Both remaining byte fields 2 and 7 could not be classified as Physical Values, due to showing too many changes. Both fields are
+classified as Random Values.
+
+Using this rule set it is easy to detect out-of-bounds values, and specifically tell which value within the data is an anomaly and
+determine the reason why this is the case. This makes the characteristic functions approach significantly more explainable than deep
+learning in regards to why a message is classified in a certain way.
+
+6.3. Intrusion detection
+
+For the Stationary log file from the same car about 50% of the messages were classified as False Positives. This is due to the fact that
+some IDs show values that have not been seen during the original recording of the training log.
+
+For the Fuzzy and Payload intrusions the results for the Field Classification (FC) approach are similar to byte alignments (see
+also [5]), whereas the Continuous Field Classification approach shows significant decreases in False Negative values.
+
+No intrusion messages from the targeted Speed intrusion were classified correctly for any of the alignments. The results also show
+a significant amount of false positive values for the byte aligned training data. Both the Field Classification and Continuous Field
+Classification approaches do not show those false positives.
+
+All introduced messages from the targeted Rom Front Left test log were classified correctly for byte alignments and CFC, but
+with a high amount of false positive values.
+
+The characteristic functions approach does excel in classifying randomized values where values are out of the usual range or
+simply zero value, but does fail on intrusions where fields are manipulated using previously observed values that are invalid within
+the context of the intrusion.
+
+7. Discussion
+7.1. Field classification
+
+Field classification did reveal interesting insights on the data that have made interpretation and analysis easier and more
+readable.
+
+The advantages of our modification to the scoring method are not that apparent from the direct comparison of the alignments in
+Fig. la and 1 b, where most of the differences are only a one bit variation.
+
+From the visual comparison of the original and modified scoring method done in Fig. 2 it can be seen that the original scoring
+method does add distortions to the data that do not occur using the modified function. Compared to the DBC alignment the pro-
+gression of the values is approximately the same for the modified field classification albeit the scaling is different. Scaling should
+theoretically be less significant to training than obvious distortion of data, especially on a intrusion detection method that utilizes the
+differences between two messages as classification characteristic.
+
+For most of the classified fields the highest bits were split from the actual field. In most cases this is due to them containing only
+few or no changes at all or the bits were never used during the recorded driving session. In some cases the lowest bits from one field
+were classified together with the highest bits of the consecutive field. In those cases both fields show only few changes and the field is
+classified as a Multi-Value field and scored according to its length.
+
+Unused portions of both messages were either correctly classified or connected with a nearby field effectively scaling this field
+without distorting its course.
+
+The field classification method [6], as well as our modified Continuous Field Classification approach did yield sufficient results to
+separate fields into more continuous alignments and should theoretically profit the accuracy of training and intrusion detection.
+
+7.2. Data selection for training and classification
+
+We decided to take inspiration on existing intrusion scenarios that would generate sufficient training data, such as a continuous
+manipulation of information potentially displayed to a human driver or disturbance of vehicular systems by introduction of many
+messages in a short timespan.
+
+The primary training data used contains, as stated in Section 3, data from 110 different IDs.
+
+So far all intruded log files used in training only utilize different forms of denial of service intrusions. This proved to be the most
+effective method for training, because manipulation and deletion alter the structure and progress of the data and may distort relations
+between consecutive messages. From a denial of service intruded log file the original file can be restored by removing all messages
+flagged as intrusion, whereas with a manipulation the data is changed and cannot be restored. During training a non-intruded log is
+required to train the model on all valid situations previously recorded. This is not possible with a manipulated log file because the
+context of some messages changes compared to their valid successor and predecessor within the log file.
+
+Introducing deletion type intrusions proved detrimental to training early on. This has already been observed in previous ex-
+periments done with similar approaches, therefore no deletion scenarios were tested on this specific approach. Using this method
+training data is reduced significantly and it may even remove important parts from the log that are critical for successful training.
+During replay and classification a deletion cannot be directly detected, due to the fact that it can not be directly classified and would
+only lead to the following messages being potentially misclassified. Using this approach, for deletion scenarios would at most produce
+F. Fenzl, et al. Simulation Modelling Practice and Theory 105 (2020) 102143
+
+a large amount of false positive messages, specifically those messages directly after a deleted message. For the successful classification
+an expectation model would be required. The approach proposed in this work is not suitable to build this type of model. An approach
+using predictive methods such as the long short-term memory networks approach by Taylor et al. [39] would be more suited.
+
+The manipulation of log data for training purposes does also alter the behavior of the data and may hinder training, therefore was
+not used for this purpose. With this type of intrusion the connections between messages could be changed or destroyed.
+
+7.3. Deep learning
+
+In most cases the deep learning approach has shown to be able to detect intrusions with a high positive predictive value for the
+randomized denial of service scenarios tested.
+
+It is to be noted that there are mostly small improvements in direct comparison of byte alignments and field classification
+alignments. In some cases a huge increase in false negatives can be observed for field classification, which might be due to the
+increased value range for the fields.
+
+All tested scenarios show an improvement in false positive rate, when comparing byte aligned models with Continuous Field
+Classificationmodels. This shows that characteristics of the data are made easier to detect for machine learning, through this ap-
+proach in preprocessing data.
+
+Deep learning models have also shown to be able to detect more complex intrusions, such as the RPM Front Left intrusion,
+with the help of preprocessed data through field classification. For this specific scenario the DBC alignment model, which should in
+theory show similar results to the field classification approaches, was unable to detect the intrusion. This is likely due to the fact that
+the model trained on different fields of the data, that showed easier detectable characteristics.
+
+7.4. Characteristic functions
+
+During manipulation tests the intrusion messages proved to be hard to detect for the characteristic functions approach. For
+calculation of the differences in between values the last seen message is saved in case it has been classified as valid. As previously
+discussed this method of building a state for the log does result in a high proneness to consequential errors. In case a valid message is
+classified incorrectly the subsequent messages may also be classified incorrectly due to distortions in the differences in between them.
+This problem does seldom show during denial of service intrusions, but becomes apparent with manipulation intrusions. Here the
+progress of data is manipulated at one point of the log, distorting the relations between consecutive messages. This may result in none
+of the messages following the intrusion being classified correctly. This case happened during the most of the manipulation intrusions
+shown in Table 5, especially with the Speed intrusion where for the first 1000 messages before the intrusion all messages were
+classified correctly. After the intrusion all subsequent messages were flagged as an intrusion. In this case this is due to the Odometer
+value of the ID 0x5d7 that is monotonically increasing with a small set of possible changes. This value changed over the course of the
+intrusion multiple times, while the state remains unchanged. The valid messages after the intrusion are then compared to the last
+valid message before the intrusion with a change in value for the Odometer n-times greater than allowed and are therefore classified
+as intrusions as well.
+
+Table 5
+Results of intrusion detection using characteristic functions approach. TP/FP/TN/FN: true/false positives/negatives; Precision (Positive Predictive
+Value) PPV = TP/(TP + FP); Recall (True Positive Rate) TPR = TP/(TP + FN); Accuracy ACC = (TP + TN)/(TP + TN + FP + FN).
+
+Test file Alignment TP FP TN FN ACC PPV TPR
+Stationary Byte 0 169,871 186,086 0 52.27 0 NA
+DBC 0 65,816 290,141 0 81.51 0 NA
+FC 0 169,920 186,046 0 52.27 0 NA
+CFC 0 169,928 186,038 0 52.26 0 NA
+Fuzzy Byte 31,981 0 1,012,991 19 99.99 100 99.94
+DBC 31,933 0 1,012,991 67 99.99 100 99.79
+FC 31,981 0 1,012,991 19 99.99 100 99.94
+CFC 31,998 0 1,012,991 2 99.99 100 99.99
+Payload Byte 31,725 0 1,012,991 275 99.97 100 99.14
+DBC 30,980 294 1,012,697 1020 99.87 99.06 96.81
+FC 31,724 0 1,012,991 276 99.97 100 99.14
+CFC 31,970 0 1,012,991 30 99.99 100 99.91
+Speed Byte 0 3867 1,008,624 500 99.57 0 0
+DBC 0 0 1,012,491 500 99.95 NA 0
+FC 0 0 1,012,491 500 99.95 NA 0
+CFC 0 0 1,012,491 500 99.95 NA 0
+RPM Front Left Byte 2500 4334 1,006,157 0 99.57 36.58 100
+DBC 0 0 1,010,491 2500 99.75 NA 0
+FC 0 0 1,010,491 2500 99.75 NA 0
+CFC 2500 4334 1,006,157 0 99.57 36.58 100
+
+10
+F. Fenzl, et al. Simulation Modelling Practice and Theory 105 (2020) 102143
+
+This problem might be reduced by updating the previous message regardless of the classification result, as done in this works
+approach. On one hand this does significantly reduce the risk of consequential errors, on the other hand this may increase the overall
+false positive rate.
+
+8. Conclusion
+
+We have seen in previous work [27] that neural network approaches for anomaly detection deliver good results but that it is hard
+to implement this kind of detection in-vehicle because of restrictions to on-board resources of typical ECUs used in vehicular systems.
+We build a log analyzer in C that focused on payload bytes having either a small set of different values or a small set of possible
+changes [5]. The results obtained are at least comparable with results obtained using deep learning techniques.
+
+In the work presented here, we have been interested in improving the results of the methods described above by deeper analysis of
+the input data and adaptation of the models to the refined structure. In particular, we have evaluated the influence of more accurate
+payload structure models on the quality of the results of intrusion detection methods. Therefore, we have analyzed if an improved
+alignment is helpful when anomalies are characterized by correlations between fields of the same message. Therefore, we adapted our
+deep learning approach as well as a characteristic functions based intrusion detection approach to utilize such message streams. In
+order to evaluate our approach, we have developed a set of test vectors based on log files of a Renault Zoe electric car enriched by
+different intrusions. In particular, we have included simulations of stealthy intrusions which are very difficult to detect because they
+mask only selected sensor values within otherwise correct messages.
+
+Using the Field Classification and especially the Continuous Field Classification approach in combination to a deep learning IDS,
+more complex intrusions could be detected reliably. This is shown in Table 3 and 5 , where these specific intrusion scenarios show
+significantly better results in regards to positive predictive value and true positive rate metrics for the deep learning approach.
+
+The characteristic functions approach does show significantly better results in classifying randomized values where values are out
+of the usual range or simply zero value, in comparison to the deep learning approach. However, it did show shortcomings on
+detecting intrusions where fields are manipulated or relations in between separate sensor values are required for the detection. In
+particular a combination of the characteristic functions and Continuous Field Classification approach shows significant decreases in
+False negative values for the relevant tests.
+
+In general an improvement in false positive rate can be observed for both approaches, with true positive rates remaining either
+similar or greatly improved for certain targeted intrusion scenarios. Regardless of these improvements, there is the possibility that
+separate fields are falsely classified as one connected field and therefore made harder to detect intrusions on this specific data area
+later on.
+
+Due to their differences in intrusion detection, a hybrid approach is advised for future research.
+
+Acknowledgment
+
+This research work has been funded by the German Federal Ministry of Education and Research and the Hessen State Ministry for
+Higher Education, Research and the Arts within their support of the National Research Center for Applied Cybersecurity ATHENE and
+by the German Federal Ministry of Education and Research in the context of the project VITAF (ID 16KISO835).
+
+This work was financially supported by Government of Russian Federation (Grant 08-08).
+
+References
+
+[1] Daimler, Aptiv, Audi, Baidu, BMW, Continental, F. C. Automobiles, HERE, Infineon, Intel, Volkswagen, Safety first for automated driving, 2019. https://www.
+daimler.com/dokumente/innovation/sonstiges/safety-first-for-automated-driving.pdf.
+[2] C. Miller, C. Valasek, Adventures in automotive networks and control units, Def. Con. 21 (2013) 260-264.
+[3] C. Miller, C. Valasek, Remote Exploitation of an Unaltered Passenger Vehicle, IOActive Labs, 2015 Technical Report.
+[4] S. Nie, L. Liu, Y. Du, Free-fall: Hacking Tesla From Wireless to CAN Bus, Briefing, Black Hat USA, 2017, pp. 1-16.
+[5] Y. Chevalier, R. Rieke, F. Fenzl, A. Chechulin, I. Kotenko, ECU-Secure: Characteristic Functions for In-vehicle Intrusion Detection, Proceedings of the
+International Symposium on Intelligent and Distributed Computing, Springer, 2019, pp. 495-504.
+[6] M. Markovitz, A. Wool, Field classification, modeling and anomaly detection in unknown CAN bus networks, Veh. Commun. 9 (2017) 43-52.
+[7] T. Rosenstatter, C. Sandberg, T. Olovsson, Extending AUTOSAR’S Counter-based Solution for Freshness of Authenticated Messages in Vehicles, Proceedings of
+the IEEE 24th Pacific Rim International Symposium on Dependable Computing (PRDC), (2019), pp. 1-109.
+[8] T. Islinger, Y. Mori, J. Neumller, M. Prisching, R. Schmidt, Autosar secOC for CAN FD, 2017. https://can-newsletter.org/engineering/engineering-
+miscellaneous/170306_autosar-secoc-for-can-fd_denso.
+[9] W. Choi, K. Joo, H.J. Jo, M.C. Park, D.H. Lee, VoltageIDS: low-level communication characteristics for automotive intrusion detection system, IEEE Trans. Inf.
+Forensics Secur. 13 (8) (2018) 2114-2129. ISSN 1556-6013
+[10] K. Cho, K.G. Shin, Fingerprinting Electronic Control Units for Vehicle Intrusion Detection, in: T. Holz, S. Savage (Eds.), Proceedings of the 25th USENIX Security
+Symposium, USENIX Security 16, Austin, TX, USA, August 10-12, 2016. USENIX Association, 2016, pp. 911-927.
+[11] U.E. Larson, D.K. Nilsson, E. Jonsson, An Approach to Specification-based Attack Detection for In-vehicle Networks, Proceedings of the Intelligent Vehicles
+Symposium IEEE, (2008), pp. 220-225. ISSN 1931-0587
+[12] T. Hoppe, S. Kiltz, J. Dittmann, Security threats to automotive CAN networks — practical examples and selected short-term countermeasures, Reliab. Eng. Syst.
+Saf. 96.
+[13] M. Miiter, N. Asaj, Entropy-based anomaly detection for in-vehicle networks, Proceedings of the IEEE Intelligent Vehicles Symposium (IV), (2011), pp.
+1110-1115. ISSN 1931-0587
+[14] I. Studnia, E. Alata, V. Nicomette, M. Kaaniche, Y. Laarouchi, A language-based intrusion detection approach for automotive embedded networks, IJES 10 (1)
+(2018) 1-12, https://doi.org/10.1504/IJES.2018.10010488.
+[15] A. Taylor, N. Japkowicz, S. Leblanc, Frequency-based Anomaly Detection for the Automotive CAN Bus, Proceedings of the World Congress on Industrial Control
+
+11
+F. Fenzl, et al. Simulation Modelling Practice and Theory 105 (2020) 102143
+
+[16]
+[17]
+[18]
+[19]
+
+[20]
+[21]
+
+[22]
+[23]
+[24]
+[25]
+[26]
+
+[27]
+
+[28]
+[29]
+
+[30]
+[31]
+[32]
+
+[33]
+
+[34]
+[35]
+
+[36]
+[37]
+[38]
+[39]
+
+Systems Security (WCICSS), IEEE, 2015, pp. 45-49.
+
+H.M. Song, H.R. Kim, H.K. Kim, Intrusion Detection System Based on the Analysis of Time Intervals of CAN Messages for In-vehicle Network, Proceedings of the
+International Conference on Information Networking (ICOIN), IEEE, 2016, pp. 63-68.
+
+Z. Wei, Y. Yang, Y. Rehana, Y. Wu, J. Weng, R.H. Deng, IoVShield: An Efficient Vehicular Intrusion Detection System for Self-driving (Short Paper), in: J.K. Liu,
+P. Samarati (Eds.), Information Security Practice and Experience: 13th International Conference, ISPEC, Melbourne, VIC, Australia, December 13-15, 2017,
+Proceedings, Springer International Publishing, Cham, 2017, pp. 638-647. ISBN 978-3-319-72359-4
+
+A. Theissler, Anomaly detection in recordings from in-vehicle networks, Big Data Appl. 23.
+
+M.J. Kang, J.W. Kang, A Novel Intrusion Detection Method Using Deep Neural Network for In-vehicle Network Security, Proceedings of the IEEE 83rd Vehicular
+Technology Conference (VTC Spring), (2016), pp. 1-5.
+
+M. Levi, Y. Allouche, A. Kontorovich, Advanced analytics for connected cars cyber security, CoRR abs/1711.01939.
+
+S.N. Narayanan, S. Mittal, A. Joshi, OBD Securealert: An anomaly detection system for vehicles, Proceedings of the IEEE Workshop on Smart Service Systems
+(SmartSys 2016), (2016), pp. 1-6.
+
+R. Rieke, M. Seidemann, E.K. Talla, D. Zelle, B. Seeger, Behavior Analysis for Safety and Security in Automotive Systems, Proceedings of the 25nd Euromicro
+International Conference on Parallel, Distributed and Network-Based Processing (PDP), IEEE Computer Society, 2017, pp. 381-385.
+
+N. Nowdehi, W. Aoudi, M. Almgren, T. Olovsson, CASAD: CAN-aware stealthy-attack detection for in-vehicle networks, 2019. https://arxiv.org/abs/1909.
+08407.
+
+D. Stabili, M. Marchetti, M. Colajanni, Detecting Attacks to Internal Vehicle Networks through Hamming Distance, Proceedings of the International Annual
+Conference, (2017), pp. 1-6, https://doi.org/10.23919/AEIT.2017.8240550. ISSN null
+
+M. Marchetti, D. Stabili, Anomaly Detection of CAN Bus Messages through Analysis of ID Sequences, Proceedings of the IEEE Intelligent Vehicles Symposium
+(IV), (2017), pp. 1577-1583.
+
+A. Taylor, S.P. Leblanc, N. Japkowicz, Probing the limits of anomaly detectors for automobiles with a cyber attack framework, IEEE Intell. Syst. PP (99) (2018).
+1-1. ISSN 1541-1672
+
+I. Berger, R. Rieke, M. Kolomeets, A. Chechulin, I. Kotenko, Comparative Study of Machine Learning Methods for In-vehicle Intrusion Detection, Proceedings of
+the Computer Security. International Workshops, CyberICPS 2018 and SECPRE 2018, Barcelona, Spain, September 6—7, 2018, Lecture Notes in Computer Science
+11387 Springer, Cham, 2019, pp. 85-101, https://doi.org/10.1007/978-3-030-12786-2_6. ISBN 978-3-030-12786-2
+
+O.Y. Al-Jarrah, C. Maple, M. Dianati, D. Oxtoby, A. Mouzakitis, Intrusion detection systems for intra-vehicle networks: a review, IEEE Access 7 (2019)
+21266-21289, https://doi.org/10.1109/ACCESS.2019.2894183. ISSN 2169-3536
+
+G. Dupont, J. den Hartog, S. Etalle, A. Lekidis, A Survey of Network Intrusion Detection Systems for Controller Area Network, Proceedings of the IEEE
+International Conference of Vehicular Electronics and Safety (ICVES), (2019), pp. 1-6, https://doi.org/10.1109/ICVES.2019.8906465. ISSN 2643-9743
+
+M. Marchetti, D. Stabili, Read: reverse engineering of automotive data frames, IEEE Trans. Inf. Forensics Secur. 14 (4) (2018) 1083-1097.
+
+A. Taylor, Anomaly-based detection of malicious activity in-vehicle networks, Université d’Ottawa/University of Ottawa, 2017 Ph.D. Thesis.
+
+K. Koscher, A. Czeskis, F. Roesner, S. Patel, T. Kohno, S. Checkoway, D. McCoy, B. Kantor, D. Anderson, H. Shacham, et al., Experimental Security Analysis of a
+Modern Automobile, Proceedings of the IEEE Symposium on Security and Privacy, IEEE, 2010, pp. 447-462.
+
+D. Zelle, R. Rieke, C. Plappert, C. Krauf$, D. Levshun, A. Chechulin, SEPAD - Security Evaluation Platform for Autonomous Driving, Proceedings of the 28th
+Euromicro International Conference on Parallel, Distributed and Network-Based Processing (PDP), (2020), pp. 413-420, https://doi.org/10.1109/PDP50117.
+2020.00070. ISSN 2377-5750
+
+B. Fisch, J. Meijer, CanZE: Take a closer look at your ZOE, 2016. https://github.com/fesch/CanZE.
+
+M. Abadi, A. Agarwal, P. Barham, E. Brevdo, Z. Chen, C. Citro, G.S. Corrado, A. Davis, J. Dean, M. Devin, S. Ghemawat, I. Goodfellow, A. Harp, G. Irving, M.
+Isard, Y. Jia, R. Jozefowicz, L. Kaiser, M. Kudlur, J. Levenberg, D. Mané, R. Monga, S. Moore, D. Murray, C. Olah, M. Schuster, J. Shlens, B. Steiner, I. Sutskever,
+K. Talwar, P. Tucker, V. Vanhoucke, V. Vasudevan, F. Viégas, O. Vinyals, P. Warden, M. Wattenberg, M. Wicke, Y. Yu, X. Zheng, TensorFlow: Large-scale
+machine learning on heterogeneous systems, 2015. https://www.tensorflow.org/, software available from tensorflow.org.
+
+F. Chollet, et al., Keras, 2015, (https://keras.io).
+
+D.P. Kingma, J. Ba, Adam: A method for stochastic optimization, arXiv:1412.6980, 2014.
+
+M.A. Nielsen, Neural networks and deep learning, 25 Determination Press San Francisco, CA, USA:, 2015.
+
+A. Taylor, S. Leblanc, N. Japkowicz, Anomaly detection in automobile control network data with long short-term memory networks, Proceedings of the IEEE
+International Conference on Data Science and Advanced Analytics (DSAA), IEEE, 2016, pp. 130-139.
+
+12

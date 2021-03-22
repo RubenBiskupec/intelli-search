@@ -1,0 +1,1664 @@
+Bentert et al. Applied Network Science (2020) 5:73
+https://doi.org/10.1007/s41 109-020-00311-0
+
+Applied Network Science
+
+RESEARCH Open Access
+
+Efficient computation of optimal ®
+temporal walks under waiting-time _
+constraints
+
+Matthias Bentert , Anne-Sophie Himmel, André Nichterlein and Rolf Niedermeier
+
+ 
+
+An extended abstract of this work appeared in the proceedings of the 8th International Conference on Complex
+Networks and their Applications (2019) (Himmel et al. 2019). This full version considers more optimization criteria,
+provides missing proofs, and presents extended experimental results.
+
+ 
+
+*Correspondence:
+
+matthias.bentert@tu-berlin.de Abstract
+
+Anne-Sophie Himmel is supported Node connectivity plays a central role in temporal network analysis. We provide a broad
+hi seve. Project FPTIN study of various concepts of walks in temporal graphs, that is, graphs with fixed vertex
+Technische Universitat Berlin, sets but arc sets changing over time. Taking into account the temporal aspect leads to
+Faculty IV, Algorithmics and a rich set of optimization criteria for “shortest” walks. Extending and broadening
+
+Computational Complexity, Berlin,
+Germany
+
+state-of-the-art work of Wu et al. [IEEE TKDE 2016], we provide an algorithm for
+computing shortest walks that is capable to deal with various optimization criteria and
+any linear combination of these. It runs in O(|V| + |E] log |E]) time where |V| is the
+number of vertices and |E] is the number of time-arcs. A central distinguishing factor to
+Wu et al.’s work is that our model allows to, motivated by real-world applications,
+respect waiting-time constraints for vertices, that is, the minimum and maximum
+waiting time allowed in intermediate vertices of a walk. Moreover, other than Wu et al.
+our algorithm also allows to search for walks that pass multiple subsequent time-arcs in
+one time step, and it can deal with a richer set of optimization criteria. Our
+experimental studies indicate that our richer modeling can be achieved without
+significantly worsening the running time when compared to Wu et al.’s algorithms.
+
+Keywords: Temporal networks, Temporal paths, Shortest path computation, Waiting
+policies, Infectious disease spreading
+
+ 
+
+Introduction
+
+Computing shortest paths in networks is arguably among the most important graph algo-
+rithms. It is relevant in numerous application contexts and used as a subroutine in a
+highly diverse set of applications. While the respective problem has been studied for static
+graphs for decades, over the last years there has been an intensified interest in study-
+ing shortest path computations in temporal graphs—graphs where the vertex set remains
+static, but the arc set may change over time (in discrete time steps).
+
+. © The Author(s). 2020 Open Access This article is licensed under a Creative Commons Attribution 4.0 International License,
+GQ) Springer O pen which permits use, sharing, adaptation, distribution and reproduction in any medium or format, as long as you give appropriate
+— credit to the original author(s) and the source, provide a link to the Creative Commons licence, and indicate if changes were
+made. The images or other third party material in this article are included in the article’s Creative Commons licence, unless
+indicated otherwise in a credit line to the material. If material is not included in the article’s Creative Commons licence and your
+intended use is not permitted by statutory regulation or exceeds the permitted use, you will need to obtain permission directly
+from the copyright holder. To view a copy of this licence, visit http://creativecommons.org/licenses/by/4.0/.
+Bentert et al. Applied Network Science (2020) 5:73 Page 2 of 26
+
+Two natural motivating examples for the relevance of path and walk (in the later one
+may visit a vertex multiple times) computations in temporal graphs are as follows. First,
+Wu et al. (2016) discussed applications in flight networks where every node represents an
+airport and each arc represents a flight connection with a departure time. Clearly, a “short-
+est” path may then relates to a most convenient flight connection between two cities.
+Second, understanding the spread of infectious diseases is a major challenge to global
+health. Herein, nodes represent persons and time-labeled arcs represent contacts between
+persons where a virus can be transmitted. “Shortest” path (walk) analysis here may help
+to find measures against disease spreading (Newman 2018, Chapter 17). Notably, in both
+examples one might need to also take into account issues such as different concepts of
+“shortest”—also called optimal—paths (walks) or waiting times in nodes; this will be an
+important aspect of our modeling.
+
+Our main reference point is the work of Wu et al. (2016) on efficient algorithms for
+optimal temporal path computation. These algorithms are also implemented in the tem-
+poral graph library of Apache Flink (Lightenberg et al. 2018). We extend their model with
+respect to two aspects. First, we additionally consider waiting-time constraints! for the
+network nodes, that is, a minimum time a walk must spend in a node before continuing
+and a maximum time a walk can stay in a node before it has to continue. Minimum wait-
+ing times can be used to model that passengers on an airport need some time to get from
+an arriving flight to the terminal for their next flight and maximum waiting times can be
+used to model recover times of patients after which they can no longer infect other peo-
+ple. Importantly, maximum-waiting-time constraints can enforce cycles from one node
+to another; refer to Fig. 1 for a simple example. Hence, we need to take into account opti-
+mal temporal walks from one node to another (in Wu et al’s model without waiting-time
+constraints there is always an (optimal) temporal path visiting no node twice because no
+cycles are necessary).
+
+Actually, if one insists on paths (without repeated nodes) instead of walks, then even
+deciding whether there exists a path between two nodes becomes NP-hard (Casteigts et
+al. 2019).
+
+The second extension to Wu et al’s work lies in an increased number of optimality
+criteria (different notions of optimal walks) and the fact that we do not only deal with opti-
+mizing one criterion but a linear combination of any of these, thus addressing potentially
+richer modeling needs in real-world applications. For example, in the above-mentioned
+flight network a traveling person might want to use our algorithm to optimize a linear
+combination of cost and travel duration. Note that trying to find walks under constraints
+(e.g., travel duration at most t and cost at most c for given c,t € IN) leads to NP-hard
+computational problems, even in the static case (Ahuja et al. 1993).
+
+Related Work. The theory of temporal graphs is a relatively young but active field of
+research (Holme 2015; Holme and Saramaki 2012; Holme and Saramaki 2013; Holme
+and Saramaki 2019). Many of the basic concepts of temporal graphs such as temporal
+connectivity (Kempe et al. 2002; Nicosia et al. 2012; Axiotis and Fotakis 2016; Mertzios
+et al. 2019) or s-z-separation (Zschoche et al. 2020; Fluschnik et al. 2020) are based on
+the notion of temporal paths and walks. The concept of optimal temporal walks plays
+
+ 
+
+1\/aiting-time constraints play a particularly important role in standard spreading models of infectious diseases such as
+the SIS-model (Susceptible-Infected-Susceptible) (Newman 2018, Chapter 17).
+Bentert et al. Applied Network Science (2020) 5:73 Page 3 of 26
+
+ 
+
+ 
+
+Fig. 1 Atemporal graph (with time-labeled arcs called time-arcs) with maximum waiting time four in which
+the only temporal walk from A to C visits B twice
+
+ 
+
+ 
+
+ 
+
+a central role in the definition of temporal graph metrics such as eccentricity, diameter,
+betweenness and closeness centrality (Pan and Saramaki 2011; Santoro et al. 2011; Kim
+and Anderson 2012; Buf et al. 2020).
+
+An early algorithm for computing optimal temporal walks is due to Xuan et al. (2003).
+They computed temporal walks under different optimization criteria, namely foremost,
+fastest, and minimum hop-count. Wu et al. (2016) followed up by introducing algorithms
+for computing optimal walks for the optimization criteria foremost, reverse-foremost,
+fastest, and shortest on temporal graphs with no waiting-time constraints. Their algo-
+rithms run in linear and quasi-linear time with respect to the number of time-arcs,
+provided that transmission times on time-arcs are greater than zero. Concerning time-
+dependent multicriteria optimal path computation, there has been research in the related
+field of route planning (Bast et al. 2016).
+
+The study of minimum- and maximum-waiting-time constraints in vertices has not
+received much attention in the context of temporal walks even though they are considered
+as important extensions to the temporal walk model (Holme and Saramaki 2012; Pan
+and Saramaki 2011). One of the first papers to consider waiting-time constraints in the
+context of paths is due to Dean (Dean 2004). Dean showed that time-dependent shortest
+path problems with waiting constraints can be solved in polynomial time. Dean’s setting
+is closely related to waiting-time constraints for optimal temporal walks. In more recent
+work, Modiri et al. (2019) and Kivela et al. (2018) studied the changes in reachability
+when introducing maximum-waiting time constraints for temporal walks using so-called
+event graphs. Lastly, Casteigts et al. (2019) have very recently shown that finding optimal
+temporal paths under maximum-waiting-time constraints is NP-hard.
+
+In the so-called multistage setting, where multiple graphs over the same vertex set are
+considered without a (temporal) ordering, paths have been studied by Fluschnik et al.
+(2020).
+
+Our Contributions. We analyze the running time complexity of computing optimal
+temporal walks under waiting-time constraints. To this end, we develop and (theoretically
+and empirically) analyze an algorithm for finding an optimal walk from a source vertex
+to each vertex in the temporal graph under waiting-time constraints. Our algorithm runs
+in quasi-linear time in the number of time-arcs. This implies that the additional consid-
+eration of waiting-time constraints on temporal walks does not increase the asymptotic
+computational complexity of finding optimal temporal walks. Moreover, our algorithm
+can compute optimal walks not only for single optimality criteria but also for any lin-
+ear combination of these. In experiments on real-world social network data sets, we
+demonstrate that in terms of efficiency our algorithm can compete with state-of-the-art
+algorithms by Wu et al. (2016). Their algorithms only run on temporal graphs without
+Bentert et al. Applied Network Science (2020) 5:73 Page 4 of 26
+
+waiting-time constraints, which do optimize only one criterion (and not a linear combina-
+tion). Additionally, our algorithm allows transmission times being zero (hence, allowing to
+pass multiple arcs in one time step) while the algorithms of Wu et al. request transmission
+
+times on arcs to be greater than zero.
+
+Organization of the Paper. In “Modeling of optimal temporal walks” section, we dis-
+cuss temporal graphs, temporal walks, and the various corresponding optimality criteria,
+starting with an extensive motivating example in the context of disease spreading. In
+“Formal definitions” section, we introduce definitions and notations used through-
+out the paper. We continue in “Transformation” section by presenting two sim-
+ple linear-time transformations to eliminate transmission times and minimum wait-
+ing times in the temporal graph without loosing any modeling power. In “Algo-
+rithm” section, we design and analyze an algorithm for computing optimal walks
+under maximum-waiting-time for any linear combination of these. Finally, in “Exper-
+imental results” section, we demonstrate the efficiency of our algorithm on real-
+world data sets. We compare our running times with the running times of the
+algorithms of Wu et al. (2016). We further examine the impact of different
+maximum-waiting-time values on the existence and structure of optimal temporal
+
+walks.
+
+Modeling of optimal temporal walks
+Before we introduce our basic concepts relating to temporal graphs and walks, we start
+with a more extensive discussion of a motivating example from the disease spreading
+
+context.
+
+Disease Spreading Motivating Example. Pandemic spread of an infectious disease is
+a great threat to global health, potentially associated with high mortality rates as well
+as economic fallout (Salathé et al. 2010). Understanding the dynamics of infectious dis-
+ease spreading within human proximity networks could facilitate the development of
+mitigation strategies.
+
+A large part of the study required to understand the dynamics of infectious diseases is
+the analysis of transmission routes through proximity networks (Salathé et al. 2010). Clas-
+sical graph theory can be used to model the main structure of a network: Each person in
+the network is represented by a node and an arc between two nodes indicates the possi-
+bility of an infection from one person to the other. However, the time component plays
+a crucial role in the analysis of transmission routes of a potential disease as shown in the
+
+following example:
+
+Example 1 Studying a proximity network as shown in Fig. 2a, there are several trans-
+mission routes from A to D, e.g., A > B — Dand A — C = D, by which a disease could
+have spread. If we extend our model by the points in time of proximity contacts in Fig. 2b
+to d, then we reach the conclusion that a disease could not have spread from A to D. The
+proximity contacts A 4 Band A ~ C occurred on day three whereas the contacts B 4D
+and C + D occurred on days one and two, respectively. Thus, A could have only infected
+B and C after proximity contact with D. a
+Bentert et al. Applied Network Science (2020) 5:73 Page 5 of 26
+
+ 
+
+Day 1 Day 2 Day 3
+
+(a) Proximity net- (b) Proximity net- | (c) Proximity net- | (d) Proximity net-
+work work at day 1 work at day 2 work at day 3
+
+Fig. 2 A proximity network modeled as a static graph (a) and a closer look at the days in which the proximity
+contacts occur (b-d)
+
+ 
+
+ 
+
+ 
+
+In addition to what has been said so far, the infectious period of a disease also has to be
+taken into account when computing potential transmission routes through the network,
+implying the minimum time a person has to be infected before she becomes conta-
+gious herself and the maximum time a person can be infected before she is no longer
+
+contagious:
+
+Example 2 Jf person B was infected by person A on day four (A 4 B) and the infectious
+period of the disease starts after one day and ends after the fourth day, then person B could
+not have infected person C she met on day ten (B ec ). Hence, person C could not have
+
+, ; . ., 4 _ 10
+been infected by the disease via the transmission route A > B —> C. a
+
+Temporal Graphs. These are capable of modeling both properties elaborated in the two
+examples above. Temporal graphs are already a frequently used model in the prediction
+and control of infectious diseases (Masuda and Holme 2013; Holme 2016). Temporal
+graphs—also referred to as temporal networks (Nicosia et al. 2013; Holme and Saramaki
+2012), evolving graphs (Xuan et al. 2003), or time-varying graphs (Santoro et al. 2011;
+Casteigts et al. 2012)—are graphs where the arc set changes over time; thus, they can
+capture the dynamics within a proximity network.
+
+In this paper, we will consider the following temporal graph model: A temporal graph
+consists of a set of vertices, a set of time-arcs, and a lifetime. A time-arc is a (directed) arc
+between two vertices that is associated with a time stamp at which the contact occurs and
+a transmission time that indicates the amount of time to traverse the arc. Furthermore,
+each vertex v is assigned an individual minimum waiting time a(v) and maximum waiting
+time B(v).
+
+The application areas of temporal graphs are numerous: In addition to human and ani-
+mal proximity networks, they are used in communication networks, traffic networks,
+and distributed computing, to name a few application areas (Holme and Saramaki 2012;
+Holme and Saramaki 2013; Holme and Saramaki 2019).
+
+In our running disease spreading example, we are interested in transmission routes of
+an infectious disease. These transmission routes can revisit a person in the proximity
+network due to possible reinfection (Barabasi 2016). Hence, the transmission routes can
+contain cycles which needs to be considered in the choice of concepts representing these
+
+routes.
+Bentert et al. Applied Network Science (2020) 5:73 Page 6 of 26
+
+Temporal Walks & Optimal Temporal Walks. Within the temporal graph model,
+temporal walks—also called journeys (Xuan et al. 2003; Nicosia et al. 2013)—are the
+fundamental concept that represents the transmission routes in our running example.
+
+A temporal walk is a sequence of time-arcs which connects a sequence of vertices and
+which are non-decreasing in time. In our model, a temporal walk additionally ensures that
+it remains the minimum waiting time in each intermediate vertex and does not exceed
+
+the maximum waiting time in any intermediate vertex of the walk.
+
+Example 3 Continuing Example 2, a valid temporal walk (transmission route) from A to
+D could be the following: A 4B D. Person A could have infected B on day four. Due to
+the infectious period of four days, B was still contagious on day eight when she had contact
+with person C. This does not hold on a route A 4 BS Cas discussed in Example 2. If B
+was infected at time step 4, then she was not contagious anymore at time step 10. a
+
+A temporal path is a temporal walk where all vertices are pairwise distinct. Maximum-
+waiting-time constraints have significant impact on temporal walks. In a temporal graph
+with constraints on the maximum waiting time, one can be forced to make detours
+because the maximum waiting time in a vertex is exceeded. As a consequence, there can
+be two vertices A and C such that any temporal walk from A to C is not a path, as shown
+in Fig. 1.
+
+Observation 1 Let G = (V,E, T, 8) be a temporal graph with maximum-waiting-time
+constraints. Then there can exist two vertices s,z € V such that no s-z-walk is a temporal
+path.
+
+We are interested in temporal walks within our proximity network in general, but wish
+to place emphasis on temporal walks that optimize certain properties. A plethora of
+criteria can be optimized as a consequence of the time aspect. Possible criteria (with
+the chosen names in brackets) include: arrival time (foremost), departure time (reverse-
+foremost), duration (fastest), transmission time (shortest), number of time-arcs (minimum
+hop-count), time-arc cost (cheapest), probability (most-likely), and waiting time (mini-
+mum waiting time). Next, we provide examples for all properties from their respective
+fields of application.
+
+Foremost. A foremost walk is a temporal walk that has the earliest arrival time. Com-
+puting a foremost walk from a source vertex to all vertices in the proximity network
+determines the speed with which an infectious disease could spread.
+
+Reverse-Foremost. A reverse-foremost walk is a temporal walk that exhibits the latest
+possible departure time. Computing a reverse-foremost walk from a source vertex
+to all vertices in the proximity network estimates the latest possible point in time
+at which an infectious disease could start spreading and still permeates the entire
+network.
+
+Fastest. A fastest walk is a temporal walk which exhibits the minimum travel dura-
+tion, that is, the minimum difference between departure and arrival times. For an
+appropriate motivation, we leave proximity networks and consider the field of flight
+networks. Airports represent vertices, time-arcs represent flights from one airport
+to another. The time stamp of a time-arc indicates the departure time of a flight,
+Bentert et al. Applied Network Science (2020) 5:73 Page 7 of 26
+
+the transmission time of the arc indicates the flight duration. The minimum waiting
+time in the vertices signifies the minimum time required to spend in an airport to
+catch a connecting flight. Within flight networks, the duration is often the criterion
+passengers aim to minimize in order to streamline their journeys.
+
+Shortest. A shortest walk is a temporal walk that minimizes the sum of transmission
+times on the time-arcs. In the context of flight networks, a shortest walk is a flight
+connection with the minimum time spent airborne.
+
+Minimum Hop-Count. A minimum-hop-count walk is a temporal walk which mini-
+mizes the number of time-arcs. Within a flight network, passengers also aim to
+minimize their number of connecting flights to avoid lengthy boarding procedures
+and the risk of missing connecting flights.
+
+Cheapest. For a given cost function on the time-arcs, a cheapest walk is a temporal walk
+with the minimum sum of costs over all time-arcs. The benefits of the minimization
+of this property within flight networks are obvious: Weighing long travel times and
+multiple connections against the cheapest fare is the oldest consideration in the book
+for many air travelers.
+
+Most-Likely. For given probabilities on the time-arcs, a most-likely walk is a tempo-
+ral walk with the highest probability. One application lies in disease spreading: For
+every contact there is a certain likelihood for an infectious disease to be transmit-
+ted depending on the proximity of the persons or the body contact between them.
+Thus, a most-likely walk is a transmission route with the highest probability for
+the infectious disease to be spread under the simplifying assumption of stochas-
+tic independence. The respective probabilities of the time-arcs within the walk are
+multiplied.
+
+Minimum Waiting Time. The minimum-waiting-time walk is a temporal walk whose
+total sum of waiting times over all intermediate vertices is minimum. Routing pack-
+ets through a router network prioritizes minimum waiting times of packages in the
+
+routers to improve the overall performance of the network.
+
+Formal definitions
+
+In this section, we formally introduce the most important concepts related to temporal
+graphs, temporal walks, and formalize our optimality criteria. We start with some basic
+mathematical definitions. We refer to an interval [a,b] as a contiguous ordered set of
+discrete time steps: [a,b] := {n | n € INA a <n < b}, wherea,b € N. Further, [ a] :=
+[1, a]. Given a function f: A — B, we write f = cif f(a) = cforalla e¢ AandceB.
+
+Temporal Graphs. A temporal graph is a graph whose arc set changes over time.
+
+Definition 1 (Temporal Graph) A temporal graph G = (V,E,T,a,f) is a five-tuple
+
+consisting of
+
+e alifetime T <€ WN,
+
+@ avertex set V,
+
+e atime-arcsetE CV x V x {1,..., 7} x {0,..., T},
+e a minimum waiting timea: V — {0,...,T}, and
+
+® amaximum waiting time B: V — {0,..., 7}.
+Bentert et al. Applied Network Science (2020) 5:73 Page 8 of 26
+
+We remark that the central modeling aspect in our work—the minimum and maximum
+waiting times—is so far not commonly part of the definition of temporal graphs. A time-
+arc (v, w,t,) € Eis a directed connection from v to w with time stamp t and transmission
+time i, that is, a transmission from v to w starting at time step ¢ and taking A time steps to
+cross the arc. The departure time in vertex v is t; the arrival time in vertex w is then t+ A.
+The two waiting-time functions a: V — IN and 6: V — NN assign each vertex a min-
+imum and maximum waiting time, respectively. The minimum waiting time a(v) is the
+minimum time a person has to stay in a vertex v before she can move on in the tem-
+poral graph. The maximum waiting time A(v) is the maximum time a person can stay
+in a vertex v before she is no longer allowed to move further in the graph. A temporal
+graph G = (V,E,T,a, B) is called instantaneous if a(v) = 0 for allv € V anda = 0 for
+all (v,w,t,A4) € E. Then, for the ease of presentation, we neglect a and we write arcs as
+triples (v, w, t) € E for instantaneous graphs.
+
+In Table 1, we introduce some notation for temporal graphs.
+
+Temporal Walk. A temporal walk is a walk in a temporal graph such that the time stamps
+of the visited time-arcs of a temporal walk are non-decreasing in time. Additionally, the
+
+transmission time and the waiting-time constraints have to be taken into account.
+
+Definition 2 (Temporal Walk) Given a temporal graph G = (V,E,T,a, B) and two
+vertices s,z € V, a temporal walk of length k from s to z is a sequence ((Vj-1, Vi, ti; ri),
+of time-arcs such that s = vo, Z = ve, and tr +A; taj) < tind < GH +Ai+ BW) forall
+ie[k — 1].
+
+A temporal path is a temporal walk where all vertices are pairwise distinct. We use
+the notation P = ((v;_1, Vj, t, My for a temporal walk or a temporal path, that is, a
+sequence of k time-arcs. The value of k is the length of P and for each i €[k] the tuple
+(Vj-1, Vi, ti, Aj) is a time-arc from vj_; to v; starting in time step ¢;. The value of A; is the
+time needed to traverse the time-arc, that is, one arrives at time step ¢; + Aj; at vj.
+
+Optimal Temporal Walk. Due to the time aspect, there are several, potentially contra-
+dicting criteria that can be optimized in a temporal walk. We formally define the criteria
+that were already motivated in “Modeling of optimal temporal walks” section.
+
+Table 1 Frequently used notation for a temporal graph G. The first part shows global variables, the
+second part shows frequently used local variables
+
+ 
+
+ 
+
+IN the natural numbers (including 0) {0,...}
+the vertex set of G
+E the time-arc set of G
+[7] the time interval of G
+a the minimum waiting time with a: V > IN
+B the maximum waiting time with B : V > IN
+Vi the vertex subset V; C V at time ¢, that is, Vk = {v,w | (v,w,t, A) € FE}
+Et the time-arc subset at time t, that is, EF; := {(v, w) | (v,w,t,A) € F}
+Gt the directed static graph G; := (V;, E¢)
+(v,w,t, A) a time-arc from u to v with time stamp t and transmission time A
+k usually the number of time-arcs in an optimal walk
+
+P a walk; often P = ((Vj-1, Vi, ti ADR, indicates the optimal walk
+
+ 
+Bentert et al. Applied Network Science (2020) 5:73
+
+Definition 3 (Optimal Temporal Walk) Let G = (V,E,T,a,B) be a temporal graph,
+let c: E — IN bea cost function, and let s,z € V be two vertices. A temporal walk P =
+((Vi-15 Vis ti, hi), from s to z is called optimal if it minimizes or maximizes a certain
+value among all temporal walks from s to z:
+
+ 
+
+criterion min/max optimization value
+
+ 
+
+foremost min th +hz
+reverse-foremost Max ty
+fastest min (th +rA,) —
+shortest min Soy Ai
+minimum hop-count min k
+cheapest min yy C((Vi-1, Vis Cis Ai))
+most-likely max Tia C((Vi-1) Vis Cis Ai))
+minimum waiting time min yy titi — (tj + Aj)
+
+Note that the most-likely criterion can easily be transformed into cheapest. For the most-
+likely criterion, the cost values of the time-arcs represent probabilities, implying c(e) €
+
+[0, 1] for alle ¢ E. Hence, maximizing Tia C((Vj-1, Vi, ti, Aj) is equivalent to minimizing
+k
+
+S _— log C((Vi-1, Vi; Li, hi)).
+
+i=1
+Hence, we neglect considering the most-likely criterion separately. We further call a tem-
+poral walk P = ((vj-1, Vj, ti, ALY from s to z an optimal temporal walk with respect to a
+
+linear combination with 61,...,67 € QF if it minimizes
+lin(P) = 61: (t, + Ax) Foremost
++ 62 -(—t) Reverse-Foremost
++ 63 - (th +Axp — th) Fastest
+k
++ 54°: S ri Shortest
+i=1
+k
++ d5 - S C((Vi-4; Vis ti, Ai)) Cheapest
+i=1
++ 66-k Minimum Hop-Count
+k-1
++ 67+) (tig — (i +40) Minimum Waiting Time
+i=1
+
+among all temporal walks from s to z.
+
+Transformation
+
+To simplify the presentation of the forthcoming algorithm in “Algorithm” section for
+computing optimal temporal walks, we design it to run only on instantaneous temporal
+graphs, that is, temporal graphs with no transmission times (A = 0 for all (v, w,t,4) € E)
+and no minimum-waiting-time constraints (w(v) = 0 for all v € V). This is no restriction
+
+since we can eliminate these with the following transformation.
+
+Page 9 of 26
+Bentert et al. Applied Network Science (2020) 5:73 Page 10 of 26
+
+Transformation 1 (Remove a and 4.) Let G = (V,E, T,a, B) be a temporal graph and
+let c: E > W bea cost function. Transform (G,c) into (G’,c’,c,, ind, A) where
+
+e G’ is an instantaneous temporal graph G’ = (V’,E’, T, B’) with
+
+~ VW=VUV! with VF := {v, | e € E},
+
+— FE’ = F° VE! with E° := {(v, ve, t) |e = (v,u,t, A) € E} and
+E! = {(ve,u,t +A +a(u)) |e = (v,u,t,A) € E},
+
+— pf’: V' > N with B’(v) := B(v) forallv € V, else B’(v) := T,
+
+e ¢: E' > N isa cost function with c'(e) := c(é) for alle = (v, v3, t) € E®,
+else c’(e) := 0,
+
+e c,: E’ > N isa transmission-cost function with c,(e) := £ for
+e = (v3,w,t+€+a(w)) € E! andé= (v,w,t, 2) € E, else cy (e) := 0,
+
+e ind: V’ — {0,1} is a vertex-index function with ind(v) := 1 ifv € V, else ind(v) := 0,
+and
+
+e A(v): V’ > {0,1} is an auxiliary function with A(v) := a(v) ifv € V, else A(v) := 0.
+
+We now show that any temporal graph can be transformed by Transformation 1 into an
+equivalent instantaneous temporal graph in linear time such that any optimal temporal
+walk in the instantaneous temporal graphs directly corresponds to an optimal temporal
+walk in the original graph and vice versa. To this end, we have to slightly adapt the formula
+
+for the linear combination as shown in the following proposition.
+
+Proposition 1 Let G = (V,E,T,a,B) be a temporal graph, let c: E — WW be a cost
+function, and let s,z € V. Let further (G’ = (V’,E', T’, B'),c’,c,, ind, A) be the result of
+applying Transformation 1 to (G,c).
+
+For 6),...,67 € Qo. there exists a temporal walk P := ((Vj-1, Vis ti, ry = (e;)_,
+from s to z in G which is optimal with respect to a linear combination of 5,,...,57 if and
+only if the temporal walk
+
+k
+P' := ((vi-1, Ves ti), (Ve;» Visti tAE+ o(vi)))) 4 = (Ayan = (Vi_4) Vi, tek
+
+from s to z in G’ is optimal with respect to the new formula for a linear combination of our
+optimality criteria defined as follows:
+
+lin’ (P’) = $1 - thy Foremost
++ 52 - (-t{) Reverse-Foremost
++ 53 - (t5, — t4) Fastest
+2k
++ 54° S c,.(e;) Shortest
+i=1
+2k
++ 55° S c(é;) Cheapest
+i=1
++ (56/2) - 2k Minimum Hop-Count
+2k-1
+
++ 67° (ty, — (4 - AW) ind) Minimum Waiting Time.
+i=1
+
+Transformation 1 runs in O(|V| + |E|) time.
+Bentert et al. Applied Network Science (2020) 5:73 Page 11 of 26
+
+Proof We will show that any temporal walk P in G corresponds to a temporal walk P’
+in G’ such that lin(P) = lin'(P’) and vice versa. To this end, observe that each ver-
+tex v € V* has an in-going and an out-going arc and the vertex set V = V’ \ V¥ is an
+independent set in G’. Hence, each temporal walk in G’ from s to z alternately uses vertices
+in V and V©. Since each vertex in V¥ represents an arc in G, each temporal walk in G’ has
+a unique representation in G and vice versa. It remains to show that lin(P) = lint (P’') —C
+for any temporal walk P in G where C is a constant only depending on the last vertex
+in P. Observe that by construction each vertex v; in P is the same vertex as v5, in P’
+and the arc (v;-1, Vi, ti, Ai) is represented by the vertex v5, and the arcs e5, , and e;,.. It
+holds that Aj; = c,(e5,) = ce, (eh, 1) + ca (e5,) and c(e;) = c'(e,,) = c(e5, 1) + c'(e5,).
+Finally, ti41 = t5,,, and t; + Aj = tj, — A(v4,) (recall A(v) = a(v) if v € V and A(v) = 0
+otherwise) and hence tj41 — (tj + Ai) = £5;,, — (65; — A(¥),)). Thus,
+
+lin(P) =
+k
+51+ (th + Ag) + 52- (—t) + 53+ (te + Ag — tr) + 84-0 Ai
+i=1
+k k-1
++ 85+) cle) + 56-k + 87+) (tiga — (ti + Ad)
+i=1 i=1
+= 81+ (te +Ag + a(t) — w(ty)) + 52 - (—t1)
+k k
++ 83 + (ty + Ag + (th) — alte) — t1) + 84°) ag +85 - >) ° clei)
+i=1 i=1
+k-1
++ 86-k+ 87>) (tiga — (i + Ai + (ti) — a(ti)))
+i=1
+
+51» (tyy_1 — A(V9y)) + 82» (— 04) + 53 + (toyp_y — AC) — Hh)
+
+2k 2k
++ 34°) ex(e}) + 55°) e'(e}) + (86/2) + 2k
+
+i=1 i=1
+k k-1
++ 87° | ) (Gj — Gir — AMD) 0) + D Gir — Gi — AM)
+i=1 i=1
+= 91+ (ty¢_1 — A(V2)) + 82 + (— 4)
+2k 2k
++ 83 + (th, Ay) — th) + b4- Yen (el) + 85-5 (4)
+i=1 i=1
+2k—1
++ (56/2) 2k + 87° )) (ig — G — A(Y))) - ind)
+i=1
+
+= lin’ (P’) — (6, + 63) - A(v4,).
+
+Observe that (6; + 43) - A(V5,) is independent of the temporal walk P’ and hence any
+optimal walk P in G corresponds to an optimal temporal walk P’ in G’. Lastly, notice that
+Transformation 1 runs in O(|V| + |£]) time. LI
+
+The algorithm for computing optimal temporal walks that we will introduce in the
+forthcoming section will find temporal walks optimizing the formula lin! (-) introduced
+Bentert et al. Applied Network Science (2020) 5:73 Page 12 of 26
+
+in Proposition 1. For instantaneous temporal graphs, where we do not have to use Trans-
+formation 1, optimizing according to lin! (-) is not a drawback as stated in the following
+(recall that the definitions of lin and lin’ depend on the parameters 41, ..., 57):
+
+Observation 2 Let G = (V,E, T, 8) be an instantaneous temporal graph and let c: E >
+IN be a cost function. Let further P := ((Vj-1, Vis tis di) Ry = (e;)K_, be a temporal walk
+in G. For 51,...,67 € Qo) it holds that
+
+lin(P) = lin’ (P) + (5¢/2)-k
+
+forc’ =6c, =0, ind=1,andA=0.
+
+Algorithm
+
+In this section, we present a single-source optimal-walks algorithm with respect to any
+linear combination of our optimality criteria. That is, given a temporal graph G =
+(V,E,T, 6), a cost function c: E — NWN, and a source vertex s € V, we compute opti-
+mal temporal walks with respect to any linear combination with 61,...,67 € Q from s
+to all vertices in the temporal graph (if they exist). To this end, we first apply Transfor-
+mation 1 to G to obtain an instantaneous temporal graph. Algorithm 1 then performs for
+each t €[ T] three main steps:
+
+GraphGeneration. Generate graph G which only contains the arcs present at time step ¢
+and add arcs from s to each vertex v in G that has been reached within the last B(v)
+time steps.
+
+ModDijkstra. Run a modified version of Dijkstra’s algorithm to compute for each v in G
+the optimal walk from s to v that arrives at time step t (if it exists).
+
+Update. Update a list storing information on optimal walks from s to each v € V. More
+precisely, for each v € V a list of tuples of arrival times and corresponding optimal
+
+values is updated.
+
+Efficiently storing and accessing the value of an optimal walk from s to v that arrives
+at a certain time step ¢ is the heart of the algorithm. We can maintain this information
+in O(|E|) time during a run of Algorithm 1 such that this information can be accessed in
+constant time, leading to the following theorem:
+
+Theorem 1 With respect to any linear combination of the optimality criteria, optimal
+temporal walks from a source vertex s to each vertex in a temporal graph G = (V,E,T, B)
+can be computed in O(|V| + |E| log |E|) time.
+
+Algorithm Details. Let G’ be a temporal graph with a cost function c’: E — IN and
+let s € V be the source. We can apply Transformation 1 to (G’,c’) to obtain (G =
+(V,E, T, B),c,c,,ind, A) where G is an instantaneous temporal graph. If G’ is already an
+instantaneous temporal graph, then we set c = c’, c, = 0, ind = 1, and A = 0 as justified
+by Observation 2.
+Bentert et al. Applied Network Science (2020) 5:73 Page 13 of 26
+
+Algorithm 1: Computes optimal walks.
+Input: An instantaneous temporal graph G = (V,E, T, 6), two cost functions c, c,, two
+vertex functions ind, A, and a source vertex s € V.
+Output: For each v € V the specific length of an optimal s-v walk.
+
+Variables :
+opt(v) stores the value of an optimal walk from s to v within time interval [ 0, ¢];
+L(v) is a sorted list [ (opty, »41)s-- +5 (opt, » ajy)| where opt,, is an optimal value of
+
+a walk from s to v that arrives at time a; with t + B(v) < a; < t.
+
+61,..,67 linear combination of the optimality criteria foremost, reverse-foremost,
+fastest, shortest, cheapest, minimum hop-count, and minimum waiting time,
+respectively.
+
+1 Initialize opt(v) = oo and L(v) as empty list for all v € V \ {s}
+2 fort=1,...,T withE; 4Bdo
+
+3 G,d,,d, < generateGraph (G;)
+
+4 V', opt, < modDijkstra(G,d,d,)
+
+5 for v <¢ V’ do
+
+/x Update step x /
+6 opt(v) <— min{opt(v), 6, -¢ — 69 - T +63 -(¢— T) + opt,(v)}
+7 L(v) < append (opt,(v), £) and delete redundant tuples (see Lemma 1)
+
+8 return opt
+
+/x GraphGeneration step: Generate graph G which only contains
+the arcs present at time step ¢ and add arcs from s to each
+vertex v in G that has been reached within the last f(v) time
+
+steps. x /
+9 function generateGraph (G;):
+10 Initialize EF, <— %; d,(v, w) <— oo and d;(v, w) < oo for all v, w € V; U {s}
+11 for (v,w) € E; do
+
+{ +53): (T —t) +54-.(y,w,t) +55-cly,wit) +56 ifv=s
+12 dt(v, w) <—
+
+64°C, (V, W, t) + 55 - c(v, Ww, t) + d¢ else
+
+13 for v € V; \ {s} do
+14 delete tuples (opt,,a@) in L(v) witha + B(v) <t
+15 if L(v) is not empty then
+16 E, — E, U {(s, v)}
+17 opt < min{opt, | (opt,,a) € L(v)}
+18 d,(s,v) < opt + 67 - ind(v) - (¢ -a+A(v))
+
+19 return ((V; U {s}, E; U E,), dz, d;)
+
+/* ModDijkstra step: Returns all vertices V’ with an arrival
+time exactly at time step ¢ and their optimization value
+
+d:V'’ oN. x /
+20 function modDijkstra ((V,E; UE,), d:,d,):
+21 initialize opt,(v) < 00, r(v) < oo forall v € V;, and r(s) = 0
+22 initialize Q < Vand V’ <— G
+23 while Q 4 4 do
+24 v < vertex in Q with minimum r(v)
+25 remove v from Q
+26 for (v,w) € E; UE, do
+27 r(w) — min{r(w), r(v) + min{d;,(y, w), d-(v, w)}}
+28 if (v, w) € E; then
+29 opt,(w) <— min{opt,(w), r(v) + d:(v, w)}
+30 L Ve V' Uf}
+
+31 return V’, opt,
+Bentert et al. Applied Network Science (2020) 5:73
+
+For given 61,...,67 € Q, Algorithm 1 for all v € V now computes an optimal walk P =
+
+((Vi-1) Vis ti), = (e;)_, from s to v with respect to
+
+k
+lin’ (P) =6) - (ty) + 89 - (th) + 83 + (te — t) + 64°) 0,(ei)
+i=1
+k k-1
++85-)  c(e;) +56-k +57 +) (tiga — te + A(viqa)) - ind(yj).
+i=1 i=1
+
+We have shown in Proposition 1 that an optimal walk with respect to lin! (P) in G directly
+corresponds to an optimal walk with respect to lin(P) in the original temporal graph G’.
+
+For each vertex v € V \ {s}, Algorithm 1 stores in opt(v) the value of an optimal walk
+from s to v and in L(v) a list of all relevant arrival times from s to v with their optimal
+values. In the beginning, opt(v) = oo and L(v) is an empty list (Line 1 in Algorithm 1).
+Then, for each time step t and each v € V, Algorithm 1 computes the optimal walk from
+the source s to v that arrives in time step ¢ (if it exists). Thus, Algorithm 1 performs for
+each t € {1,..., T} the following steps:
+
+GraphGeneration. Generate a static graph G with GenerateGraph (Line 3 and Lines
+9 to 19). This graph consists of the static graph G; = (V;, E;), that is, the static graph
+induced by all time-arcs with time stamp ¢, and the source vertex s.
+
+The weight of an arc (v,w) € E; is set to 54 - c,(v, w) + 55 - c(v, w) + dg. If further
+v = s, then we have to add (62 + 63) - (J — t) to take the departure time in s into
+account for the criteria reverse-foremost and fastest, see Line 12.
+
+Additionally, non-existing arcs from s to each vertex v € V; are added if there
+exists a temporal walk from s to v that arrived not later than 6(v) time steps ago. Let
+opt, be the optimal value among all walks that arrive within the time interval [ t —
+B(v), t] and let a be the corresponding arrival time in v. Additionally, the minimum
+waiting time A(v) plus the additional waiting time (¢ — a) in v has to be taken into
+account if ind(v) = 1. Hence, the weight of arc (s, v) is set to opt, + 57 - ind(v) -
+(t —a+A(v)), see Line 18. Let E; be the set of these additional arcs. Then, G =
+(V; U {s}, E; UE,, dt, d;).
+
+ModDijkstra. Runa modified Dijkstra Algorithm on G with modDijkstra (Line 4 and
+Lines 20 to 31). Instead of computing a shortest walk (using the original Dijkstra
+Algorithm) in G, compute a shortest walk among all walks that end in an arc of E;.
+This represents a temporal walk that arrives in time step ¢ with optimal value. The
+function modDijkstra returns the set V’ of vertices that can be reached within G
+via an arc in E; and the function opt,: V’ — IN that maps each vertex v € V’ to its
+optimal value of a walk from s to v arriving exactly at time ¢.
+
+Update. For each v € V’, set the optimum opt(v) to the minimum of its current value
+and the optimal value of a newly computed walk, that is, opt(v) := min{opt(v), 6) -
+t+ 53 -(t — T) + opt,(v)} (Line 6). Herein, we have to add the arrival time ¢ that has
+not been taken into account in the calculation of the optimal value because it is the
+same for all walks found at time step t. Add the tuple (opt,(v), ¢) to list L(v) (Line 7).
+
+After the Update step for time step ¢, the list L(v) contains all tuples (opt,,, ar) such
+that there exists a walk from s to v that arrives at time ar €[¢ — B(v),¢] with its optimal
+
+cost value opt,,. We want to have constant-time access to the optimal value of a walk
+
+Page 14 of 26
+Bentert et al. Applied Network Science (2020) 5:73 Page 15 of 26
+
+that arrives in v within time interval [ t — 6(v),t]. This can be achieved by deleting tuples
+from list L(v) that are redundant, that is these tuples are not meaningful for the correct
+computation of optimal walks. Let
+
+L(v) =| (opt,,,41),..-, (opty, 4x)]
+be such a list for a time step ¢ with ¢ — B(v) < a, < ... < ag < t. A tuple (opt,,, ar)
+is redundant if there exists a tuple with an arrival time greater than ar such that its opti-
+mal value is smaller than opt,, plus the additional waiting time. This is shown with the
+
+following lemma:
+
+Lemma 1 For a time step t € {1,...,T} and a vertex v € V, if there are two tuples
+(opt,,,4i); (opt,,, 4j) € L(v) with a; < a; and
+opty, < opty, + 67 - ind(v) - (aj — aij),
+
+then (opt,,, ai) is redundant and can be removed from L(v).
+
+Proof After all time-arcs with time stamp ¢ have been processed, Algorithm 1 only
+considers time-arcs with time stamp t’ > ft. In the generated graph G (Line 3), the algo-
+rithm adds an arc from s to v € V» if a walk from s arrives in v within [¢’ — B(v), t’].
+Ifa; €[t' — B(v), t'], then a; €[t’ — B(v), t’] because a; < a; < t’. Furthermore, let (opt, a)
+be the optimal value and the arrival time of a walk from s to v that arrives within time
+interval [| ¢’ — B(v), t’] that minimizes
+
+opt + 67 - ind(v)(t’ — a+ A(v)).
+
+Then, the weight of the arc (s, v) is set to this value. Since a; < aj €[t’ — B(v),t’] and
+opt,, + 67 - ind(v) - (aj — aj) = opt,,, we know that
+
+opt, + 57 - ind(v)(t' — a; + A(v)) < opt,, + 67 - ind(v)(t’ — a; + A(V)).
+
+Hence, the tuple (opt,,, a;) is not needed in the list L(v) at time step ¢ and can be removed.
+|
+
+ 
+
+If L(v) does not contain any redundant tuples, then it also holds that
+opt,, + 67 -ind(v) - (42 — a1) <--- < opt,,.
+
+Hence, (aj, opt,, ) contains the optimal value and arrival time of a walk that arrives within
+time interval [¢ — B(v),t] and minimizes opt + 67 - ind(v)(t’ — a + A(v)). It follows that
+finding opt = min{opt, | (opt,,a) € L(v)} in Line 18 takes constant time. The deletion
+of redundant tuples takes O(|E|) time during the whole run of Algorithm 1. With these
+
+considerations at hand, we can derive the following lemma.
+Lemma 2 Algorithm 1 runs in O(|V| + |E| log |E|) time.
+
+Proof The initialization in Algorithm 1 can be done in O(|V]) time. Furthermore, the
+time-arcs have to be sorted by time stamps which takes O(|E| log |E|) time. Then, for each
+time step ¢ €[ 7], Algorithm 1 generates in O(|E;| + |V;|) time a static directed graph
+G = (V; U {s}, Ey U E,) with O(| V;|) vertices and O(|FE;| + |Vz|) arcs.
+
+For each generated graph G, modDijkstra is executed in O(|E;| log |E;|) time. The
+updates of opt and L afterwards run in O(|V;|) time. Note that |V;| is the number of
+Bentert et al. Applied Network Science (2020) 5:73 Page 16 of 26
+
+vertices that have at least one in-going or out-going time-arc at time step ¢t. Consequently,
+it holds that |V;| < 2|EF;|.
+
+Due to the sorting of L(v), maintaining these lists in Lines 15 and 7 takes O(|E|) time
+during the whole run of the algorithm as shown Lemma 1. In the list L(v), we delete
+at most as many elements as there are time-arcs in the temporal graph. Recall that if
+(opt,,a) € L(v), then there exists a time-arc (w,v,a) € E.
+
+We can analyze the running time by
+
+T
+O(|V| + |El + > (Er|) + (Vil log |Vil))
+t=1
+T
+O(|V| + El +) (Ezl) + (Er| log |E,I))
+t=1
+T
+O(|V| + IE + )— |Er| log |ErI)
+t=1
+
+O(|V| + |E| log ||).
+
+IN
+
+Hence, Algorithm 1 runs in O(| V| + |E| log |E ) time. a
+
+Next, we show the correctness of Algorithm 1. We prove that for every time step ¢ and
+for every vertex v, Algorithm 1 computes an optimal walk from s to v that arrives at time
+step ¢ (if it exists).
+
+Lemma 3 For a time step t €| T] and a vertex v € V, Algorithm 1 computes the optimal
+value of a temporal walk from s to v that arrives exactly in time step t.
+
+Proof The proof is by induction on the time step ¢ € {1,..., T}.
+In the beginning, L(v) is empty. For t = 1, the algorithm generates a graph G = (Vj U
+{s}, £1). For all arcs (s, w) € Ej, the weights are set to
+
+dy(s, w) = CD) + 63) , (T a 1) + 64° Cry, Ww, 1)) + 65 , c((y, Ww, 1)) + 56;
+for the other arcs (v, w) € EF, the weights are set to
+dy (v, w) = 64° CY, w) + 65 - c((y, Ww, 1)) + d6.
+
+Note that if there is an optimal temporal walk arriving in time step 1, then there also exists
+an optimal temporal walk arriving at time step 1. Now if there is an optimal walk P =
+((Vi-1) Vis 1D), = (e;)K_, from s to a vertex v € V that arrives exactly in time step 1, then
+there exists a path P’ = ((yj-1, Vi) hy = (ai), from s to vin G with value
+
+k
+
+k
+YS) di (ai) = (62 +83) -(T — 1) + 84 en Vi-n vi) + 85 + C(Vi-1, Vi) + 86
+
+= opt, (v).
+Bentert et al. Applied Network Science (2020) 5:73 Page 17 of 26
+
+Algorithm 1 finds in modDijkstra the path P’, adds (opt, (v), 1) to L(v) and sets
+
+opt(v) := 6, -1—62-T+63-(1—T) + opt, ()
+k
+= 6,-1—8)-T +63-(1—T) + (8) +83): (T—1) + 9 b4.- ce, (Vi-1, Vi)
+i=1
++ 65 + c(Vji-1, Vi) + 56 +k
+k
+= 5) -1—8)-14+53-0+54-) ee)
+i=1
+k k-1
++85-) cle) +36 -k +57 +) Giga — t + A(vi)) - indi)
+i=1 i=1
+
+lin! (P).
+
+Note that A(vj) = 0 for i e[k — 1] by Transformation 1 in time step 1. If there exists
+an optimal path P* in G, then this directly translates to the existence of a temporal path
+P’ that arrives also in time step 1 with a smaller optimal value than P, contradicting the
+assumption that P is optimal.
+
+Now, let us assume that for all time steps t/ € {1,...,¢} Algorithm 1 computed the
+optimal value opt of a walk from s to v € V that arrives exactly in time step t’ and added
+(opt — 6, -t/ +6)-T — 53: (t' — T),t’) to L(y). If for time step t + 1 a vertex v € V has
+no in-going time-arc with time step ¢ + 1, then there cannot exist a temporal walk from s
+to v that arrives exactly in time step ¢ + 1. Thus, only vertices in V;;1 are candidates for a
+temporal walk that arrives exactly in time step ¢ + 1.
+
+Let v € V;4, be a vertex such that there is a temporal walk from s to v that arrives
+exactly in time step ¢ + 1. Let P = ((vj-1, vj, ID), = (e;)_, be an optimal walk from s to
+v that arrives exactly in time step ¢ + 1 with the optimal value
+
+k
+lin" (P) = 61 + ty — 69+ t% +63 - (te —t1) + 54+ ¥en (i)
+i=1
+k k-1
++85-)° c(e;) + 86-k +.57- Y (tin1 — Gy + A(%i)) - ind(vj).
+i=1 i=1
+
+Assume towards a contradiction that Algorithm 1 does not find a walk from s to v with
+optimal value lin! (P).
+
+First consider the case that ¢; = £+ 1 for all i €[ ky], that is, all time-arcs of the temporal
+walk P have time stamp t+ 1. Then, we can assume that P is a temporal path. Hence there
+exists a path P’ = ((v;_-1, vi) = (ai)K_, from s to v in G;4 and therefore in G with
+
+optimal value
+
+k
+
+k
+Y- di(ai) = (82 + 53) + (T — (6+ 1)) + D4 x (Vi-a, i) +85 + C(Vi-1, Vi) + 86
+i=1 i=1
+
+opt,.1(Y).
+Bentert et al. Applied Network Science (2020) 5:73 Page 18 of 26
+
+Algorithm 1 finds in modDijkstra the path P’, adds (opt,,)(v),f + 1) to L(v), and
+updates opt(v) to the minimum of opt(v) and
+
+61° (£+1)—62-7T+63-(€+1-—T) + opt,,,(v)
+
+= 6):(¢+1)—62.-T+53-(€+1—T) + (2 + 63)- (7 - 4+ D)
+k
++ Yo 4c, (Vi-1, Vi) + 85 + C(Vj-1, Vi) + 86 - k
+i=1
+k
+51 - ty — 52+ te +63 - (te —t1) + 54°) (ei)
+i=1
+
+k k-1
++85-) clei) + 66-k + 87+) (titi — + ACV) - ind(v)
+i=1 i=l
+= lin (P).
+
+Note again that A(v;) = 0 fori e€[k — 1] if t;_1 = t; by Transformation 1. Hence, we
+find a walk from s to v at time step ¢ + 1 with optimal value lin! (P), contradicting our
+assumption.
+
+Now assume for P that there exists an ¢ € {1,...,k — 1} such that for j €[ ¢] it holds
+that  < ¢£+1and forj’ € {i+ 1,...,k} it holds that t; = ¢ + 1. The temporal walk
+Pe = (Wi-1) Vis ti) i = (eK, is an optimal subwalk from s to v¢ that arrives exactly in
+time step t;, otherwise P is not optimal because it could be improved by replacing P:. The
+subwalk P, has an optimal value
+
+k
+lin’ (Pe) = 81 - ty — 8 - te +53 - (te —t1) +54) €i)
+i=1
+£L f-1
++85: ) cle) + 55-k +57- Y (tin — + AM) - ind(vj).
+i=1 i=1
+Then
+opt,,(ve) = optp, — 51 - te + d2 - T — 53 - (fe — T)
+£
+= (62 + 53) -(T — te) + 64° > e4(e)
+i=1
+£ f-1
++85-) cle) +86 -k +57 +>) Cig — te + A(Y)) - ind(y).
+i=1 i=1
+
+By our induction hypothesis, the tuple (opt, (ve), te) was added to L(ve). If the
+tuple (opt,, (vc), t¢) is not in L(v¢) in time step ¢ + 1, then due to Lemma 1 there must be
+another tuple (opt;(v¢), t) in L(ve) with te < t <t+1 < te + B(ve) < t+ B(ve) and
+
+opt,, (ve) + 67 -ind(vg) (£+1— te +A(ve)) = opt; (ve) + 47 - ind(ve) (f+ 1— t+A(vp)).
+
+Otherwise P is not optimal because it could be improved by replacing P¢ by the temporal
+walk represented by (opt;(vz), t).
+
+Now consider the generated graph G = (V;41 U{s}, E41 UE,). The arc sequence P;41 =
+((Vi-1) Vi) ceyd = (ai) p44 is a path in Gz4y = (Vi41, £41) and, thus, contained in G.
+The arc ae = (s, ve) is contained in E, with weight
+
+d,(s, ve) = opt, (ve) + (E+ 1 — te + A(ve)) - ind(v,).
+Bentert et al. Applied Network Science (2020) 5:73 Page 19 of 26
+
+Thus, there is a walk from s to v in G and modDijkstra on G returns the vertex v
+because ax € E;+1 with the optimal value
+
+k
+d-(ac)+ >> dr(ai)
+i=l+1
+opt,, (vi) + ind(ve) - (£+ 1 — te + A(ve))
+k
++ S 64°C, (Vi-1, i,t + 1) + 55 - C(Vi-1, Vi, t + 1) + 56
+i=l+1
+
+L
+
+(52 + 63) «(I —te) + > (54+ c,(e) + 55 - ee) + 56)
+i=1
+
+f-1
++87)  ind(j) - (tiy1 — t + AM)
+i=1
++ ind(ve) -(£+1— te +A(ve))
+k
++ So (54+ cx (vi-1, Vi) + 85 + c(Vi-1, Vi) + 56)
+i=l+1
+k
+= (69 +3): (T — te) +4- > cn (ei)
+i=1
+k £
++85-) clei) + 66-k + 87+) (isi — § + ACY) - ind(v)
+i=1 i=1
+k
+(52 + 63) - (I — te) + 4° )) ei)
+i=1
+
+k k-1
++85-) clei) + 66-k + 87+) (isi — § + ACY) - ind(v)
+i=l i=l
+
+opt,,;(V).
+
+Note that by Transformation 1 A(v;) = 0 for i e€[@€+ 1,k — 1] if t;_1 = ¢;. Consequently,
+the tuple (opt, ; (v),£+ 1) is added to L(v) and opt(v) is set to the minimum of its current
+value and
+
+6,:(€+1)—62-7T+4+63(¢+ 1 —- T) + opt,.1(Y)
+
+6)-(¢+ 1) —6.-T+63(¢+1- T)
+
+k
++ (82 + 63) + (T — ty) + 4°) ¢,(ei)
+i=1
+k k-1
++85-) clei) + 66-k + 87+) (isi — § + ACY) - ind(v)
+i=1 i=1
+L L k
+= 6-(f+1) +82: () +63(¢+1—4) +64- > x (e/)
+i=1
+k k-1
++85-)° c(e;) + 85 -k +.57- (tigi — ty + A(Mi)) - ind(vi)
+i=1 i=1
+
+= lin! (P).
+Bentert et al. Applied Network Science (2020) 5:73 Page 20 of 26
+
+This is a contradiction to our assumption.
+
+Lastly, observe that the algorithm only computes temporal walks that are contained
+in G as it only uses arcs from G; which all correspond to temporal walks in G (single arcs
+or longer walks starting in s). Thus, for ¢ € {1,...,7}, Algorithm 1 computes an optimal
+temporal walk from s to v € V that arrives exactly in time step t. O
+
+Based on this statement, we can finally prove the correctness of Algorithm 1. This
+concludes the proof of Theorem 1.
+
+Lemma 4 Algorithm 1 computes optimal walks from a given source vertex s to all
+
+vertices.
+
+Proof Let P = ((Vj-1, Vis Dy, = (e;)_, be a walk with minimum lin! (P) among all
+temporal walks from s to a vertex v. The walk P is also an optimal walk from s to v that
+arrives exactly in time step t,. This is computed by Algorithm 1 in time step tf, as shown
+
+ 
+
+in Lemma 3. |
+
+Experimental results
+
+We implemented Algorithm 1 and performed experimental studies including compar-
+isons to existing state-of-the-art algorithms by Wu et al. (2016). Note that the algorithms
+by Wu et al. (and our algorithm as well) are Dijkstra-like algorithms adjusted to the
+specific temporal setting. A notable difference is that our algorithm stops the graph explo-
+ration if no more vertex can be visited, whereas the algorithms by Wu et al. (2016) always
+iterate over all time-arcs. We show that our algorithm—while being able to solve a more
+general problem—can compete with these algorithms on real-world instances for the spe-
+cial case of computing temporal walks with no maximum-waiting-time constraints. We
+further examine the influence of different maximum-waiting-time values on the existence
+and structure (e.g., the number of cycles) of optimal temporal walks and on the running
+time of Algorithm 1.
+
+Setup and statics
+
+We implemented Algorithm 1 in C++ (v11) and performed our experiments on an Intel
+Xeon E5-1620 c omputer with 64GB of RAM and four cores clocked at 3.6 GHz each.
+The operating system was Debian GNU/Linux 7.0 where we compiled the program with
+GCC v7.3.0 on optimization level -O3. We compare Algorithm 1 to the algorithms of
+Wu et al. (2016) using their C++ code and testing it on the same hardware and with the
+same compiler. We tested our algorithm on the same freely available data sets as Wu et
+al. (2016) from the well-established KONECT library (KONECT 2017). The graphs are
+listed in Table 2 with some relevant statistics.
+
+For each optimization criterion, each 6 = c,c € {1,2,4,8,..., gllegTI\ and each data
+set, Algorithm 1 ran for 100 fixed source vertices of the data set chosen independently
+and uniformly at random. Our open source code is freely available at https://fpt.akt.tu-
+berlin.de/temporalwalks.
+
+Findings
+In the following, we first compare Algorithm 1 to the algorithm by Wu et al. (2016) in
+terms of running times in our experiments. In the second part, we analyze the effects of
+
+different maximum-waiting-time values 6 on Algorithm 1.
+Bentert et al. Applied Network Science (2020) 5:73 Page 21 of 26
+
+Table 2 Statistics for the real-world data sets used in our experiments (same freely available data sets
+as used by Wu et al. (2016), taken from the KONECT library (KONECT 2017)). The column “7" shows
+the lifetime of the temporal graph (after factoring out the precision in which time-arcs are measured)
+and the column “t” shows the number of time steps of the graph for which there exists at least one
+
+ 
+
+ 
+
+ 
+
+time-arc
+
+File \V| IE | T T
+elec 7,118 1-10° 1.19. 10° 1-10°
+facebook-wosn-links 63,731 8.2-10° 1.23 - 10° 74-10?
+epinions 1.3-10° 84-10? 8.16 - 107 939
+enron 87,273 1.1- 10° 1.4-10° 2.1- 10°
+digg-friends 2.8- 10° 1.7-10° 1.25 - 10° 82,641
+ca-cit-HepPh 28,093 46-10° 3.15 - 108 2,337
+youtube-u-growth 3.2 - 10° 9.4-10° 1.94. 107 203
+dblp-coauthor 1.3-10° 18-107 2.4- 10° 70
+flickr-growth 2.3- 10° 3.3 - 107 1.7- 107 134
+wikipedia-growth 1.9- 10° 4.107 1.93 - 10° 2,198
+Comparison
+
+When comparing with the algorithms by Wu et al. (2016), we only use the runs with no
+maximum-waiting-time constraints (6 = 7) and we tested all algorithms on the same set
+of randomly chosen starting vertices. In the experiments, we could only measure a very
+small effect of the optimization criteria on the running time. This even holds for linear
+combinations. The only exception was the computation of foremost which was a bit faster
+in comparison to the computation of the other criteria. For this reason we only include
+two examples here. We chose foremost and shortest as these are the two criteria where
+Algorithm 1 performed the best and the worst compared to the algorithms by Wu et al.
+(2016), respectively. The respective findings are illustrated in the box plots in Fig. 3.
+
+As one can observe in Fig. 3, Algorithm 1 has a larger variance and, therefore, is more
+dependent on the choice of starting vertices. The reason is that even for 6 = T, that
+is, no maximum waiting time constraints, not all vertices can reach all other vertices by
+temporal walks in the considered graphs: Algorithm 1 only considers arcs that start in
+vertices that were already visited and, hence, if many verices are not reached then the
+algorithm stops. In contrast, the algorithm by Wu et al. (2016) always considers the whole
+sorted time-arc list and, therefore, has almost no variance in the running time.
+
+The high variance is also the reason why our algorithm has a higher average running
+time but a comparable median running time: On average, the algorithm by Wu et al.
+(2016) is 16.4 times faster for computing the foremost walk and 7.6 times slower for short-
+est walks. Considering the median running times, however, our algorithm is 5.8 times
+faster for the foremost walk but the algorithm by Wu et al. (2016) is 1.2 times faster for
+shortest walks. The higher average running time is a clear weakness of our algorithm. We
+believe, however, that the algorithm is still a valuable contribution as it solves more gen-
+eral problems: it can easily combine multiple optimization criteria and it can cope with
+maximum waiting times and instantaneous arcs, that is, arcs with A = 0.
+
+When looking at the time to read the data we can observe that our algorithm takes
+roughly twice to thrice the time for preprocessing compared to the algorithms by Wu et
+al. This is due to the fact that for each arc in the input graph Transformation 1 constructs
+a new vertex and a new arc and so the resulting graph is almost thrice the size. The time
+to read in the data is much larger than the time of the actual algorithm and so Algorithm 1
+Bentert et al. Applied Network Science
+
+(2020) 5:73
+
+ 
+
+Wu et al.’s shortest
+Our shortest
+
+x Wu et al.’s read-in —— Wu et al.’s foremost
+
+* Our read-in Our foremost
+
+102
+
+10°
+
+1072
+
+Time in seconds
+
+ 
+
+Fig. 3 Running time comparison for computing foremost and shortest walks. For each graph there are four
+box plots. From left to right these correspond to the following algorithms: foremost of Wu et al. (black), our
+foremost (red), shortest of Wu et al. (blue), our shortest (green). The boxes represent the 25% to 75% percentile
+of running times over the 100 runs for different sources on the respective temporal graph and the line within
+the boxes illustrates the 50% percentile (the median). The whiskers on the top and the bottom represent the
+best and worst running times, respectively. We only depict the running times of the algorithms after the data
+has been read in and was preprocessed by Transformation 1. The two plots with the crosses show the
+running times of reading in the input and preprocessing it
+
+ 
+
+ 
+
+ 
+
+ 
+
+takes roughly thrice the time of the algorithms by Wu et al. (2016) if preprocessing is taken
+into account.
+
+Finally, we compared the running time of Algorithm 1 with a single optimization cri-
+terion against the same algorithm with a linear combination of all criteria considered.
+Figure 4 displays the average and median running time for 6 = T on all considered data
+sets.
+
+As expected, the linear combination of optimization criteria does not change the
+
+running time compared to a single criterion.
+
+Effect of different maximum waiting-time values B
+
+We next analyze the impact that the maximum-waiting-time constraint 6 has on Algo-
+rithm 1. Decreasing 6 can have two different effects: First, it can make temporal walks
+invalid as the maximum allowed waiting time in a vertex is exceeded. Thus, with small 6-
+values certain vertices can only reach few vertices by temporal walks. The second effect
+is that a temporal walk is invalidated but can be fixed by a detour that starts and ends in
+the vertex in which the maximal waiting time was exceeded.
+
+We first investigate the second effect. To this end, we partition the optimization crite-
+ria into two categories: The first category contains all optimization criteria for which a
+detour has no negative effect on the solution. These are foremost, reverse-foremost, fastest,
+and minimum waiting time. Since the solution for, e. g., fastest is only depending on the
+first and last time-arc of the temporal walk, adding a cycle somewhere in between does
+not change the solution. Minimum waiting time plays a special role here as this value can
+decrease when adding intermediate cycles. The second category contains all other opti-
+mization criteria, that is, those for which a detour has a negative effect on the solution.
+
+Page 22 of 26
+Bentert et al. Applied Network Science (2020) 5:73
+
+ 
+
+ 
+
+Po
+10! — Linear Combination
+— Cheapest
+
+o
+
+= lo}
+
+3
+
+oO
+
+Gh
+
+a
+
+2 107%
+
+=
+
+cy
+
+10-°
+© S 2 > 2 > Ae s Sw A
+SS oe SS x a 4° ic RY
+» o> oo “ oe <O <O <S
+x 9 SS 2 eo & xX
+O © 68 Aw xy x < 2
+A xe x ee KO * oF So
+VW & S So Se
+oo SS & oY
+ys
+S “ <
+KD
+
+Fig. 4 Running time comparison for computing optimal walks with respect to a linear combination
+(6) = 62 =... =67 = 1) of different optimization criteria (black) and with respect to cheapest walks (red)
+for B =T. Note that the red and black line are on top of each other and hence almost indistinguishable. The
+(upper) lines with crosses illustrate the average running time and the (lower) lines with boxes show the
+median running time
+
+ 
+
+ 
+
+ 
+
+These are minimum hop count, cheapest, and shortest. Since we could not measure signif-
+icant differences for the different optimization criteria within a category, we only display
+one figure for each category in Fig. 5.”
+
+We remark that in the first category we implemented the algorithm such that irrelevant
+cycles (cycles which do not change the optimality value) are kept in the solution. Hence
+Fig. 5 (top left plot) displays values close to the upper bound on the number of cycles in
+an optimal solution.
+
+Figure 5 (two bottom plots) show that the different categories behave very similarly
+when it comes to the running-time dependence on the value of 6. It seems to be more
+likely that the first effect we described in the beginning of this subsection (that decreas-
+ing B-values can make temporal walks invalid as the maximum allowed waiting time
+in a vertex is exceeded) is more important for explaining the running times. With very
+small 6-values, a vertex can only reach few other vertices and hence only few time-arcs
+are considered by Algorithm 1. With increasing 6-values, there seems to be a critical
+value (around 0.1% — 10% of the lifetime of the temporal graph) where suddenly much
+more connections appear and hence the running time increases drastically. This observa-
+tion is affirmed by Fig. 6, which shows that (almost) independently of the input graph, the
+running time is linearly depending on the number of vertices that are visited.
+
+We believe that the difference for small 6-values comes from the initialization which is
+again more depending on the input graph compared to the algorithms by Wu et al. This
+
+would explain, why our algorithms have a higher running time variance.
+
+Conclusion
+Building on and widening previous work of Wu et al. (2016), we provided a theoretical and
+
+experimental study of computing optimal temporal walks under waiting-time constraints.
+
+ 
+
+2\We omitted the data sets facebook-wosn-links, flickr-growth, ca-cit-HepPh, and youtube-u-growth in Fig. 5 to keep the
+figure clear. There is no information gain in displaying these data sets.
+
+Page 23 of 26
+Bentert et al. Applied Network Science (2020) 5:73 Page 24 of 26
+
+ 
+
+Visited Vertices (Average)
+
+ 
+
+  
+
+  
+
+10 102 10° 104 10°
+elec epinions enron
+digg-friends dblp-coauthor wikipedia-growth
+10° 10°
+rr hhhhhha
+
+> 10° a 10°
+ad 4 A 4
+< 10 pa tiRESSEEGEacce 10
+S103 pe of 103
+<x ry IORROOOOEX
+‘CO 10?
+o 10! 10!
+CO 10° 10°
++ 1071 10-1
+
+1072 10-2 I
+
+10—710—710—1 10° 10! 102 10° 10—-710—710—1 10° 10! 10? 10°
+foremost walk cheapest walk
+“—™~ 1 1
+80 10 pt thee hes 10
+xX
+
+g 10° K ttt 10°
+<
+— 10-4 go dpoProoooo 10-1
+S ; 90-00-00 0p AAR RB ADDL ,
+= 10 RROD HOH ri 10 l
+2 10% 10-3 A
+5 DAA AA A Ad OX AAAAAAAAA
+5 10-4 See @sseeee2! 10-4 |
+pc Ht Baamemoeees +
+
+10-° 107°
+
+10—-710-710—1 10° 10! 102 10° 10~-710-710-1 10° 10! 102 10°
+
+G-value / Lifetime in % G-value / Lifetime in %
+
+Fig. 5 Impact of different B-values on the number of cycles, the running time, and the number of vertices
+that can be reached by temporal walks from the chosen starting vertices. Each data point represents 100 runs
+for a specific B-value for randomly selected starting vertices in the same graph (the same vertices where used
+for all B-values). The symbol of the data point represents the input graph, the color represents the average
+number of visited vertices, and the x-coordinate represents the chosen 6-value (for the sake of comparability
+in terms of B-value divided by the graphs lifetime). The y-coordinate represents in the two upper plots the
+average number of cycles in optimal walks to all reached vertices and in the bottom two plots the average
+running time for each source vertex. A line connects all data points that use the same graph. The two plots on
+the left side show results for foremost walks and the two plots on the right side show results for cheapest walks
+
+ 
+
+ 
+
+ 
+
+ 
+
+The performed experiments indicate the practical relevance of our approach. As to future
+challenges, recall that moving from walks to paths would yield NP-hard optimization
+problems (Casteigts et al. 2015). Hence, for the path scenario the study of approximation,
+fixed-parameter, or heuristic algorithms is a natural next step. For the scenario considered
+in this work, note that we did not study the natural extension to Pareto-optimal walks
+(under several optimization criteria). Moreover, for (temporal) network centrality mea-
+sures based on shortest paths and walks, counting or even listing all optimal temporal
+walks or paths would be of interest. First results in this direction indicate that for several
+Bentert et al. Applied Network Science (2020) 5:73 Page 25 of 26
+
+ 
+
+ 
+
+ 
+
+ 
+
+ 
+
+ 
+
+101
+4
+A
+10°
+
+e fs
+
+op
+
+3
+
+S 49-1 o®
+
+< oo o° “
+
+=~ ® © > was
+
+o A
+
+& 1072 or i
+
+3 ex x XA Oo
+
+op BA AA XW x elec
+
+a O .
+
+& 107° ag Oepinions
+
+e a A enron
+
+4 4 © digg-friends
+107 H U + dblp-coauthor
++ 4 wikipedia-growth
+107° Lil pot pitt pop pitt pod pith pop pitiiil pop pitiiil pop viiiiil
+10° 101 10? 10% 104 10° 10°
+# Visited Vertices (Average)
+
+Fig.6 Average number of visited vertices and its influence on the average running time for foremost. Each
+data point represents 100 runs of our algorithm for foremost for one of the considered graphs for a
+specific B-value. The x-coordinate represents the average number of visited vertices and the y-coordinate
+indicates the average running time
+
+ 
+
+ 
+
+optimization criteria counting temporal paths is computationally hard even without wait-
+ing time constraints; in contrast, counting temporal walks seems easier (Rad et al. 2017;
+Buf et al. 2020).
+
+Acknowledgements
+We thank Lilian Jacobs (TU Berlin) for her programming work helping to enable our experimental studies and the
+anonymous reviewers of COMPLEX NETWORKS 2019 and Applied Network Science for their constructive feedback.
+
+Authors’ contributions
+Parts of this work originated from the master thesis of ASH. Overall, all authors have contributed equally to the paper. All
+authors read and approved the final manuscript.
+
+Funding
+ASH was supported by the DFG, project FPTinP (NI 369/16). Open access funding provided by Projekt DEAL.
+
+Availability of data and materials
+The data sets used and analyzed during the current study are available in the KONECT library, http://konect.cc/networks/
+(KONECT 2017). The open source code of the algorithm is freely available at https://fpt.akt.tu- berlin.de/temporalwalks.
+
+Competing interests
+The authors declare that they have no competing interests.
+
+Received: 10 March 2020 Accepted: 24 August 2020
+Published online: 06 October 2020
+
+References
+
+Ahuja RK, Magnanti TL, Orlin JB (1993) Network Flows: Theory, Algorithms, and Applications. Prentice Hall, Upper Saddle
+River
+
+Axiotis K, Fotakis D (2016) On the size and the approximability of minimum temporally connected subgraphs. In:
+Proceedings of the 43rd International Colloquium on Automata, Languages, and Programming (ICALP '16). Schloss
+Dagstuhl-Leibniz-Zentrum fuer Informatik, SaarbrUcken. pp 149-114914
+
+Barabasi A-L (2016) Network Science. Cambridge University Press, Cambridge
+
+Bast H, Delling D, Goldberg A, Muller-Hannemann M, Pajor T, Sanders P, Wagner D, Werneck RF (2016) Route planning in
+transportation networks. In: Algorithm Engineering - Selected Results and Surveys. Lecture Notes in Computer
+Science. Springer Vol. 9220. pp 19-80
+
+Bu S, Molter H, Niedermeier R, Rymar M (2020) Algorithmic aspects of temporal betweenness. In: Proceedings of the
+26th SIGKDD Conference on Knowledge Discovery and Data Mining (KDD '20). ACM. pp 2084-2092
+
+Casteigts A, Flocchini P, Godard E, Santoro N, Yamashita M (2015) On the expressivity of time-varying graphs. Theor
+Comput Sci 590:27-37
+Bentert et al. Applied Network Science (2020) 5:73 Page 26 of 26
+
+Casteigts A, Flocchini P, Quattrociocchi W, Santoro N (2012) Time-varying graphs and dynamic networks. Int J Parallel
+Emergent Distrib Syst 27(5):387-408
+
+Casteigts A, Himmel A-S, Molter H, Zschoche P (2019) The computational complexity of finding temporal paths under
+waiting time constraints. arXiv preprint arXiv:1909.06437. To appear at ISAAC '20
+
+Dean BC (2004) Algorithms for minimum-cost paths in time-dependent networks with waiting policies. Networks
+44:41-46
+
+Fluschnik T, Molter H, Niedermeier R, Renken M, Zschoche P (2020) Temporal graph classes: A view through temporal
+separators. Theor Comput Sci 806:197—218
+
+Fluschnik T, Niedermeier R, Schubert C, Zschoche P (2020) Multistage s-t path: Confronting similarity with dissimilarity.
+arXiv preprint arXiv:2002.07569. To appear at ISAAC '20
+
+Himmel A, Bentert M, Nichterlein A, Niedermeier R (2019) Efficient computation of optimal temporal walks under waiting-
+time constraints. In: Proceedings of the 8th International Conference on Complex Networks and Their Applications
+(COMPLEX NETWORKS '19). Studies in Computational Intelligence. Springer, New York. Vol. 882. pp 494-506
+
+Holme P (2015) Modern temporal network theory: a colloquium. Eur Phys J B 88(9):234
+
+Holme P (2016) Temporal network structures controlling disease spreading. Phys Rev E 94(2):022305
+
+Holme P, Saramaki J (2012) Temporal networks. Physics Reports 519(3):97-125
+
+Holme P, Saramaki J (2013) Temporal networks as a modeling framework. In: Holme P, Saramaki J (eds). Temporal
+Networks. Springer, New York. pp 1-14
+
+Holme P, Saramaki J (2019) Temporal Network Theory. Springer, New York
+
+Kempe D, Kleinberg J, Kumar A (2002) Connectivity and inference problems for temporal networks. J Comput Syst Sci
+64(4):820-842
+
+Kim H, Anderson R (2012) Temporal node centrality in complex networks. Phys Rev E 85(2):026107
+
+Kivela M, Cambe J, Saramaki J, Karsai M (2018) Mapping temporal-network percolation to weighted, static event graphs.
+Sci Rep 8(1):12357
+
+KONECT (2017) DNC emails network dataset. Inst Web Sci Technol. http://konect.uni-koblenz.de/networks/dnc-
+temporalGraph. Accessed 2017
+
+Lightenberg W, Pei Y, Fletcher G, Pechenizkiy M (2018) Tink: A temporal graph analytics library for Apache Flink. In: Proc.
+of WWW '18. ACM, New York. pp 71-72
+
+Masuda N, Holme P (2013) Predicting and controlling infectious disease epidemics using temporal networks. F1000prime
+Rep 5
+
+Mertzios GB, Michail O, Spirakis PG (2019) Temporal network optimization subject to connectivity constraints.
+Algorithmica 81 (4):1416-1449
+
+Modiri AB, Karsai M, Kivela M (2019) Efficient limited time reachability estimation in temporal networks. arXiv preprint
+arXiv:1908.11831
+
+Newman MEJ (2018) Networks. Oxford University Press, Oxford
+
+Nicosia V, Tang J, Mascolo C, Musolesi M, Russo G, Latora V (2013) Graph metrics for temporal networks. In: Temporal
+Networks. Springer, New York. pp 15-40
+
+Nicosia V, Tang J, Musolesi M, Russo G, Mascolo C, Latora V (2012) Components in time-varying graphs. Chaos Interdisc J
+Nonlinear Sci 22(2):023101
+
+Pan RK, Saramaki J (2011) Path lengths, correlations, and centrality in temporal networks. Phys Rev E 84(1):016105
+
+Rad AA, Flocchini P, Gaudet J (2017) Computation and analysis of temporal betweenness in a knowledge mobilization
+network. Comput Soc Netw 4(1):5
+
+Salathé M, Kazandjieva M, Lee JW, Levis P, Feldman MW, Jones JH (2010) A high-resolution human contact network for
+infectious disease transmission. Proc Natl Acad Sci 107(51):22020-22025
+
+Santoro N, Quattrociocchi W, Flocchini P, Casteigts A, Amblard F (2011) Time-varying graphs and social network analysis:
+Temporal indicators and metrics
+
+Wu H, Cheng J, Ke Y, Huang S, Huang Y, Wu H (2016) Efficient algorithms for temporal path computation. IEEE Trans
+Knowl Data Eng 28(11):2927-2942
+
+Xuan BB, Ferreira A, Jarry A (2003) Computing shortest, fastest, and foremost journeys in dynamic networks. Int J Found
+Comput Sci 14(02):267-285
+
+Zschoche P, Fluschnik T, Molter H, Niedermeier R (2020) The complexity of finding small separators in temporal graphs. J
+Comput Syst Sci 107:72-92
+
+ 
+
+ 
+
+ 
+
+Publisher’s Note
+
+Springer Nature remains neutral with regard to jurisdictional claims in published maps and institutional affiliations.

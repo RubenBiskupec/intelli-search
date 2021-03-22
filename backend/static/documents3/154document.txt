@@ -1,0 +1,1389 @@
+Li et al. EURASIP Journal on Wireless Communications and Networking
+
+(2020) 2020:110
+
+https://doi.org/10.1186/s13638-020-01 734-0
+
+EURASIP Journal on Wireless
+Communications and Networking
+
+RESEARCH Oy else =e
+
+A dynamic taint tracking optimized fuzz ®
+testing method based on multi-modal
+
+Check for
+updates
+
+ 
+
+sensor data fusion
+
+Qianmu Li'*?'@, Yaozong Liu’, Shunmei Meng'“, Hanrui Zhang’, Haiyuan Shen® and Huaqiu Long?
+y
+
+ 
+
+* Correspondence: gianmu@mail.
+njustedu.cn
+
+This work was supported in part by
+the 2019 Industrial Internet
+Innovation and Development
+Project from Ministry of Industry
+and Information Technology of
+China, 2018 Jiangsu Province Major
+Technical Research Project
+“Information Security Simulation
+System,” Fundamental Research
+Funds for the Central Universities
+(30918012204).
+
+"School of Cyber Science and
+
+Abstract
+
+The safety of the Industrial Internet Control Systems has been a hotspot in the
+information security. To meet the needs of communication, a large variety of
+proprietary protocols have emerged in the field of industrial control. The protocol
+field is often trusted in the implementation of industrial control terminal code. If
+attackers modify the data of these fields using the protocol defect, the operation of
+the program can be controlled and the entire system will be affected. To cope with
+such security threats, academia and industry generally adopt fuzz test methods.
+However, the current industrial control protocol fuzz test methods generally have
+low code coverage, where unified description models are missing and test cases are
+
+Engineering, Nanjing University of
+Science and Technology, Nanjing
+210094, China
+
+“Intelligent Manufacturing
+Department, Wuyi University,
+Jiangmen 529020, China
+
+Full list of author information is
+available at the end of the article
+
+not targeted. A method of fuzzification processing combined with dynamic multi-
+modal sensor communication data is proposed. To track the program execution, the
+dynamic pollution analysis is used to search for the input fields that affect the
+execution of the conditional branch and capture the dependencies between the
+conditional branches to guide the grammar generation of test cases, which can
+increase the chances of executing deep code. The experimental results show that
+the proposed method improves the validity and code coverage of test cases to a
+certain extent and greatly increases the probability of anomaly detection in the
+protocol implementation.
+
+Keywords: Fuzz test, Dynamic taint analysis, Dependence relationship, Grammar
+generation
+
+ 
+
+1 Introduction
+The IIS (Industrial Internet System) was implemented by a variety of automation com-
+ponents to achieve data acquisition, control, monitoring, and other functions. A typical
+industrial Internet communication architecture generally consists of a three-layer
+structure, from high to low, respectively, the Enterprise Network, Monitoring Network,
+and Control System Network [1, 2]. Figure 1 shows a typical Industrial Internet Con-
+trol System architecture.
+
+The IIS refers to the system composed by the computer equipment and the indus-
+trial production control unit, mainly including the SCADA (Supervisory Control and
+Data Acquisition), the DCS (distributed control system), the PCS (process control
+
+© The Author(s). 2020 Open Access This article is licensed under a Creative Commons Attribution 4.0 International License, which
+permits use, sharing, adaptation, distribution and reproduction in any medium or format, as long as you give appropriate credit to the
+original author(s) and the source, provide a link to the Creative Commons licence, and indicate if changes were made. The images or
+other third party material in this article are included in the article's Creative Commons licence, unless indicated otherwise in a credit
+line to the material. If material is not included in the article's Creative Commons licence and your intended use is not permitted by
+statutory regulation or exceeds the permitted use, you will need to obtain permission directly from the copyright holder. To view a
+copy of this licence, visit http://creativecommons.org/licenses/by/4.0/.
+
+o) Springer Open
+Li et al. EURASIP Journal on Wireless Communications and Networking (2020) 2020:110 Page 2 of 21
+
+ 
+
+Enterprise Manufacturing
+EX Management Execution System
+
+222 g¢S
+
+=
+
+ 
+
+eS
+Dak gevetom (ony Ko) .<
+: “8 } Historical DAtabase Engineer Station Monitoring Center
+
+Server
+
+Real-time Operator Station
+Database Server
+
+Monitoring Network
+
+OLE for |
+Process Control Server
+
+T fem . Programmable Distributed
+ermunal Cnt Logic Controller Control System
+
+ 
+
+   
+
+Control System Network
+
+ 
+
+Fig. 1 A typical Industrial Internet Control System architecture
+
+system), the PLC (programmable logical controller), and the FCS (Fieldbus Control Sys-
+tem) [3].
+
+In the electric IIS, for example, each link, from electricity generation to electricity
+utilization, has the corresponding electric IIS terminal, such as the PLC, the intelligent
+substation equipment, the monitoring, and control device and other types, for data ac-
+quisition, instruction scheduling, remote control, and so on. The transmission of con-
+trol flow and data flow between the IIS terminal and the main station is realized
+through industrial Internet protocols. The program component running in the terminal
+is responsible for analyzing and processing industrial Internet protocols.
+
+In recent years, with the rapid development of various emerging information tech-
+nologies, industrialization, and informatization are more closely integrated. More mod-
+ern information technology has been applied to traditional IIS. Meanwhile, various
+standardized communication protocols and network switching architectures have been
+popularized in IIS. Due to the addition of advanced information technology and com-
+munication network technologies (such as Ethernet), the openness of Industrial Inter-
+net Control Systems has been greatly enhanced, and it has also exposed it to more
+security risks. In 2010, Iranian nuclear facilities were attacked by Stuxnet [4], causing
+the delay of uranium enrichment. Using the vulnerability of Siemens’ SIMATIC
+WinCC/Step7 control system, Stuxnet broke into the SCADA successfully, injected the
+malicious code into the PCL, and hided perfectly to destroy the centrifuge while getting
+the control power of turbine for the purpose of destruction. As of September 2010, 0.1
+million host computers worldwide have been infected by the virus with a strong de-
+structive effect. In 2011, DUQU, Stuxnet’s variant [5], forged digital signatures through
+Li et al. EURASIP Journal on Wireless Communications and Networking (2020) 2020:110 Page 3 of 21
+
+Microsoft’s vulnerability MSII-087 to avoid the detection of security components of
+system and then stole various information on system and returned it to the attacker. In
+2015, Ukrainian electric power system was attacked by malicious software Black Energy
+[6] which got the remote access and control power of system and thus caused the crash
+of power grid’s SCADA host system and then an electricity black-out in a large area. In
+2017, security manufacturer ESET announced a tool win32/Industroyer attacking elec-
+tric IIS directly. The tool can cause the blackout from transformer substation by con-
+trolling the breaker. In 2018, a lot of warning messages of illegal intranet access
+appeared on a provincial electric IIS monitoring platform in China. After an analysis,
+people found the reason was the manufacturer ran and maintained the product server
+remotely by opening the function of file sharing and thus exposed the system in the
+public network for a long time, which brought serious hidden dangers. In the past 10
+years, many security incidents and potential and possible dangers made the security
+situation of IIS increasingly serious. Figure 2 shows the statistic of IIS security incidents
+in recent years, and the data came from IS-CERT (The Internet Systems Cyber Emer-
+gency Response Team) [7-13].
+
+During the realization of protocols by the industrial Internet terminal codes, protocol
+fields are generally credible, but the attacker can control the running of program by
+changing the data values of the fields using the defects of protocols and then affect the
+whole system. For example, the skip instruction’s destination address parameters gener-
+ally come from credible data sources in the program rather than externally incredible
+input such as the incoming data from an industrial Internet protocol. However, the at-
+tacker can overwrite the instruction’s destination address through system vulnerability
+and then control the running process of HS. Professor Jonathan M. Garibaldi proposed
+an indistinguishable conceptual framework as a key component of the evaluation of
+computerized decision support systems. Case studies show that human experts are not
+
+ 
+
+Taint Taint
+Datum a; Datum a>
+
+ViAtars
+
+Vr:A {az} V3:A{a)}
+
+ 
+
+V4:A {az}
+
+ 
+
+ 
+
+Fig. 2 An example of dynamic taint analysis
+Li et al. EURASIP Journal on Wireless Communications and Networking (2020) 2020:110 Page 4 of 21
+
+perfect, and there are techniques that allow fuzzy systems to simulate human-level per-
+formance, including variability. He demonstrated the necessity of “fuzzy intelligence”
+from two aspects: (a) fuzzy methodology (in the technical sense of Zade fuzzy sets and
+systems) is necessary as a knowledge-based system to represent and reason for uncer-
+tainty; (b) when evaluating intelligent systems, ambiguity (in a non-technical sense) is
+required and imperfect performance is accepted [14].
+
+This paper is inspired by these ideas and has carried out related research. In this con-
+text, to solve the problem of low rate of code coverage caused by the repeated execu-
+tion of test cases on the same path, starting from the level of system program in the
+realization of industrial Internet protocols and in the premise of acquirable source pro-
+gram codes or executable binary file, the paper proposes a method combined with the
+dynamic multi-modal sensor communication data in the program for fuzzy processing.
+The method tacks the program execution of protocol realization, finds the input fields
+affecting conditional branches through dynamic taint analysis, and captures the de-
+pendence relationship between conditional branches to guide the generation of test
+cases pertinently.
+
+1.1 Security analysis of industrial control protocols
+
+The industrial control system is to directly communicate with the underlying
+equipment or the data acquisition converter using the protocol agreed by the com-
+municating parties. At first, most industrial control protocols were implemented
+only between a closed network and trusted software through a dedicated serial
+port. But in order to meet the increasingly complex requirements of industrial con-
+trol systems, dedicated lines are gradually being replaced by TCP or wireless links.
+At the beginning of the design of industrial control protocols did not fully consider
+the necessary conditions to protect users’ security such as encryption and authenti-
+cation, and many protocols currently rely on TCP/IP. In this case, the data trans-
+mitted through the protocol cannot guarantee its security. An attacker only needs
+to master the protocol specifications and penetrate into the industrial control net-
+work to tamper with any data of the target device. The security flaws of common
+
+industrial control protocols are analyzed as follows.
+
+1. The Modbus protocol has no authentication mechanism. It establishes
+communication on the basis of TCP/IP. Therefore, as long as the attacker obtains
+the device’s network IP, he can successfully connect using port 502 directly. If the
+function code carried by the application data unit is supported by the Modbus
+device, a legal Modbus session can be established. In addition, there is no message
+check in the Modbus/TCP protocol. The checksum is generated at the transport
+layer instead of the application layer, so it is easier to fake the command. At the
+same time, for anyone, as long as they can connect to the target Modbus device,
+they can perform the functions of the Modbus device without permission to
+distinguish. Moreover, the data encapsulated in Modbus is transmitted in clear
+text, and an attacker can obtain the message data by using a network packet
+capture tool. Finally, the most dangerous aspect of Modbus is its programmability.
+Attackers can inject malicious code into RTU or PLC to achieve control.
+Li et al. EURASIP Journal on Wireless Communications and Networking (2020) 2020:110
+
+2. IEC 60870-5-101/104 is a widely used protocol in power industrial control systems,
+used to implement communication data transmission between MTU and RTU in
+industrial control systems. First, the checksum mechanism cannot guarantee the
+integrity of the transmitted data. The IEC-101 protocol only has a 1-byte check-
+sum. There is a possibility of a checksum overflow, and the exact value of this
+checksum cannot be determined by using a single-byte checksum, so the integrity
+of the data cannot be guaranteed. IEC-104 defaults to the default checksum. Its in-
+tegrity is completely dependent on the underlying layer, and data values can be eas-
+ily changed. Secondly, in the data transmission layer, the limited bandwidth limits
+the transmission length of the packet frame. The IEC-101 and IEC-104 protocols
+can only send 255 8-bit bytes when used at the same time, so it is not possible to
+add security bits during the data transmission. Although IEC 62351 was introduced
+to add security features to the IEC 60870-5 series of protocols, it is only focused on
+the application layer and does not involve the security mechanism of the data link
+layer.
+
+3. DNP3 is a standard formulated by IEEE PES on the basis of IEC. Its security is
+mainly reflected in the absence of authorization and encryption mechanisms, and
+its function codes and data types have been clearly defined, which makes it easier
+for attackers to tamper with DNP3 session content.
+
+4. The OPC protocol is a set of interface specifications conforming to industrial
+control requirements formulated by the OPC Foundation for protocol conversion
+and data sharing. The OPC protocol is implemented in a Windows environment,
+so an attacker can use Windows system vulnerabilities to attack it. Although most
+OPC hosts have the authentication mechanism enabled, the weak passwords,
+coupled with the opening of many system-independent services, make unnecessary
+running processes and development ports vulnerable to attack. OPC’s reliance on
+Microsoft’s authorization services is also outdated, and these security policies are
+too fragile and vulnerable.
+
+5. Ethernet/IP is more modern than Modbus, but there are still security issues. For
+example, when using UDP to broadcast data in real time, it lacks any built-in net-
+work layer mechanism to ensure communication reliability and data integrity. At-
+tackers can easily inject false data or use IGMP control messages to manipulate
+
+transmission paths.
+
+1.2 An industrial Internet protocol fuzz test method based on dynamic analysis
+
+In view of the serious damages caused by IIS’ vulnerability, researchers have proposed
+many vulnerability discovery technologies, such as the dynamic analysis, the symbolic
+execution, and the fuzz test [15, 16]. Comparing with other technologies, the fuzz test
+requires only a little knowledge of target, but can expand to large application program
+easily with good reusability and thus has become the most popular vulnerability discov-
+ery solution currently, especially in the IIS.
+
+With regard to network protocols, the most representative fuzzifier is SPIKE [17]. Its
+principle is describing the protocol as a block sequence model and making the data
+variation in blocks, and then partitioning the message’s data structure and making stat-
+istic of field length after the variation automatically, thus improving the effectiveness of
+
+Page 5 of 21
+Li et al. EURASIP Journal on Wireless Communications and Networking (2020) 2020:110 Page 6 of 21
+
+test cases significantly, but the fuzzifier shows an inadequate descriptive power for the
+constrained relationship in protocol messages. Later, Sulley [18] and Peach [19] ex-
+tended the data model based on SPIKE and added more descriptions on the depend-
+ence relationship between data blocks. In order to provide a more flexible and accurate
+fuzzy framework, AFL [20] tracked the path coverage of each input through the light-
+weight instrumentation in source program and allocated ID randomly to the basic
+blocks on the path using the Hash mechanism to determine whether where is any new
+path generated, and then used the input generating a new path as the seed. Combining
+with the detailed information in the program, the method improves the code coverage
+rate, but the Hash method may have collision cases easily and thus cause the problem
+of false negatives even though the input has reached a new path. Gan et al. proposed
+CollAFL [21] which allocated the ID value to each basic block using the greedy algo-
+rithm and other methods to ensure the Hash value is difference in each side and thus
+avoided Hash collision and realized a more accurate judgment of path coverage. Be-
+sides, the method uses the number of neighbor branches of paths as the weight to sort
+seeds and prompts the fuzzifier to probe the paths that have not been reached. Sanjay
+et al. proposed VUzzer [22]. The method requires no prior knowledge of application
+program or input format, and mainly uses the control flow and data flow characteristic
+of static and dynamic analyses to assist in variation and selecting seed files, and
+prompts the program to execute on a deeper level by giving the specific weight to each
+basic block.
+
+With regard to the industrial Internet protocol, most research achievements were
+realized by improving and extending existing network protocol fuzz test methods
+or tools. For instance, Roland et al. proposed ProFuzz [23] specific for the Profinet
+protocol stack. ProFuzz is mainly based on the fuzz test tools developed by Scapy
+fuzzer [24], and also contains Sullley’s fuzzer module, supporting five types includ-
+ing cyclic real-time execution, device discovery, configuration acquisition, applica-
+tion request, and accurate time control protocol. With regard to Wurldtech
+Company’s BlackPeer test framework [25], its key to constructing anomalous data
+is, in the premise of given initial sample data, defining protocol messages with the
+extended Backus-Naur form and generating corresponding test data grammar and
+then realizing the variation of protocol data units using interactive semantlIS. On
+the basis, Yafeng Zhang et al. [9] improved the BNF grammar. They parsed the in-
+dustrial protocol samples into the variation tree by introducing a tree-shape struc-
+ture and traversed all nodes in the tree for the purpose of variation. McCorkle
+et al. [26] made a fuzz test to the upper computer software of IIS, constructing
+anomalous data by making the variation operation to response messages and keep-
+ing the communication state of protocol by forging check codes and count values.
+SecuriTeam added the DNP3 protocol into the test tool beSTORM [27] and found
+the vulnerability of denial of service attack specific for DNP3 during the fuzz test
+to Wireshark. The Mu suite launched by Mu Dynamic Company [28] is applicable
+to protocols of IEC 61850, Modbus/TCP and DNP3, which constructs abnormal
+message data with the structured grammar analysis method and can also extend
+the industrial Internet protocols with unknown specifications using the additional
+function Studio Fuzz. Lzfuzz [29] is used for the specific DCADA protocols with
+unknown grammar, of which the basic idea is deducing message tokens using the
+Li et al. EURASIP Journal on Wireless Communications and Networking (2020) 2020:110 Page 7 of 21
+
+Lempel-Ziv compression algorithm and, combined with token information, making
+the variation processing to samples, but the method can hardly be used for the
+protocols with complicated input grammar.
+
+From the research above, we summarize the problems of fuzz test methods ap-
+plying to industrial Internet protocols currently as follows: (a) The low code cover-
+age: Many bugs can be triggered only in the case of a large path coverage rate.
+Although some methods have used the dynamic multi-modal sensor communica-
+tion data processed in the program, it is not reflected in the generation of test
+cases directly, causing that most cases are executed repeatedly on the same paths
+as input data and only cover a few paths. (b) No unified description models. Proto-
+cols, even of the same type, have different forms of messages, but current methods
+require building different data models, thus increasing the construction workload
+of model. (c) Insufficient pertinence of test cases. It is hard for test cases to pass
+the program verification, thus causing too many invalid tests. The design of vari-
+ation strategy without taking the characteristic of industrial Internet protocols into
+full consideration may cause the redundancy of case in the case of a lot of sample
+
+data and then affect test efficiency.
+
+1.3 Dynamic taint analysis
+
+The dynamic taint analysis proposed by Newsome [30] is a method tracking informa-
+tion flow during the running of program, i.e., tracking the transmission of data slots to
+be analyzed in the system and gaining target program’s detailed processing process for
+the data. In the method proposed, we use the technology to get the dynamic multi-
+modal sensor communication data in the program to provide the basis for the further
+fuzz test.
+
+The dynamic taint analysis method involves two parts, namely taint data identifica-
+tion and taint transmission path monitoring [31]. The core of taint data identification
+is defining taint data. If the data source is suspect, the data generated by it are taint
+data, which, as the input, shall be tracked and analyzed in the running process of binary
+code, and then the message data constructed in the fuzz test can be considered as
+suspect.
+
+During the running of program, the transmission of taint data is completed through
+instructions and taint data may participate in the operation as the source operands in
+the arithmetical operation instruction or the parameters of data movement instruction,
+of which the operation output is generally related to taint tracking data and thus should
+be identified as the taint attribute. Figure 2 shows a simple example of dynamic analysis
+process. In the figure, a; and a, are taint data; the arrow means the operation execu-
+tion; the leading end represents the source operand; and the tail end represents the op-
+eration output. During the running of program, variables V;~Vg are affected by taint
+data a; and ap. If A, as the set of taint source of each variable, is empty, we can consider
+that the variable is not tainted. From the figure, we can see that the set of taint source
+of Vg which is the last output is the union set of taint source sets of operation operands
+V3 and Ve.
+
+Using the dynamic taint method, we mainly aim to analyze the data flow and the con-
+trol flow, also known as the explicit flow and the implicit flow, during the execution of
+Li et al. EURASIP Journal on Wireless Communications and Networking (2020) 2020:110
+
+binary codes. The former refers to data dependence relationship, i.e., variable V,’s taint
+information is sent to V2 directly through the assignment or arithmetic operation, as
+shown in Fig. 2; the latter corresponds to the control and dependence relationship of
+conditional branches, i.e., variable V;’s taint information is sent to V> indirectly through
+the associated condition expression. For the purpose of understanding, we make a sim-
+ple analysis using the example of sample code shown in Fig. 3.
+
+In the example above, the function of code implementation experiences the input of
+variable x, the generation of message msg and the submission through post. In the
+process, x is identified as the taint datum, and according to the analysis method of data
+
+a )
+
+flow, msg is assigned as constant “a” or “b” directly. The constant would not be tainted,
+so msg is identified as the untainted attribute. However, the value of msg also depends
+on whether conditional branches x==a and x==d are true or false, i.e., msg and x have
+a control and dependence relationship, which belongs to the implicit taint of flow. In
+practical applications, such codes have a security risk when used for the communica-
+tion realization of network protocols.
+
+When msg is submitted, the attacker may intercept msg and then deduce the value
+of input x, so msg is definitely a taint datum and thus should be tacked and monitored.
+
+There will be false negatives without considering the control and dependence
+
+ 
+
+begin
+2 Ll x=get input():
+L2 msg = uri ="';
+4 L2if(x=='a'){
+5 L4 uri='post';
+LS msg =‘a’;
+L6}
+L7 else if (x =='b'){
+L8 uri='post’;
+L9 msg="D
+L10}
+2 L11 send(uri, msg):
+5 end
+
+Fig. 3 Example code for dynamic analysis
+
+ 
+
+ 
+
+Page 8 of 21
+Li et al. EURASIP Journal on Wireless Communications and Networking (2020) 2020:110 Page 9 of 21
+
+relationship of msg. On the contrary, url’s value is independent of branches L3 and L7,
+so there is no harm even if it is identified as the untainted datum.
+
+1.4 Method and principle
+
+According to the industrial Internet protocol realization program, the section gets re-
+lated dynamic multi-modal sensor communication data through dynamic taint analysis
+to guide the generation of test cases. Figure 4 shows the specific test process of the
+method. The method proposed uses many protocol messages as the input to avoid the
+problem of insufficient test cases caused by single sample datum.
+
+Definition 1 The dynamic interactive fields: In the given program execution, then for
+conditional branch x; (the ith execution of conditional branch x), there is DIF(x;) =
+{F;|F; is the protocol field affecting the execution of x;} in which DIF(x;) is the set of
+protocol fields.
+
+Definition 2 The dependence and control relationship: In the given program execu-
+tion, then if there is a conditional branch y; deciding whether to execute x;, we can say
+x; depends on y,;s dynamic control and express it as CDC(x;) = {y,T|F} in which
+CDC(x;) is the set of branches meeting the condition, and Constraint(x;) represents the
+constraint of conditional branch x;.
+
+Definition 3 Dynamic control flow diagram: For each program input, its execution
+path can be expressed with the dynamic control flow diagram, in which conditional
+branch x;, is the node, DIF(x;) is the dynamic interactive field of node, and CDC(x%;) is
+the side representing the dependence relationship of conditional branches.
+
+We define the input protocol fields affecting conditional branches through the dy-
+namic taint analysis, make the taint identification processing to each protocol input
+
+field, and track the tainted data flow in the execution of program. With regard to the
+
+Dynamic
+Taint
+
+   
+ 
+
+  
+
+Source Program of Protocol
+Target System Message
+
+  
+         
+  
+
+Fuzzy
+
+_—— Does the ae
+Algorithm
+
+~—
+
+~
+
+_
+~~ target crash? —
+ata ae
+
+ail
+
+Generation of Yes
+Test Cases
+| End )
+
+ 
+
+Fig. 4 Industrial Internet protocol fuzz test process based on dynamic analysis
+Li et al. EURASIP Journal on Wireless Communications and Networking (2020) 2020:110 Page 10 of 21
+
+dependence and control relationship of program, we capture it with the algorithm pro-
+posed in ref. [32]. It should be noted that for industrial Internet protocols, the fields
+generally have the checksum (like the CRC) which will cause the deluge of taint data if
+transmitted in control information flow. Because of all fields used as checksums, most
+conditional branches will be identified as taint data, in which case, it is hard to directly
+find the specific field affecting conditional branches. Besides, due to the dependence
+and control relationship, the fuzzy method proposed considers the transmission taint
+in control flow indirectly. Therefore, when using the dynamic taint analysis method, we
+only focus on the transmission taint in the data flow rather than tracking the transmis-
+sion taint in the control flow.
+
+Algorithm 1 introduces the fuzzy method proposed in details. The main function
+dynamicFuzz can execute program P, Protocol G, and protocol message J as the in-
+put, to process much protocol input, and the output is the abnormal information
+triggered. Lines 1~2 of algorithm initialize the data structure to be stored. The test
+cases generated which will also be used as the new input are put in the queue for
+storage for convenience of recursion execution. Line 5 combined with two parame-
+ters, program, and protocol input, gets the sets of DIJF(x;) and CDC(x;) of each
+conditional branch in each program using the dynamic taint analysis method, and
+then constructs the corresponding dynamic control flow diagram using DIJF(x;) as
+the node and CDC(x,) as the side. Line 6 makes the fuzzy operation from the start
+point of executable path in the control flow diagram. Line 8 deduces Constraint(x;),
+the corresponding constraint condition of node x;, as the parameter of test case
+generation algorithm.
+
+Line 16 of algorithm means that after the generation of test case, we need to use the
+test case as the new input to replace the value of protocol field in set DIF(x,) of original
+input and modify all fields related to Constraint(x;) to meet the constraint condition.
+To ensure the test case will be executed on a deeper level in the program and improve
+the probability of finding new execution paths, the rest of protocol fields which are un-
+related to DIF(x;) and Constraint(x;) should also be kept valid according to protocol
+grammar. For instance, in the protocol input, the values of two fields start address and
+end address shall change from original 1 and 2 into 3 and 6. Even if there is no con-
+straint condition, the corresponding fields of address data shall be regenerated based
+on the original normal size (increasing from 1 to 3), but if the two address change into
+the invalid test cases of 6 and 3 after the fuzzification (start address < end address), the
+fields unrelated to DIF(x;) and Constraint(x;) still keep the normal values.
+
+Lines 17~20 monitors whether there is any abnormal state such as the crash or mem-
+ory leak in the execution of test case. Although the test case is used as the new input,
+in consideration of the expenses caused by program execution, the method proposed
+does not get the dynamic multi-modal sensor communication data of each conditional
+branch repeatedly. In the execution of test case, lines 21~24 store the code paths tra-
+versed, put the conditional branches unparsed into the input queue and then decide
+the priority ranking according to the quantity of new branches. Line 25 of algorithm
+stores the dynamic multi-modal sensor communication data sequence of each node for
+lines 9~13 to judge whether current node generates the test case. When the list has a
+dynamic multi-modal sensor communication data sequence and the test case generated
+
+which correspond to current node x,’s DIF(x;) and Constraint(x;), respectively, then the
+Li et al. EURASIP Journal on Wireless Communications and Networking (2020) 2020:110 Page 11 of 21
+
+algorithm will skip the test case generation of the node directly. Line 29 of algorithm
+stores the dynamic control flow diagrams as the paths probed in the queue after com-
+pleting the code paths of program.
+
+Algorithm 1. A Fuzz test Algorithm Combined with Dynamic
+multi-modal sensor communication data
+Input: Program P, Protocol Grammar G and Protocol Message [
+Output: Abnormal Information
+Function dynamicFuzz (P,G,/)
+
+1. probedPath,inputQueue, checklist — empty()
+
+2. inputQueue.push(I)
+
+3. while inputQueue.notEmpty() do
+
+4. input — inputQueue.pop()
+
+5. dcefg < executionAnalysis (P, / )
+
+6. node < dcfg.start(probedPath)
+
+7 while node 4 NULL do
+
+8. c <— dcfg.getConstraint (node.CDC)
+9. if checklist.find(node.DIF, c) &&
+10. node.true, node.false 4 NULL then
+11. node < dcfg.next()
+
+12. continue
+
+13. end
+
+14. tcList ~ makeTestCases (node.DIF, c, G)
+15. for each tc in tcList do
+
+16. input’<— makeInput (input, tc.value, c)
+17. res <— executionMonitor( P , input’)
+
+18. if (res.execption) then
+
+19. return getExceptionInfo(res)
+
+20. end
+
+21. if(probedPath.isNew(res.pathInfo)) then
+22. inputQueue.push(input’)
+
+23. end
+
+24. end
+
+25. _checklist.add(node.DIF, c)
+26. node <— dcfg.next()
+
+27. end
+
+28. end
+
+29. probedPath.add(dcfg)
+
+To reflect the dynamic multi-modal sensor communication data extracted from the
+program into the construction of test case directly, the method proposed focuses on
+the generation technology assisted with the variation and guides the generation of test
+case grammar specific for node x; by combining with corresponding dynamic multi-
+modal sensor communication data. Algorithm 2 describes the specific process. The test
+case generation function makeTestCases considers protocol field fields, i.e., the element
+in set DIF(x,) in Definition 1, rule constraint c and protocol G as the input, and the out-
+put is the set of test cases tcList. The key to the function is generating test cases by ac-
+quiring the efficient grammar of each node and the reversed grammar. Line 2 has only
+one valid grammar for protocol fields, i.e., deducing the grammar of each protocol field
+in the constraint condition according to parameters as the valid grammar of the node.
+The feasibility is the valid grammar applied to node ~; definitely is the subset of proto-
+col grammar G, because according to Definition 3.2, i.e., in the constraint condition of
+Constraint(x;), the valid grammar can apply to all the protocol fields in DIF(x,). Line 3
+means when the protocol field has much valid grammar, constructing much grammar
+through the combinations of the valid grammar and storing the grammar in the set of
+test cases. For instance, for node xi, there is DIF(x;) = {F,,F,}, and the valid grammar
+deduced in Constraint(x;) is F, = (0|1), F, = 2, and then the grammar combined is (F,
+= 0, F, = 2) and (F, = 1, F, = 2). Next, lines 4~9 of algorithm reverses the valid gram-
+
+mar corresponding to each filed of valid grammar in the premise of meeting constraint
+Li et al. EURASIP Journal on Wireless Communications and Networking (2020) 2020:110 Page 12 of 21
+
+condition Constraint(x;) and then combine them with other fields’ valid grammar for
+
+fuzzified grammar and add the grammar to the set of test cases.
+When there is no applicable test grammar found in DIF(x;), the case data shall be
+
+generated through variation with methods like random bit flip, extreme substitution,
+and boundary value substitution.
+
+Algorithm 2. A Test Case Generation Algorithm Combined with
+Dynamic multi-modal sensor communication data
+
+Input: Protocol Field fields, Rule Constraint c and Protocol
+Grammar G
+Output: Set of Test Cases tcList
+Function makeTestCases(fields, c, G)
+. tcList — empty()
+. validGrams <— extractGrams(fields, c, G)
+. tcList < combination (validGrams) A c
+for each g in validGrams do
+fg<—~gAc
+fuzzyGram <— fg ( (other g’in validGrams)
+. tcList.add(fuzzyGram);
+end
+. return tcList
+
+2 Methods and experimental
+We use the Modbus protocol as an example. Figure 5 shows the simplified format of
+
+CHNAAKKRWN
+
+Modbus protocol. The fields include the protocol identity, the length of information,
+the field of function code, the start address, the end address, the data field determined
+according to function code, and the CRC (Cyclic Redundancy Check). The figures in
+brackets represent the sizes of fields. The values of CRC calculation and other check-
+sum algorithms as the mechanisms completing protocol communication are generally
+imbedded into protocol specifications to identify potential broken data. Although the
+verification mechanism of Modbus/TCP is realized in the transmission frame of TCP
+and the protocol formats do not include the CRC, the CRC verification generally exists
+in Modbus RTU and other industrial Internet protocols. If the CRC received by the
+program fails to match the CRC obtained through calculation, the data of correspond-
+ing case may be ignored directly. It is a very important mechanism to ensure security
+and functionality, but if CRC’s value is not updated when protocol fields change, the
+fuzz test shall be blocked, so the CRC is also considered as an important field.
+
+Figure 6 describes some program codes processing protocol realization. Line 3 condi-
+tional branch of program checks whether the protocol identity meets specifications and
+verifies the validity of input message data. The protocol messages failing to meet speci-
+fications shall be abandoned directly without any processing. Line 8 is the CRC. Simi-
+larly, the messages failing to pass the check shall also be abandoned directly. If the
+conditional branches above are passed, the next operation is reading the function code.
+The example program only offers two typical function codes of Modbus protocol: read-
+ing and writing, i.e., function code 0x05 supported represents the writing operation,
+and Ox01 represents the reading operation. The example code has two bugs, and these
+
+anomalies shall be triggered only in the case of meeting specific conditional branches.
+
+Identity (2) | Length (2) | Function Start End Data(n) | CRC (2)
+Code (1) Address (n) | Address (n)
+
+ 
+
+Fig. 5 An example of industrial Internet protocol input format
+
+ 
+Li et al. EURASIP Journal on Wireless Communications and Networking (2020) 2020:110
+
+ 
+
+1 int modbus_ handle(char* field)
+1 {
+
+ 
+
+if(field[Oj]!='\x00" || Field[l]!='\xo00') {
+return 0;
+}
+else {
+unsigned short length=get_length (field);
+if(get_crce(field) !=crclé(field,length)) {
+return 0;
+
+1 }
+
+i bak else {
+
+12 char func=field[¢];
+1 if (func="'\xO0l'){...
+
+else if (func=—' a
+unsigneds short get start (field,2);
+unsigneds short e=get_end(field,2);
+if(s>e) {
+
+return 0;
+
+}
+{
+s=
+
+}
+
+else {
+for(int i=0;i<=e-s;itt) {
+if (length-7<(e-s+1) *DATA_ SIZE)
+error trigger();
+if(s<=TRIG POINT && TRIG POINT<=e)
+if(buf[S+TRIG POINT-s]==KEY) )
+error trigger();
+write register (sti,field[9+ti]);
+
+}
+
+in «fh
+
+} Oy
+
+ 
+
+Fig. 6 An example of industrial Internet protocol code realization
+
+Line 22 describes the typical heap overflow bug which means the program fails to
+check whether the size of data from the start address to the end address is consistent
+with the size of actual message and thus causes the problem of heap overflow when the
+length of data exceeds the size of actual data. Lines 24~26 are the bugs embedded de-
+liberately, which shall be triggered only if a specific value (KEY) is written into a spe-
+cific address (TRIG_POINT). We can see clearly that for the test case input, the bug
+may be triggered only through the protocol identity and CRC. It is difficult for the fuzz
+test method based on random variation which does not know the grammar actually ex-
+ecuted by the target protocol in the program and thus cannot reach the conditional
+branches may trigger the anomaly and also causes a lot of invalid test data. According
+to the algorithm above, we analyze the protocol input format in Fig. 5 and the protocol
+program example in Fig. 6. For the convenience of description, we call the protocol
+fields as J, L, F, S, E, D, and C for short.
+
+Figure 7 shows the control flow diagram and execution paths of the first input. It is a
+dynamic control flow diagram constructed through a valid input executing the writing
+function, of which the right half part shows the paths actually covered by the input dur-
+ing the running of example program and the dotted part shows the new execution
+paths discovered in each node. According to Definition 3, in the figure, the start node
+3, represents the first execution of the conditional branch corresponding to the 3rd line
+of example code; the elements in braces represent DIF(3,), the field affecting the 3rd
+line conditional branch; the side with arrow represents the dependence and control
+
+Page 13 of 21
+Li et al. EURASIP Journal on Wireless Communications and Networking (2020) 2020:110 Page 14 of 21
+
+ 
+
+214:{S,E} 214:{S,E}
+215:{S,E} 215:{S,E}
+213:{S,E} 213:{S,E}
+
+    
+ 
+
+221:{L,S,E} 221:{L,S,E}
+22):{L,S,E} 22):{L,S,E}
+
+Fig. 7 Control flow diagram and execution paths of the first input
+
+ 
+
+relationship CDC(3,). The control flow diagram shown in Fig. 8 is the test case gener-
+ated by choosing the combinations of function code 0x05 and n data fields in the case
+node 24, is true in the first input execution, and is considered as the second input.
+Suppose the start node 3, does not depend on any node, considers protocol identity
+field J as the dynamic interactive field, and has the only true value of 0x0000, and then
+get the corresponding two test grammar after fuzzification with the algorithm. Node 3,
+actually is a conditional branch to identify whether the field is true or false according
+to the protocol, so according to each test grammar, it is easy to deduce that the con-
+straint condition making node 3, true is J+ 0x0000. Briefly speaking, the condition
+making the conditional branch of line 3 executable is J + 0x0000, while the constraint
+making the conditional branch false is J = O0x0000. In this case, for the next node 8,
+Li et al. EURASIP Journal on Wireless Communications and Networking (2020) 2020:110 Page 15 of 21
+
+ 
+
+35:41}
+81: {1,L.F,S,E,D,C} 81: -LL,.F,S,E,D.C}
+
+   
+
+   
+     
+
+ 
+ 
+
+  
+  
+   
+  
+
+211:{S,E} 213:{S,E}
+21n+1:{S,E}
+22;:{L.S,E}
+
+22n:{L,S,E}
+
+Anomaly
+
+Fig. 8 Control flow diagram and execution paths of the second input
+
+ 
+
+according to its CDC(8,), deduce Constraint(8,) is the constraint making 3,’s condi-
+
+tional branch false, ie., J = 0x0000. The cyclic redundancy filed, as the only grammar
+check field applicable to the whole field, generates two test grammar I = Ox000Acrc(J, L,
+F, S, E, D) = C and I = 0x000AcrcU, L, F, S, E, D) # C in a similar way. On the basis, go
+on getting the constraint condition of node 8), and then, in the similar manner, solve
+each node.
+
+It should be noted that according to the algorithm description, the test grammar gen-
+erated in node 13, has decided whether node 14, is true or false, so there is no corre-
+sponding test grammar generated in node 141. Similarly, skip nodes 21,, 215, 225, 24,
+and 213. According to Algorithm 1, when the test grammar is generated, the dynamic
+flow diagram is stored into the queue as the probed path. In this case, if there is the
+probed path, when searching paths in the control flow diagram, we can get the parti-
+tion node generating different paths by comparing the paths and consider the node as
+a start node. All nodes before the node have the same dynamic multi-modal sensor
+Li et al. EURASIP Journal on Wireless Communications and Networking
+
+(2020) 2020:110
+
+communication data and thus can be extracted directly to avoid the repeated gener-
+ation of test cases. Table 1 gives an example of the test case generation grammar of the
+first input obtained with Algorithm 2.
+
+We make an experiment using the most popular Modbus/TCP protocol as an ex-
+ample. Figure 9 shows the test environment created.
+
+Table 2 gives the equipment involved in the Fig. 10. The experiment is made with
+Ubuntu 14.04, so we choose the open source library libmodbus to realize the Modbus/
+TCP protocol communication in Linux system. The fuzzy method proposed is realized
+with Symfuzz [33], a tool developed based on BAP [34] open-source binary system ana-
+lysis framework, which can convert executable files into the intermediary language ap-
+plicable to program analysis, and combined with PIN to execute dynamic binary system
+instrumentation to the target program to get the dynamic interactive fields and de-
+pendence and control relationship required by the method to guide the generation of
+subsequent test case. We choose AFL-fuzzer as the fuzzy tool in the comparison
+experiment.
+
+The Modbus slave station (libmodbus server) waits for the request messages from
+other main stations. In the experiment, we set that the main station messages send 5,
+10, and 15 request messages, as test input, to the slave station, respectively, and makes
+the fuzzy processing to Modbus slave station program and monitors whether the target
+program has any anomaly.
+
+To evaluate the performance of the fuzz test method proposed, we make a compari-
+son in terms of the quantity of test cases, the total number of execution paths, the code
+coverage rate, and the test time with the same number of samples.
+
+The experiment makes the statistic on the number of test cases generated using two
+fuzz test methods with 5, 10, and 15 sample data. The number of test cases refers to
+the total number of samples generated after the crash of program or the complete exe-
+cution of samples. Figure 10 shows that with the increase in the number of samples,
+the test data generated with the method proposed are significantly less than the test
+
+Table 1 Test case generation grammar rules
+
+ 
+
+ 
+
+Node x; DIF(x;)) CDC(x;) Constraint(x;) Valid grammar Grammar after fuzzification Test grammar
+3, | ® ® ! = 0x0000 | + 0x0000 ! = 0x0000
+| + 0x0000
+8 I~C (3,,F) ! = 0x0000 Crce(l ~ D) = C Cre(l ~ D) $C Crce(l ~ D) = C
+Crc(l ~ D) $C
+13, F (8,,F) ! = 0x0000 F = Ox01 F # Ox01 F = Ox01
+crc(l~ D) = C F # 0x01
+14, F (13,,F) — | = 0x0000 Skip Skip Skip
+crc(l~ D) = C
+F # 0x01
+17; SE (14,,71) — |= 0x0000 SSE S>E SSE
+crc(l~ D) = C S>E
+F = 0x05
+21, SE (17,,F) — |= 0x0000 Skip Skip Skip
+crc(l~ D) = C
+F = 0x05
+SSE
+21, L,S,E  (21,,1) — 1 = 0x0000 Input size is valid Input size is valid Input size is valid
+crc(l~ D) = C
+
+F3 = {1},
+Fy S Fs
+
+ 
+
+Page 16 of 21
+Li et al. EURASIP Journal on Wireless Communications and Networking (2020) 2020:110 Page 17 of 21
+
+ 
+
+| ee
+
+Moduus Moduus
+
+Main Station Slave Station
+
+Fig. 9 Test environment
+
+   
+     
+
+ 
+
+data generated with AFL-fuzzer, because the method proposed constructs test cases
+
+using the generation-based technology in which case the test cases generated are defin-
+itely less than those of AFL-fuzzer using the variation strategy. Besides, we can see the
+number of test cases generated by AFL-fuzzer grows steadily as the number of samples
+increases, because Afl-fuzzer prunes input samples in consideration of that users may
+offer low-quality initial samples and thus cause the possible data redundancy in some
+types of variations. Although depending more on the number of samples, the method
+proposed adopts a more pertinent generation strategy [35-49].
+
+Figure 11 shows the coverage rate of code. The calculation principle is that the in-
+strumentation can help capture the coverage rate of branch and detect the rough hit
+count of branch execution. The code coverage rate does not necessarily have any con-
+nection with the probability of finding anomalies, but undoubtedly, for a test case, an
+execution path failing to reach the program’s conditional branch on a deep level cer-
+tainly will not trigger any potential anomaly. So, we can see that the method proposed
+realizes a higher rate of code coverage compared with the AFL-fuzzer.
+
+Table 3 shows the statistic when the target program crashes. The process of guiding
+test case generation by combining with program dynamic multi-modal sensor commu-
+nication data pays the price of test time for solving conditional branch constraint and
+generating test grammar, compared with the variation strategy. However, it significantly
+increases the number of execution paths and the code coverage rate, indicating in the
+running of program, the more execution paths are found by the conditional branches
+traversed, the bigger the probability that test cases reach the deep level and trigger
+anomalies is, and the stronger the pertinence is. Therefore, in the case the program has
+anomalies, although scarifying some test time, the method proposed is superior to the
+AFL-fuzzer in terms of realizing Modbus-TCP protocol test.
+
+3 Conclusion
+The work proposes a fuzzy processing method combined with dynamic multi-modal
+
+sensor communication data from the level of system program in industrial Internet
+
+Table 2 Network equipment in the test environment
+
+ 
+
+Equipment Quantity Use
+Modbus main station 1 The Modbus client side to realize writing and reading operation
+Modbus slave station 1 The Modbus server to respond to data request
+
+Fuzzer 1 The fuzz test tool to construct anomalous data
+
+ 
+Li et al. EURASIP Journal on Wireless Communications and Networking (2020) 2020:110 Page 18 of 21
+
+ 
+
+100
+
+ 
+
+0 5 10 15
+emeeeMVethod proposed emm_==AFL-fuzzer
+
+ 
+
+Fig. 10 The numbers of test cases with different numbers of samples
+
+protocol realization. The paper first expounds the theory of dynamic taint analysis and
+then gives the definition of dynamic multi-modal sensor communication data required
+and proposes the fuzz test method combined with dynamic multi-modal sensor com-
+munication data. The method proposed tracks program execution, finds the input fields
+affecting conditional branches through the dynamic taint analysis, and captures the de-
+pendence relationship of conditional branches to guide test case grammar generation
+pertinently, thus increasing the opportunity of executing codes on the deep level. The
+results of comparison experiment prove that the method improves the validity of test
+cases and the coverage rate of codes to some extent and also increases the probability
+of finding the anomalies in protocol realization.
+
+However, follow-up research needs to deepen around the following areas:
+
+ 
+
+emeeeMVethod proposed emm==AFL-fuzzer
+
+ 
+
+Fig. 11 Code coverage rates with different numbers of samples
+Li et al. EURASIP Journal on Wireless Communications and Networking (2020) 2020:110 Page 19 of 21
+
+Table 3 Comparison results of experiment
+
+ 
+
+ 
+
+Test method Number of test Number of execution Code coverage Test time = Anomaly
+cases paths rate /h
+
+Method 16247 2896 50.90% 4.19 1
+
+proposed
+
+AFL-fuzzer 38652 1057 41.85% 3.35 1
+
+ 
+
+1. The method in this paper is a dynamic and targeted test from the perspective of
+the program under test. Dynamic analysis of the program also causes a large cost.
+So, in the next step, we consider combining the static analysis technology of the
+program to reduce the burden of dynamic analysis and at the same time use the
+obtained dynamic information to adjust the position of the blur and the
+combination strategy.
+
+2. The industrial control protocol model in this article only describes the data format
+level. In actual production, it is necessary to consider that the protocol has state
+implementation. Therefore, the description of the industrial control protocol state
+machine needs to be studied in depth to establish the association between the
+
+protocol format and the protocol state transition.
+
+Abbreviations
+DCS: Distributed control system; FCS: Fieldbus Control System; IIS: Industrial Internet System; PCS: Process control
+system; PLC: Programmable logical controller, SCADA: Supervisory Control and Data Acquisition
+
+Acknowledgements
+We want to thank the authors of the literature cited in this paper for contributing useful ideas to this study.
+
+Authors’ contributions
+
+Qianmu Li, Yaozong Liu, Shunmei Meng, Hanrui Zhang, Haiyuan Shen, and Huaqiu Long have written this paper and
+have done the research which supports it. Qianmu Li, Yaozong Liu, Shunmei Meng, and Hanrui Zhang have
+collaborated in the conception, research, and design of the paper. The authors read and approved the final
+manuscript.
+
+Authors’ information
+
+Qianmu Li received the BSc and PhD degrees from Nanjing University of Science and Technology, China, in 2001 and
+2005, respectively. He is currently a full professor with the School of Cyber Science and Engineering, Nanjing University
+of Science and Technology, China. His research interests include information security and data mining. He received the
+China Network and Information Security Outstanding Talent Award in 2016 and Education Ministry Science and
+Technology Awards in 2012.
+
+Yaozong Liu received the Ph.D. degree from the Nanjing University of Science and Technology, China, in 2016. He is
+currently a Lecturer with the Intelligent Manufacturing Department, Wuyi University, China. His research interests
+include data mining and network security.
+
+Shunmei Meng received her PhD degree in the Department of Computer Science and Technology from Nanjing
+University, China, in 2016. Now, she is an assistant professor of the School of Computer Science and Technology,
+Nanjing University of Science and Technology, Nanjing, China. She has published papers in international journals and
+international conferences such as TPDS, ICWS, and ICSOC. Her research interests include recommender systems, service
+computing, and cloud computing.
+
+Hanrui Zhang received the BSc. degree from Nanjing University of Science and Technology, China, in 2017. She is now
+a Ph.D. student at Nanjing University of Science and Technology. Her research interests include data mining and
+network security.
+
+Haiyuan Shen was born in 1984 and has master’s degree. After graduating with a master’s degree in 2009, he became
+a software engineer. He also serves as the director of Zhongtian Software. He works in Jiangsu Zhongtian Technology
+Co., Ltd. His research interests include service computing and cloud computing.
+
+Huaqiu Long received his BSc degree from the Intelligent Manufacturing Department, Wuyi University, in 2019. He
+currently works in the Cyber Security Lab of Wuyi University. In 2019, he was admitted to a part-time master’s degree.
+His research interests include information security, computing system management, and data mining.
+
+Funding
+
+This work was supported in part by the 2019 Industrial Internet Innovation and Development Project from Ministry of
+Industry and Information Technology of China, 2018 Jiangsu Province Major Technical Research Project “Information
+Security Simulation System,” Fundamental Research Funds for the Central Universities (30918012204).
+
+Availability of data and materials
+Data sharing is not applicable to this article as no datasets were generated or analyzed during the current study.
+Li et al. EURASIP Journal on Wireless Communications and Networking (2020) 2020:110 Page 20 of 21
+
+Competing interests
+The authors declare that there is no conflict of interest regarding the publication of this manuscript.
+
+Author details
+
+2
+
+ 
+
+School of Cyber Science and Engineering, Nanjing University of Science and Technology, Nanjing 210094, China.
+Intelligent Manufacturing Department, Wuyi University, Jiangmen 529020, China. Jiangsu Zhongtian Internet
+Technology Co., Ltd., Nantong 226463, China. “Jiangsu Graduate Workstation of Nanjing University of Science and
+Technology, Nanjing Liancheng Technology Development Co., Ltd., Nanjing 210008, China.
+
+Received: 11 February 2020 Accepted: 20 May 2020
+Published online: 03 June 2020
+
+References
+
+1.
+
+22.
+
+23.
+24.
+
+25.
+
+26.
+
+2/7.
+
+28.
+29.
+
+30.
+
+Q. Li, Y. Tian, Q. Wu, Q. Cao, H. Shen, H. Long, A Cloud-Fog-Edge closed-loop feedback security risk prediction method.
+IEEE Access 8(1), 29004-29020 (2020)
+
+Ericd, Knapp et al., Industrial Network Security: Smart Power Grids, SCADA and other IIS Key Infrastructures, CA: NDIP,
+2014, pp.18-26.
+
+Qianmu Li, Shunmei Meng, Shuo Wang, Jing Zhang and Jun Hou. CAD: command-level anomaly detection for vehicle-
+road collaborative charging network. IEEE Access, Vo.7, pp. 34910-34924, 2019.
+
+Yao Dong, Xiaohua Yang & Shubin Jin, An analysis on Stuxnet’s influence on IIS’ security, Report of Times (Academic
+Edition), no.1, pp. 64, 2013.
+
+Qianmu Li, Shunmei Meng, Sainan Zhang, Ming Wu, Jing Zhang, Milad Taleby Ahvanooey and Muhammad Shamrooz
+Aslam. Safety risk monitoring of cyber-physical power systems based on ensemble learning algorithm. IEEE Access, Vol.
+7, Dp. 24788-24805, 2019
+
+S. Raval, Black Energy a threat to Industrial Control Systems network security, International Journal of Advance Research
+in Engineering. Sci Technol 2, 31-34 (2015)
+
+IIS-CERT. Information products [EB/OL], https://IIS-cert.us-cert.gov/, 2018.
+
+China National Vulnerability Database. Vulnerability of Industrial Internet Industry [EB/OL], http://IlS.cnvd.org.cn/, 2018.
+Yafeng Zhang, Zheng Hong, Lifa Wu, et al., Paradigmatic-grammar-based Industrial Protocol Fuzzing Test Technology,
+Application Research of Computer, vol.33, 2016.
+
+S Wan, M Li, G Liu, C Wang, Recent advances in consensus protocols for blockchain: a survey. Wireless Networks, 1-15,
+2019.
+
+Ndiaye M A A, Petin J F, Camerini J, et al., Performance assessment of Industrial Internet System during pre-sales
+uncertain context using automatic Colored Petri Nets model generation, in International Conference on Control, Belfast,
+2016.
+
+Banerjee S, Gro&mann | D., An Electronic Device Description Language based approach for communication with DBMS
+and file system in an industrial automation scenario, in IEEE International Conference on Emerging Technologies &
+Factory Automation, 2016.
+
+Chang Luo, Research on IIS Information Security Protection System's Application in Electric Power System, Mechanical &
+Electrical Engineering Technology, vol.12, 2016.
+
+J.M. Garibaldi, The need for fuzzy Al, IEEE/CAA J. Autom. Sinica 6(3), 610-622 (2019)
+
+Liu B, Shi L, Cai Z, et al, Software vulnerability discovery techniques: a survey, in Fourth International Conference on
+Multimedia Information Networking & Security. IEEE, 2013.
+
+Cui Baojiang, Zhang Xiangqian, Zhang Tianxin, Zhang Qin. Embedded system vulnerability mining technology based on
+in-memory fuzzing test. The 13th International Conference on Broadband, Wireless Computing, Communication and
+Applications. Taichung, Taiwan. 439-449. https://doi.org/10.1007/978-3-3 19-6981 1-3_40. October 27-29, 2018
+
+Aitel D., An introduction to SPIKE, the fuzzer creation kit [EB/OL], http://www.blackhat.com/presentations/bh-usa-02/bh-
+us-02-aitel-spike.ppt, Accessed, 2014-01-06.
+
+Devarajan G.Unraveling, SCADA protocols: using Sulleyfuzzer [EB/OL], http://www.defcon.org/html/defcon-15/dc15
+speakers.html, 2015-06-21.
+
+Peach. [EB/OL]. http://www.peachFuzzer.com, 2015-07-21.
+
+Zalewski, American fuzzy lop [EB/OL]. http://Icamtuf.coredump.cx/afl/, 2017-12-25.
+
+S. Gan, C. Zhang, X. Qin, et al., ColAFL: path sensitive fuzzing, in 2018 IEEE Symposium on Security and Privacy (SP) (IEEE
+Computer Society, San Fransisco, CA, USA, 2018), pp. 660-677
+
+S. Rawat, V. Jain, A. Kumar, et al., Vuzzer: application-aware evolutionary fuzzing, in Proceedings of the Network and
+Distributed System Security Symposium (NDSS) (SanDiego, CA, USA, Internet Society, 2017)
+
+Koch R. Profuzz [EB/OL]. https://github.com/HSASec/ProFuzz, 2015-06-21,
+
+Philippe Biondi. Scapy, python interactive packet manipulation framework [EB/OL]. https://www.secdev.org/projects/
+scapy/, 2012.
+
+Byres EJ , Hoffman D , Kube N., On shaky ground-a study of security vulnerabilities in control protocols, in 5th
+American Nuclear Society International Topical Meeting on Nuclear Plant Instrumentation, Controls, and Human
+Machine Interface Technology, American Nuclear Society, 2006.
+
+Michael Toecker: response fuzzing [EB/OL]. http://www.digitalbond.com/blog/response-Fuzzing/, 2013-05-08.
+
+Qianmu Li, Shunmei Meng, Sainan Zhang, Jun Hou, Lianyong Qi. Complex attack linkage decision-making in edge
+computing networks. IEEE Access, Vo. 7, pp. 12058 - 12072, 2019.
+
+DynamllS M. Mu test suite [EB /OL]. http://www.mudynamilS.com /products/mu-test-suite.html, 2015-06-21.
+
+Shapiro R, Bratus S, Rogers E, et al., Identifying vulnerabilities in SCADA systems via fuzz-testing, in Critical Infrastructure
+Protection V-ifip Wg 1110 International Conference on Critical Infrastructure Protection, 2011.
+
+J. Newsome, D. Song, Dynamic taint analysis for automatic detection, analysis, and signature generation of exploits on
+commodity software. NDSS 5, 3-4 (2005)
+
+L. Chen, S. Liu, D. Xiao, et al, A Cisco IOS heuristic fuzz test method. Comput Eng 40, 68-73 (2014)
+
+ 
+
+ 
+
+ 
+Li et al. EURASIP Journal on Wireless Communications and Networking —_ (2020) 2020:110 Page 21 of 21
+
+32.
+
+33.
+
+34,
+
+35,
+
+36.
+
+37.
+
+38.
+
+39.
+
+ 
+
+Q. Li, Y. Wang, P. Ziyuan, S. Wang, W. Zhang, A time series association state analysis method in Smart Internet of electric
+vehicle charging network attack. Transport Res Record 2673, 217-228 (2019)
+
+S.K. Cha, M. Woo, D. Brumley, Program-adaptive mutational fuzzing, in 2015 IEEE Symposium on Security and Privacy, San
+Jose, CA (2015)
+
+Brumley D , Jager! , Avgerinos T , et al., BAP: a binary analysis platform, in International Conference on Computer Aided
+Verification, Berlin, Heidelberg, 2011, pp. 463-469.
+
+L. Qi, X. Zhang, W. Dou, Q. Ni, A distributed locality-sensitive hashing based approach for cloud service
+recommendation from multi-source data. IEEE Journal on Selected Areas in Communications 35(11), 2616-2624 (2017)
+Hanwen Liu, Huaizhen Kou, Chao Yan, Lianyong Qi. Link prediction in paper citation network to construct paper
+correlated graph. EURASIP Journal on Wireless Communications and Networking, 2019.DOI: https://doi.org/10.1186/
+$13638-019-1561-7.
+
+L. Qi, X. Zhang, W. Dou, C. Hu, C. Yang, J. Chen, A two-stage locality-sensitive hashing based approach for privacy-
+preserving mobile service recommendation in cross-platform edge environment. Future Generation Computer Systems
+88, 636-643 (2018)
+
+Wenwen Gong, Lianyong Qi, Yanwei Xu. Privacy-aware multidimensional mobile service quality prediction and
+recommendation in distributed fog environment. Wireless Communications and Mobile Computing, vol. 2018, Article ID
+3075849, 8 pages, 2018.
+
+Wan, S., Li, X., Xue, Y. et al. Efficient computation offloading for Internet of vehicles in edge computing-assisted 5G
+networks. J Supercomput (2019). https://doi.org/https://doi.org/10.1007/s11227-019-0301 1-4
+
+Lianyong Qi, Xuyun Zhang, Shancang Li, Shaohua Wan, Yiping Wen, Wenwen Gong. Spatial-temporal data-driven service
+recommendation with privacy-preservation. Information Sciences, 2019. DOI: https://doi.org/10.1016/j.ins.2019.11.021.
+
+S Wan, L Qi, X Xu, C Tong, Z Gu. Deep learning models for real-time human activity recognition with Smartphones,
+mobile networks and applications, 1-13, 2019.
+
+S Ding, S Qu, Y Xi, S Wan. Stimulus-driven and concept-driven analysis for image caption generation, Neurocomputing,
+2019
+
+S Wan, Y Xia, L Qi, YH Yang, M Atiquzzaman. Automated colorization of a grayscale image with seed points
+propagation. IEEE Transactions on Multimedia. PP. 1-1. https://doi.org/10.1109/TMM.2020.2976573. 2020
+
+Hou, J., Li, Q., Cui, S. et al. Low-cohesion differential privacy protection for industrial Internet. J Supercomputing. vol. 7,
+pp. 1-23, 2020.
+
+J Hou, Q. Li, R. Tan, S. Meng, H. Zhang and S. Zhang, An intrusion tracking watermarking scheme, IEEE Access, vol. 7, pp.
+141438-141455, 2019.
+
+S. Wan, Z. Gu, Q. Ni, Cognitive computing and wireless communications on the edge for healthcare service robots.
+Comput Commun 149, 99-106 (2020)
+
+Z Gao, HZ Xuan, H Zhang, S Wan, KKR Choo. Adaptive fusion and category-level dictionary learning model for
+multiview human action recognition. IEEE Internet of Things Journal 6 (6), 9280-9293, 2019
+
+S. Ding, S. Qu, Y. Xi, S. Wan, A long video caption generation algorithm for big video data retrieval. Future Generation
+Computer Systems 93, 583-595 (2019)
+
+S. Wan, Y. Zhao, T. Wang, Z. Gu, Q.H. Abbasi, KK:R. Choo, Multi-dimensional data indexing and range query processing
+via Voronoi diagram for internet of things. Future Generation Computer Systems 91, 382-391 (2019)
+
+ 
+
+Publisher’s Note
+
+Springer Nature remains neutral with regard to jurisdictional claims in published maps and institutional affiliations.
+
+ 
+
+Submit your manuscript to a SpringerOpen”®
+journal and benefit from:
+
+> Convenient online submission
+
+> Rigorous peer review
+
+> Open access: articles freely available online
+> High visibility within the field
+
+> Retaining the copyright to your article
+
+ 
+
+Submit your next manuscript at > springeropen.com
+
+ 
+
+ 

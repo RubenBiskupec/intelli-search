@@ -1,0 +1,1353 @@
+Yan et al. EURASIP Journal on Wireless Communications and j
+Networking (2020) 2020:215 EURASIP Journal on Wireless
+
+https://doi.org/10.1186/s13638-020-01820-3 Communications and Networking
+
+RESEARCH Open Access
+
+M-BiRank: co-ranking developers and ®
+projects using multiple developer-project ~~
+interactions in open source software
+community
+
+Dengcheng Yan!? ©, Bin Qi!, Yiwen Zhang!” and Zhen Shao!
+
+ 
+
+ 
+
+*Correspondence:
+zhangyiwen@ahu.edu.cn Abstract
+‘School of Computer Science and Social collaborative coding is a popular trend in software development, and such
+
+Technology, Anhui University, ; ; ; ; ; ws
+Jiulong Road No. 111, Hefei, 230601, platforms as GitHub provide rich social and technical functionalities for developers to
+
+China collaborate on open source projects through multiple interactions. Developers often
+
+Full list of author information is follow popular developers and projects for learning, technical selection, and
+
+available at the end of the article ; ; ic ; ; ,
+collaboration. Thus, identifying popular developers and projects is very meaningful. In
+this paper, we propose a multiplex bipartite network ranking model, M-BiRank, to
+co-rank developers and projects using multiple developer-project interactions. Firstly,
+multiple developer-project interactions such as commit, issue, and watch are extracted
+
+and a multiplex developer-project bipartite network is constructed. Secondly, a
+random layer is selected from this multiplex bipartite network and initial ranking scores
+are calculated for developers and projects using BiRank. Finally, initial ranking scores
+diffuse to other layers and mutual reinforcement is taken into consideration to
+iteratively calculate ranking scores of developers and projects in different layers.
+Experiments on real-world GitHub dataset show that M-BiRank outperforms degree
+centrality, traditional single layer ranking methods, and multiplex ranking method.
+
+Keywords: M-BiRank, Ranking, Multiplex bipartite network, Social collaborative
+coding, GitHub
+
+ 
+
+1 Introduction
+Open source software community is now a main driven force of innovations, and plenty
+of software developers collaborate on millions of open source software projects, among
+which are many popular software projects that drive the innovations of different fields
+[1, 2]. For example, deep learning frameworks such as TensorFlow, PyTorch, and MXNet
+contributed by famous companies simplify the building of deep learning models, which to
+some extent speed up the innovations in the field of artificial intelligence in both academia
+and industry [3, 4].
+
+In open source software community, developers from different areas usually take the
+social collaborative coding paradigm and participate in different portions of a common
+
+. © The Author(s). 2020 Open Access This article is licensed under a Creative Commons Attribution 4.0 International License,
+GQ) Springer O pen which permits use, sharing, adaptation, distribution and reproduction in any medium or format, as long as you give appropriate
+— credit to the original author(s) and the source, provide a link to the Creative Commons licence, and indicate if changes were
+made. The images or other third party material in this article are included in the article’s Creative Commons licence, unless
+indicated otherwise in a credit line to the material. If material is not included in the article’s Creative Commons licence and your
+intended use is not permitted by statutory regulation or exceeds the permitted use, you will need to obtain permission directly
+from the copyright holder. To view a copy of this licence, visit http://creativecommons.org/licenses/by/4.0/.
+Yan etal. EURASIP Journal on Wireless Communications and Networking (2020) 2020:215 Page 2 of 18
+
+project using the social and technical functionalities provided by the community [5, 6].
+Taking GitHub as an example, developers from different areas and with different techni-
+cal backgrounds can collaborate on a project by committing codes and commenting on
+issues, star/fork a project for improving technical skills or technical selections, and fol-
+low other professional developers for keeping pace with new trends. Much like the role of
+opinion leaders in social networks, influential developers and projects drive the technical
+trends and the prosperity of open source community. Thus, identifying influential devel-
+opers and projects will be of great significance. Existing work on influence analysis for
+open source software community mainly focused on applying traditional unipartite sin-
+gle layer graph ranking methods [7, 8], including PageRank [9] and HITS [10], although
+many new graph ranking methods for more complex network structures, such as bipartite
+network [11, 12] and multiplex network [13, 14], have been proposed. On the other hand,
+existing graph ranking methods have not merged bipartite network and multiplex net-
+work as a single network model, which is necessary for our case to model multiple interac-
+tions between developers and projects. Potential applications of influence analysis of open
+source software community would include service recommendations [15-19] and risk
+assessment [20].
+
+In this paper, we focus on modeling multiple interactions between developers and
+projects as a multiplex bipartite network and propose a new ranking method based on it
+in an iterative and mutually enhanced way. The main contributions of this research are
+
+many folds:
+
+e We propose a multiplex bipartite network model to represent multiple interactions
+between developers and projects.
+
+e We propose a new ranking model called M-BiRank on multiplex bipartite network
+which takes into account the mutual reinforcement between different types of nodes
+as well as different layers.
+
+e We apply the proposed model to real-world GitHub dataset, showing that our model
+
+outperforms baseline ranking models.
+
+The remainder of the paper is organized as follows. Section 2 gives a brief introduction
+to related works on ranking models from the perspective of network and its applications
+in software engineering. In Section 3, details about the proposed M-BiRank model are
+illustrated. Then, the experiment results and discussions are given in Section 4. Finally,
+
+we briefly summarize our work and explain future directions in Section 5.
+
+2 Related work
+Identifying influential nodes in social networks has been a hot topic for decades. Exist-
+ing works mainly focus on either structural properties or diffusion dynamics. Plenty of
+structure-based metrics and random walk-based methods have been proposed.
+Structure-based metrics usually base itself on some intuition for centrality from either
+local or global views. Degree is the most common local structure-based centrality met-
+rics. Based on degree, Chen et al. [21] proposed a semi-local centrality metric, considering
+both the nearest and the next nearest neighbors. Chen et al. [22] further considered the
+negative impact of local clustering on information diffusion in networks and proposed
+ClusterRank. In addition to extending degree, several local structure-based centrality
+metrics are originated from H-index, which is originally used to measure the citation
+Yan et al. EURASIP Journal on Wireless Communications and Networking (2020) 2020:215 Page 3 of 18
+
+impact of a scholar or a journal [23]. Zhao et al. [24] first extended H-index concept to
+networks and defined the h-Degree metrics for weighted networks. Liu et al. [25] com-
+bined the H-index of both node itself and its neighbors and proposed a local H-index
+centrality. Lu et al. [26] revealed the relation among degree, H-index, and coreness and
+introduced a family of H-indices.
+
+Local structure-based centrality metrics benefit from low computational complexity
+at the cost of reducing effectiveness. While global structure-based centrality metrics
+can better identify influential nodes from a global view of the whole network. Ear-
+lier researches in sociology introduced several global structure-based centrality metrics,
+including closeness centrality [27], betweenness centrality [28], and eigenvector central-
+ity [29]. Recently, researches introduced eigenvector centrality to more complex network
+structures. Wang et al. [30, 31] extended eigenvector centrality to multilayer networks
+under a framework of tensor decomposition.
+
+Random walk-based methods apply resource diffusion dynamic process in networks
+and measure node’s influence according to the final resource the node obtains at
+stationary state of the dynamic process. Typical random walk-based ranking meth-
+ods include PageRank [9] and HITS [10]. To solve the problem of dangling nodes
+of PageRank, Lu et al. [32] added a ground node to the original network, mak-
+ing the original network connected, and proposed the parameter-free LeaderRank
+method. Halu et al. [13] extended PageRank to multiplex network and proposed Mul-
+tiplex PageRank, which included four kinds of intra-layer enhancement mechanism
+[33]. To address the ranking problem on bipartite networks, He et al. [11] proposed
+the BiRank method. Instead of modeling pairwise interactions, higher-order network
+models have recently been proposed and applied to ranking nodes with group inter-
+actions. Treating scientific collaboration as a group interaction, Liang et al. [34] mod-
+eled it as a hypergraph and proposed HHGBiRank. From another view of higher-
+order structure of networks, that is motif, Zhao et al. [35] proposed motif-based
+PageRank.
+
+In addition to identifying influential nodes for general purpose social networks, needs
+have also emerged for open source software community, a special kind of social network.
+Xuan et al. [8] constructed several social networks based on the communications between
+developers in Apache and applied degree, PageRank, and HITS for developer ranking. Hu
+et al. [7] studied the problem of influence identification of developers in GitHub and pro-
+posed a Following-Star-Fork-Activity-based approach. Joblin et al. [5] employed several
+activity counts, centrality metrics, and network structural properties to distinguish core
+and peripheral developers.
+
+3 Method
+
+In this section, we will present a Multiplex Bipartite Ranking method, called M-BiRank,
+for co-ranking developers and projects in open source software community. As shown
+in Fig. 1, the proposed M-BiRank consists of three parts and incorporates two basic
+assumptions that address the issues in Section 1. We will start by giving the definition of
+multiplex bipartite network and introducing the notations. Then, thorough explanations
+and mathematical formulations are given for the two basic assumptions, that is, mutual
+reinforcement between different types of entities and between different layers of network.
+Finally, we will introduce the overall algorithm and time complexity analysis of it.
+Yan etal. EURASIP Journal on Wireless Communications and Networking (2020) 2020:215 Page 4 of 18
+
+ 
+
+ 
+
+Step 1. Ranking iteration in Layer A Step 2. Ranking scores in Layer A diffuse Step 3. Ranking iteration in Layer B
+to Layer B
+
+Fig. 1 M-BiRank framework. M-BiRank contains three iterative steps
+
+ 
+
+ 
+
+ 
+
+3.1 Multiplex bipartite network
+
+Definition 1 Multiplex bipartite network. A multiplex bipartite network is a set of M
+bipartite networks GA = (U U P, E4) where A = 1,...,M. U and P represent two different
+kinds of nodes and all layers have the same sets of nodes U and P, while the set of edges EA
+depends on the layer A. Specially, there is no edge between same kinds of nodes. A multiplex
+bipartite network is formally defined as G = (G',...,G™). Each network G4 is described
+by the bipartite weight matrix W4 (< R'4!*!"!) with elements Wis where wi > 0 if there is
+a link with weight wi between nodes u; and p; in layer A, and wi = 0 otherwise.
+
+In this paper, we model multiple interactions between developers and projects as a
+developer-project multiplex bipartite network. The notations we will use throughout the
+
+article are summarized in Table 1.
+
+3.2 Mutual reinforcement between developers and projects
+
+Most ranking methods in networks adopt the intuition as PageRank and HITS that an
+influential node should be linked by many other influential nodes, which is also appli-
+cable in the case of developer-project bipartite network. For example, an elite developer
+usually participates in popular projects. In open source software community, it is quite a
+practice to estimate the influence of a developer by how popular the projects she/he par-
+ticipates in are and how much she/he contributes to these popular projects. And a project
+with influential developers or organizations as major contributors always attracts a large
+
+Table 1 Notations and explanations
+
+ 
+
+ 
+
+Notation Explanation
+
+TA Ranking score of developer /in layer A
+
+p; Ranking score of project / in layer A
+
+we Weight matrix of layer A, its element Ww; represents the edge weight
+between developer i and project / in layer A
+
+yr Hyperparameters
+
+u?, py Query vectors for developer / and project /
+
+0 Threshold for SIR simulation
+
+|U4|, |PA| Numbers of developers and projects in layer A
+
+di, d? Degrees of developer i and project jin layer A
+
+SA Symmetric normalization of weight matrix W4
+
+ 
+Yan et al. EURASIP Journal on Wireless Communications and Networking (2020) 2020:215 Page 5 of 18
+
+number of attention. Taking TensorFlow as an example, it got thousands of stars quickly
+upon its first release in GitHub because it is supported by Google.
+
+This intuition forms our first assumption that a developer (project) should be ranked
+high if it is connected to high-ranked projects (developers) in a certain layer A, which can
+
+be formulized as follows:
+
+|U|
+
+Dj — » Wi Ut (1)
+i=l
+|P|
+
+ui = > wipe (2)
+j=l
+
+In order to employ a prior belief on nodes’ importance and provide better ranking
+results, we also adopt query vector and symmetric normalization as BiRank. The prior
+belief on nodes’ importance and rankings from network structure are balanced with
+two parameters y and i. The final formulation of the mutual reinforcement between
+
+developers and projects is as follows:
+
+|u|
+pe=y i __ +(1—y)p? (3)
+J d (as |aA J
+
+|P| wi
+OR Ne
+
+3.3. Mutual reinforcement between different layers
+
+pi +(1-A)uy (4)
+
+Besides considering the mutual reinforcement between developers and projects in each
+single layer, we also take into account the mutual reinforcement between different layers.
+From our experience as open source software developers, we could firmly assume differ-
+ent interactions between developers and projects reflect different aspects of influence and
+only a composition of all the aspects could reflect a comprehensive influence of develop-
+ers and projects. For example, committing code to a project indicates a developer’s coding
+skill and commenting issues of a project may show a developer’s design skill or bug-fixing
+skill. The influence of a developer should be measured by summarization of both coding
+and design skills.
+
+To implement mutual reinforcement between different layers, we choose to incorporate
+the ranking scores of developers and projects from the first layer as an enhancement of
+the query vectors of the second layer. The mathematical formulations are given in Eqs. (5)
+and (6).
+Yan etal. EURASIP Journal on Wireless Communications and Networking (2020) 2020:215
+
+To be more clearer, we transform Eqs. (5) and (6) to their equivalent matrix form in
+Eqs. (7) and (8):
+
+—
+N
+—
+
+pe =y(S®)' uw +a-y)p4
+u® = 2 (S®) pp? +(1—-Aju4
+
+—
+CO
+—
+
+where S? = (D2)~ we (pp)?
+
+is the symmetric normalization of weight matrix W®.
+
+3.4 Overall algorithm
+
+By combing both the mutual reinforcement between developers and projects in each sin-
+gle layer and that between different layers, we finally propose the M-BiRank method
+to co-rank developers and projects in open source software community and the overall
+algorithm is shown in Algorithm 1.
+
+Algorithm 1 M-BiRank Algorithm
+Input:
+Weight matrix W4 and W, query vectors u°, p® and hyper-parameters y, A;
+Output:
+Ranking vectors u, p;
+: Symmetrically normalize W4 : S4 = (DA)~3 wA (DA)~2 ;
+: Randomly initialize p4 and u4;
+
+: while Stopping criteria is not met do
+
+pA — y(SA)Tu4 + (1 — yp;
+
+us <— 1S4 pA +(1—A)v;
+
+: end while
+
+: Symmetrically normalize W® : S? = (DB)~2 we (DB)~2 ;
+: Initialize p? and uv using p4“ and uv“, respectively;
+
+eo oN Dn F WwW WN
+
+: while Stopping criteria is not met do
+pP — y(S*)'uP + (1 — yp’;
+
+uP <— 1.58 pb +(1—A)uA;
+
+: end while
+
+Se e
+Yy mr S
+
+:p<—pu<w;
+
+Se
+eo
+
+: return uv and p.
+
+3.5 Time complexity analysis
+
+The overall time complexity of M-BiRank is a summarization of each layer’s time com-
+plexity. For each layer, according to Eqs. (7) and (8), the time cost mainly depends on the
+multiplication of (S?)"u2 and (S?)p®, showing a time complexity of O(|U| - |P|). How-
+ever, most real-world networks are usually very sparse and only non-zero elements (which
+correspond to existing edges) should be stored and computed regarding matrix multipli-
+cation of (S?)? 8 and (S®)p®. Thus, the time complexity of layer A is O(c4|E,|) and the
+overall time complexity of M-BiRank is OA] c4|E4|), where ca denotes the number
+of iterations in layer A and |E,4| denotes the number of edges in layer A.
+
+Page 6 of 18
+Yan et al. EURASIP Journal on Wireless Communications and Networking (2020) 2020:215 Page 7 of 18
+
+4 Experiment
+In this section, the performance of M-BiRank model is evaluated against the GHTorrent
+dataset [36].
+
+4.1 Datasets
+
+GHTorrent [36] monitors the GitHub public event timeline and retrieves information of
+developers, projects, and interaction details between them from these events [37]. We
+choose the GHTorrent dataset as of November 1, 2018, and extract the relationships
+between developers and projects, both of which mainly belong to PHP community. The
+steps of data preprocess include the following: (1) choose issues and commits which
+belong to PHP projects, (2) keep developers and projects which exist in both issues and
+commits, and (3) construct multiplex developer-project bipartite network, using a func-
+
+tion of issue/commit number as edge weight, that is, wigsue = log(#issues) + 0.3 or
+commit
+ij
+
+experiment is shown in Table 2.
+
+w = log(#commits) + 0.3. The detailed information about the dataset used in our
+
+4.2 Evaluation metrics
+In order to evaluate and compare the performance of M-BiRank and baseline methods,
+both correlation analysis and SIR model are adopted.
+
+Correlation analysis mainly focuses on comparing predictions against the ground truth,
+and Pearson’s correlation coefficient (PCC) [38] is chosen. In our experiment, the num-
+ber of watch of projects and the number of followers of developers are set as the ground
+truth for the rankings of projects and developers, respectively. PCC reflects the corre-
+lation degree of two variables through the linear correlation between vectors, which is
+defined as follows:
+
+NY Xi — DIDI
+nx? — (Som) ny? — (Si)
+
+where 7 represents the number of elements; x; and y; represent the ith element of sample
+
+PCC(x, y) = (9)
+
+x and y, respectively; and the value range of PCC is [ —1, 1].
+
+However, the ground truth in correlation analysis is some kinds of degree in networks,
+which is a rough metric in evaluating the influence of developers or projects. To rank
+more precisely, dynamic models are needed for simulating the influence diffusion process
+[39]. SIR model [40] is a classical epidemic model and is often used to evaluate the abil-
+ity of information spreading of a node in social networks. Generally, an influential user
+with a higher ranking score will spread his/her opinions to more developers. The trans-
+mission process of SIR model is shown in Fig. 2, where S (Susceptible), I (Infected), and R
+
+(Removed) denote the susceptible, infected, and recovered nodes. At the initial step of the
+
+Table 2 The statistics of the dataset
+
+ 
+
+ 
+
+Data Count
+Developers 147,105
+Projects 126,415
+Developer-project commit relations 205,478
+Developer-project issue relations 441,558
+Developer-project watch relations 68,566
+
+Developer-developer follow relations 10,701
+
+ 
+Yan etal. EURASIP Journal on Wireless Communications and Networking (2020) 2020:215 Page 8 of 18
+
+ 
+
+'S) D
+
+Fig. 2 SIR model. Source: the figure is adapted from Pastor-Satorras et al. [43]
+
+ 
+
+transmission process, several infected nodes are set, and then, the transmission is itera-
+tively repeated until no new nodes are infected [41]. At each step, infected nodes infect
+its susceptible neighbors with the probability a, and infected nodes’ recovery to removed
+status with the probability 8. So SIR model is suitable for evaluating the ability of infor-
+mation spreading of a node. By applying nodes with highest ranking scores of different
+ranking methods as the initial infected nodes and comparing the final number of affected
+nodes (both infected and removed nodes), the effectiveness of different ranking methods
+can be compared.
+
+4.3 Baseline methods
+We compare M-BiRank with several baseline methods:
+
+Degree [42]. The degrees of developers and projects in different layers of multiplex
+developer-project bipartite network are calculated and averaged.
+
+PageRank |9]. PageRank ranks nodes by iteratively propagating scores on the network
+and is usually suitable for single layer monopartite network. In this experiment, we apply
+it to multiplex developer-project bipartite network with two different setups. PageRank-
+Avg ignores types of nodes and applies PageRank algorithm directly to different layers of
+the multiplex developer- project bipartite network. The final ranking score of a node is the
+average of different layers. PageRank-Add merges different layers of multiplex developer-
+project bipartite network into a single layer of developer-project bipartite network and
+uses the average edge weights of different layers as edge weights of this single layer bipar-
+tite network. Then, we apply PageRank algorithm to this single layer of developer- project
+bipartite network ignoring types of nodes. Finally, both PageRank-Avg and PageRank-
+Add rank developers and projects separately according their final ranking scores. The
+hyperparameter is set to 0.85.
+
+BiRank |11]. BiRank is a propagation-based ranking method on bipartite networks and
+adopts a normalization strategy in the iterative process. BiRank-Avg applies BiRank algo-
+rithm to different layers of multiplex developer-project bipartite network separately and
+averages the ranking scores in different layers as the final ranking scores. BiRank-Add
+firstly merges different layers of multiplex developer-project bipartite network into a sin-
+gle layer of developer-project bipartite network with the average of the edge weights in
+different layers as edge weights. Both of the hyperparameters are set to 0.85.
+
+Multiplex PageRank |13]. Multiplex PageRank considers the impact of the centrality of a
+node in one layer on that in another layer and introduces nodes’ centrality of the preceding
+layer to current layer in four ways. In this experiment, we choose the Additive Multiplex
+PageRank and have two different setups, that is, MPR-Commit uses the commit layer as
+the first layer and MPR-Issue uses the issue layer as the first layer. The hyperparameter is
+set to 0.85.
+
+M-BiRank. M-BiRank is the method we proposed for ranking nodes in multiplex bipar-
+tite network. As the setup in Multiplex PageRank, M-BiRank-Commit uses the commit
+Yan et al. EURASIP Journal on Wireless Communications and Networking (2020) 2020:215 Page 9 of 18
+
+layer as the first layer and M-BiRank-Issue uses the issue layer as the first layer. The hyper-
+parameters y and A are set to 0.85. Each element of the query vector u° (p®°) for the
+corresponding node (developer/project) is set to the sum of its all edges’ weights over the
+total sum of all edges’ weights of the whole developer-project bipartite network of the first
+layer.
+
+4.4 Results
+
+We compare the experimental results of M-BiRank with baseline methods by both corre-
+lation analysis and SIR modeling. The hyperparameters for M-BiRank y and d are both
+set to 0.85.
+
+4.4.1. Correlation analysis
+
+In correlation analysis, the follower number of developers and the watch number of
+projects are set as the ground truth for ranking developers and projects, respectively.
+Pearson’s correlation coefficient (PCC) is calculated between the ranking results from
+M-BiRank and baseline methods and ground truth rankings. The results are shown in
+Table 3.
+
+From the results of correlation analysis, we have the following observations:
+
+(1) M-BiRank model we proposed outperforms all the baseline methods for both devel-
+oper ranking and project ranking. This indicates that it is necessary to model multiple
+interactions between developers and projects as a multiplex bipartite network, which not
+only considers mutual enhancement between developers and projects but also takes into
+account mutual enhancement between different interactions. This highly agrees with real-
+world practice. For example, a project with elite developers participating in is usually a
+popular project and a developer participating in popular projects is often an elite devel-
+oper. Developers have different ways to take part in certain projects such as committing
+code or solving issues, and different ways are tightly coupled.
+
+(2) Comparing the different settings of M-BiRank itself, M-BiRank-Commit performs
+better than M-BiRank-Issue in most cases, which means it is better to take the commit
+layer of the multiplex developer-project bipartite network as the initial layer for M-BiRank
+model. This also agrees with real-world practice. Issue is a helper function in social col-
+laborative coding which provides a discussion board for software developers about bugs
+and designs. While commit is a main function during software development for develop-
+ers, thus, the commit layer is more important. So M-BiRank-Commit performs better in
+
+Table 3 Correlation analysis
+
+ 
+
+ 
+
+ 
+
+Method Top 20 Top 50 Top 100
+Project Developer Project Developer Project Developer
+
+Degree 0.441 0.090 0.383 0.173 0.393 0.219
+BiRank-Avg 0.402 —0.014 0.442 0.091 0.462 0.016
+BiRank-Add 0.398 —0.022 0.422 —0.062 0.487 0.030
+PageRank-Avg 0.430 —0.116 0.450 —0.027 0.498 —0.035
+PageRank-Add 0.357 —0.111 0.419 —0.067 0.475 —0.004
+MPR-Issue 0.350 0.113 0.437 0.160 0.458 0.202
+MPR-Commit 0.464 —0.066 0.459 —0.013 0.516 0.017
+M-BiRank-Issue 0.374 0.057 0.423 0.068 0.447 0.273
+
+ 
+
+M-BiRank-Commit 0.468 0.152 0.459 0.261 0.541 0.143
+
+ 
+Yan etal. EURASIP Journal on Wireless Communications and Networking (2020) 2020:215
+
+ 
+
+ 
+
+6000
+—— M-BiRank-lssues(Developer)
+—-—- M-BiRank-Issues(Project)
+5000; —— M-BiRank-Commit(Developer) ee]
+—--—: M-BiRank-Commit(Project) eo
+a
+4000 ; OO
+a
+a =
+Conse
+7 a
+~ ao a
+4 7 a
+z= 3000 7 ea
+7 oe
+/
+f Yo
+4 Zz
+2000 5 J zc
+
+ 
+
+ 
+
+ 
+
+0 50 100 150 200 250 300
+t
+Fig. 3 Performance comparison between M-BiRank-Commit and M-BiRank-lssue. The horizontal axis t
+indicates the number of iterations in SIR modeling. The vertical axis N; indicates the number of final infected
+nodes (developers or projects, including infected and removed nodes)
+
+ 
+
+ 
+
+ 
+
+identifying more influential developers and projects. In Section 4.4.2, we only compare
+M-BiRank-Commit with benchmark methods.
+
+4.4.2 SIR simulation
+
+In this section, to evaluate the information spreading ability of top 100 developers ranked
+by different methods, SIR model is adopted on commit layer of the developer-project mul-
+tiplex bipartite network. M-BiRank is compared against each baseline method separately.
+For each comparison, the initial infected nodes (developers) for SIR model are the top
+100 developers ranked by each method excluding those ranked top 100 by both methods.
+During the SIR process, an infected node infects each of its neighbors with probability
+a = 0.005 simultaneously and recoveries to removed state with probability 68 = 0.006.
+For each SIR simulation, we run 300 iterations at most and repeat 10 times to average the
+value of each step. The results are shown in Figs. 3, 4, 5, 6, and 7, and several significant
+observations are found:
+
+(1) The result of comparison between different settings of M-BiRank itself in Fig. 3 indi-
+cates M-BiRank-Commit performs better, which is in perfect accordance with the result
+found in correlation analysis in Section 4.4.1. Thus, only M-BiRank-Commit is compared
+against baseline methods in the rest part of this section.
+
+(2) M-BiRank outperforms all the baseline methods in identifying influential develop-
+ers, which means nodes’ types and mutual reinforcement among different interactions
+play important roles and multiplex bipartite network can model multiple interactions
+between two different types of nodes more precisely. Specially, the performance differ-
+ence between M-BiRank and BiRank is larger than that between M-BiRank and Multiplex
+PageRank (MPR), from which we can conclude that considering mutual reinforcement
+among different interactions is of more importance than distinguishing nodes’ types.
+
+(3) The number of final infected projects is more than that of developers in both M-
+BiRank and all the baseline methods. According to researches on epidemics on networks,
+
+Page 10 of 18
+Yan et al. EURASIP Journal on Wireless Communications and Networking (2020) 2020:215 Page 11 of 18
+
+ 
+
+ 
+
+ 
+
+ 
+
+ 
+
+ 
+
+6000
+— Degeree(Developer)
+—-—- Degree(Project)
+5000, —— M-BiRank(Developer)
+——-: M-BiRank(Project)
+4000 5
+> 3000;
+2000 |
+1000 ;
+0
+0 50 100 150 200 250 300
+t
+Fig. 4 Performance comparison between M-BiRank and Degree. The horizontal axis t indicates the number
+of iterations in SIR modeling. The vertical axis Ny indicates the number of final infected nodes (developers or
+projects, including infected and removed nodes)
+
+ 
+
+ 
+
+ 
+
+ 
+
+ 
+
+ 
+
+6000 6000
+— PageRank-Add(Developer) — PageRank-Avg(Developer)
+——: PageRank-Add(Project) —:— PageRank-Avg(Project)
+5000, —— M-BiRank(Developer) 50001 —— M-BiRank(Developer)
+——: M-BiRank(Project) —— M-BiRank(Project)
+
+40004 4000
+z= 3000] z= 3000
+20004 2000
+
+1000 5 1000
+
+ 
+
+ 
+
+ 
+
+ 
+
+  
+
+ 
+
+ 
+
+0 50 100 150 200 250 300 0 50 100 150 200 250 300
+
+(a) (b)
+
+Fig. 5 Performance comparison between M-BiRank and PageRank. The horizontal axis t indicates the
+number of iterations in SIR modeling. The vertical axis N; indicates the number of final infected nodes
+(developers or projects, including infected and removed nodes)
+
+ 
+
+ 
+
+ 
+
+ 
+
+ 
+
+ 
+
+6000 6000
+— BiRank-Add(Developer) — BiRank-Avg(Developer)
+—-—- BiRank-Add(Project) ——- BiRank-Avg(Project)
+5000, —— M-BiRank(Developer) 5000, —— M-BiRank(Developer)
+——: M-BiRank(Project) —-—: M-BiRank(Project)
+
+4000 4000,
+
+z= 3000 > 3000;
+2000
+
+2000
+
+1000 10004
+
+ 
+
+ 
+
+ 
+
+ 
+
+  
+
+ 
+
+ 
+
+0 50 100 150 200 250 300 0 50 100 150 200 250 300
+
+(a) (b)
+
+Fig. 6 Performance comparison between M-BiRank and BiRank. The horizontal axis t indicates the number of
+iterations in SIR modeling. The vertical axis N indicates the number of final infected nodes (developers or
+projects, including infected and removed nodes)
+
+ 
+
+ 
+
+ 
+
+ 
+Yan etal. EURASIP Journal on Wireless Communications and Networking (2020) 2020:215 Page 12 of 18
+
+ 
+
+6000 6000
+— MPR-Commit(Developer) — MPR-Issue(Developer)
+——: MPR-Commit(Project) —-—: MPR-Issue(Project)
+
+5000, —— M-BiRank-Commit(Developer) 5000, —— M-BiRank-Issue(Developer)
+——: M-BiRank-Commit(Project) ——: M-BiRank-lssue(Project)
+
+ 
+
+ 
+
+4000; 4000 5
+
+ae
+
+z= 3000] eo
+
+ 
+
+ 
+
+ 
+
+ 
+
+ 
+
+ 
+
+  
+
+0 50 100 150 200 250 300 0 50 100 150 200 250 300
+
+(a) (b)
+Fig. 7 Performance comparison between M-BiRank and MPR. The horizontal axis t indicates the number of
+iterations in SIR modeling. The vertical axis N; indicates the number of final infected nodes (developers or
+projects, including infected and removed nodes)
+
+ 
+
+ 
+
+ 
+
+information spreads faster and broader in networks with shorter average path length.
+From Table 2, we can see the average degree of projects is larger than that of developers.
+
+4.5 Case study
+
+In addition to correlation analysis and SIR simulation, we further do a detailed case study
+to show the effectiveness of our model in identifying influential developers and projects.
+The top 20 developers and projects ranked by our model M-BiRank are listed in Tables 4
+and 5, respectively, followed by their ranks in baseline methods.
+
+Table 4 indicates baseline methods, and M-BiRank ranks the first six developers sim-
+ilarly, while some influential PHP developers ranked in top 20 by M-BiRank are not
+identified or ranked with lower scores by baseline methods. For example, Fabien Potencier
+(GitHub ID: fabpot) and Taylor Otwell (GitHub ID: taylorotwell), the most active contrib-
+utors of the two most popular PHP frameworks, Symfony and Laravel, are not identified
+as influential developers by some of the baseline methods. From GitHub as of June 1,
+2020, Symfony and Laravel have 23.3k and 59.4k stars, respectively, and Fabien Potencier
+and Taylor Otwell have 10.4k and 18.6k followers, respectively. Taylor Otwell has more
+followers than Fabien Potencier, and Laravel is more popular than Symfony, but Fabien
+Potencier is ranked higher than Taylor Otwell because Laravel is based on some popular
+components of Symfony. Thus, we can conclude that Fabien Potencier is more influential
+than Taylor Otwell.
+
+As for projects, from Table 5, we can see both M-BiRank and baseline methods rank
+popular PHP frameworks with higher scores. But some important PHP components iden-
+tified by M-BiRank are not identified as influential projects or ranked with lower scores
+by baseline methods. For example, illuminate/database, a popular ORM library, is ranked
+with a high score by M-BiRank but is ranked with a lower score by BiRank-Add and
+PageRank- Add, and is never identified as influential projects by BiRank-Avg, PageRank-
+Avg, and MPR-Commit. As we know, in modern web development, ORM is quite critical
+because it is responsible for accessing database.
+
+4.6 Experimental settings discussion
+In the experiment, several key settings will affect the performance of M-BiRank and a
+brief discussion about these settings is shown as follows.
+Page 13 of 18
+
+ 
+
+ 
+
+ 
+
+ 
+
+Lv 67 ral 97 ral LZ El 02 uleiqul|ds
+Ol LZ LZ ZI €Z Zl LC 61 ydeajjuep
+- El SZ 99 O€ - ey 81 J}aMIOO|AeY
+GZ 97 67 v7 97 7 v1 Zl sulonjdsulddid
+Z 61 8 € 8 v 61 ot |PAOps09
+ZI 02 81 02 67 7 6 Gl nqp
+in ral Ol Sl Ol ZI Ol LE ral LLUMWS|
+N G CI LI l Ol 9 ez El pewuezey!6es
+S 8 LI El g EL / gl ZI an|>
+S - 8 E7 SS ve L8 Oz LI jodqey
+a LL ZI 6 Ol 6 g 91 Ol auoqouAlo
+61 LL Ol El ZL ZL l 6 SNILUPIIO
+56 l 02 ep 02 GE 9 8 A-IU2}
+Sl OL ZL LI LI 6 8 Z JOAN
+€8 G G LZ G 61 G 9 SZINUW 924
+v 9 l 9 l G ZL G jos
+CY v v ZL v El Z b Aaguulydossiam
+€ 6 9 v 9 € l € Jaqnyypeqjaluep
+l Z C Z € Z € C jaqdweyuwueyess
+19 | C G C Ol | | JOXJ-O1N P-JOZIUINIDS
+WWWOD-YdW anss|-YdIN ppy-yueyabed Bay-yueyabed ppy-yueulg Bay-yueyl” aa1baq yueyig-W
+Gupjuey Jadojaneq
+Sladojanap 07 do| yaqey
+
+Yan et al. EURASIP Journal on Wireless Communications and Networking
+Page 14 of 18
+
+ 
+
+ 
+
+ 
+
+8l CC LC CC 6L 6L SE OC JSACIE|/|SACIE|
+vS VC ve Lv CE LE vl 61 doyselsaid/doyse\sald
+LZ BL ZI LZ BL 02 61 BL IWA/YOSIA
+Sl Ol CZ Ol CZ Ol EZ L\ SMIIAS/SNIIAS
+91 ZL Bl Sl OC Bl cE Ol a|PUNgUILUPYe}eUOS/}Da/O1d-e]eUOS
+~ SL SS 7 eS 7 OL Sl aseqejep/ayeullun|||
+Ln OL EL OL OL OL LL LI vl uopjeyda/uosjeyd
+N 8 Cl 8 8 Q 6 Q| CL QDIBUULUOIOOM/IDIBWUWWODOOM
+S S 8 9 9 9 Z CC Zl Jasodwod/Jasodwod
+S vl vl ZL El ZL ZL ZL LL SWUDOJAC /SWDOIAC
+a Cl OL Ll Ll LL Ol 9 Ol Jayubjapod/qes|||5
+OC 6 0 61 LZ vl v 6 SDOP-AUOJWAS/AUOJWAS
+61 LL 61 Sl Ol El 09 8 ypedjal/aijewoiny
+6 L 6 6 6 8 8 l dydayes/dydayes
+Z 9 l l l 9 G 9 SLUD-2|WOO/[/e|WOOf
+9 S S S S S Cl S 3109/PNO|DUMO
+€ b € € € € C b CHA/YOSIIA
+Vv € Vv Vv Vv Vv L C Z7OJUSHeW/O]UsHeW
+| C L L | L € C YIOMAWEI/JOACIE|
+C L C C C C L L AUOUUAS/AUOJWAS
+HWWWO>-YdW anssi-YdW ppy-yueyebed Bay-yueysbed ppy-yueulg Bay-jueyl” veibaq yueylg-W
+6upjuey yefoig
+
+ 
+
+Yan etal. EURASIP Journal on Wireless Communications and Networking
+
+speloid 97 do| ¢ ajqey
+Yan et al. EURASIP Journal on Wireless Communications and Networking (2020) 2020:215 Page 15 of 18
+
+ 
+
+ 
+
+1.0
+
+—s— Weighted
+—@ Unweighted
+
+0.8
+
+ 
+
+0.6
+O
+O
+OW
+0.4
+0.2
+0.0
+10 20 30 40 50
+K
+
+Fig. 8 Impact of edge weight. The horizontal axis K indicates the number of initial infected nodes in SIR
+modeling. The vertical axis N; indicates the number of final infected nodes (including infected and removed
+nodes)
+
+ 
+
+ 
+
+ 
+
+First, we will study the impact of edge weight in the ranking process. Both unweighted
+and weighted developer-project multiplex bipartite networks are constructed, and for
+weighted case, the interaction times are summed as edge weight. Then, correlation anal-
+ysis on top k developers and projects is applied and the results are shown in Fig. 8,
+from which it can be concluded that weighted developer-project multiplex bipartite net-
+work performs better than unweighted case and edge weight plays an important role in
+identifying influential developers and projects.
+
+Then, experimental settings for SIR simulation are discussed. It can be seen from Fig. 9
+that the more initial infected nodes are set, the more final infected nodes. It is also obvious
+
+ 
+
+ 
+
+7000
+
+M-BiRank-lssue(Developer)
+
+M-BiRank-Issue(Project)
+
+M-BiRank-Commit(Developer)
+6000 M-BiRank-Commit(Project)
+
+5000
+
+‘— 5 me 5
+
+4000
+
+ 
+
+ 
+
+2000 . . . . . . . .
+10 20 30 40 #50 60 +70 80 £90 100
+K
+
+Fig. 9 Impact of the number of initial infected nodes on final infected nodes
+
+ 
+
+ 
+
+ 
+Yan etal. EURASIP Journal on Wireless Communications and Networking
+
+(2020) 2020:215
+
+ 
+
+8000
+
+7000
+
+N,
+
+5000
+
+ 
+
+6000]
+
+— M-BiRank-Issue(Developer)
+—— M-BiRank-Issue(Project)
+
+8000
+
+7000
+
+6000
+
+N,
+
+5000
+
+ 
+
+— M-BiRank-Commit(Developer)
+——- M-BiRank-Commit(Project)
+
+~.
+~.
+~
+
+4000
+
+ 
+
+ 
+
+3000
+
+ 
+
+05 O06 O07 O8 09
+
+y,A
+
+(a)
+
+01 O02 O03 04
+
+ 
+
+ 
+
+3000 r +
+0.5 0.6
+
+y,A
+
+(b)
+
+01 O02 O03 04
+
+ 
+
+ 
+
+ 
+
+Fig. 10 Hyperparameter analysis
+
+ 
+
+that the same number of top k projects being set as initial infected nodes will result in
+more final infected nodes.
+
+Finally, the hyperparameters y and A of our proposed M-BiRank model are analyzed.
+For simplicity, we consider the condition that y and A are equal. It can be concluded
+from Fig. 10 that both prior belief of developers’ (projects’) importance and rankings
+from network structure play roles in the final rankings of developers (projects) and their
+contributions to final rankings are approximately equal.
+
+5 Conclusions
+
+In this work, we study the problem of identifying influential developers and projects in
+open source software community. We model multiple interactions between developers
+and projects as a multiplex bipartite network and propose an iterative refinement rank-
+ing method M-BiRank by incorporating the mutual reinforcement between developers
+and projects as well as between multiple developer-project interactions. The proposed
+M-BiRank is evaluated against four baseline methods on real-world GitHub dataset.
+Extensive experimental analysis and case study show M-BiRank significantly outperforms
+baseline methods in both correlation analysis and SIR simulation.
+
+The general idea behind the proposed M-BiRank is modeling multiple kinds of entities
+and interactions in open source software community into a single network and incor-
+porating mutual reinforcement between different kinds of entities as well as between
+different types of interactions when ranking. As we know, there are other entities such
+as blogs and organizations in addition to developers and projects in open source soft-
+ware community and plenty of interactions between them such as user-user following and
+project-project dependency. In future work, more entities and interactions could be intro-
+duced and modeled as a heterogeneous information network and mutual reinforcement
+in ranking would be generalized using meta-path.
+
+Abbreviations
+M-BiRank: Multiplex bipartite ranking; PCC: Pearson’s correlation coefficient; MPR: Multiplex PageRank
+
+Acknowledgements
+None.
+
+Authors’ contributions
+Dengcheng Yan and Bin Qi designed the model. Bin Qi conducted the experiment and prepared the figures. Dengcheng
+Yan wrote the entire article. All authors read and approved the final manuscript.
+Yan et al. EURASIP Journal on Wireless Communications and Networking (2020) 2020:215 Page 17 of 18
+
+Funding
+
+This work is supported by the National Natural Science Foundation of China (Grant No. 61872002), the University Natural
+Science Research Project of Anhui Province (Grant No. KJ2019A0037), the University Collaborative Innovation Program of
+Anhui Province (Grant No. GXXT-2019-013), and the Doctoral Scientific Research Foundation of Anhui University (Grant
+No. Y040418194).
+
+Availability of data and materials
+The datasets used and/or analyzed during the current study are available from the corresponding author on reasonable
+request.
+
+Competing interests
+The authors declare that they have no competing interests.
+
+Author details
+'School of Computer Science and Technology, Anhui University, Jiulong Road No. 111, Hefei, 230601, China. 2 Institutes
+of Physical Science and Information Technology, Anhui University, Jiulong Road No. 111, Hefei, 230601, China.
+
+Received: 10 June 2020 Accepted: 29 September 2020
+Published online: 27 October 2020
+
+References
+
+1. Y. Chen, N. Zhang, Y. Zhang, X. Chen, W. Wu, X. S. Shen, Toffee: task offloading and frequency scaling for energy
+efficiency of mobile devices in mobile edge computing. IEEE Trans. on Cloud Comput. (2019). https://doi.org/10.
+1109/TCC.2019,2923692
+
+2. _Y. Zhang, J. Pan, L. Qi, Q. He, Privacy-preserving quality prediction for edge-based iot services. Future Gener.
+Comput. Syst. 114, 336-348 (2021). https://doi.org/10.1016/j.future.2020.08.014
+
+3. Y. Chen, N. Zhang, Y. Zhang, X. Chen, Dynamic computation offloading in edge computing for internet of things.
+IEEE Internet Things J. 6(3), 4242-4251 (2019). https://doi.org/10.1109/JIOT.2018.2875715
+
+4. Y. Chen, Y. Zhang, Y. Wu, L. Qi, X. Chen, X. Shen, Joint task scheduling and energy management for heterogeneous
+mobile edge computing with hybrid energy supply. IEEE Internet Things J. 7(9), 8419-8429 (2020). https://doi.org/
+10.11 09/JIOT.2020.2992522
+
+5. M.Joblin, S. Apel, C. Hunsen, W. Mauerer, in 2017 IEEE/ACM 39th International Conference on Software Engineering
+(ICSE), Classifying developers into core and peripheral: an empirical study on count and network metrics (IEEE,
+Buenos Aires, 2017), pp. 164-174. https://doi.org/10.1109/ICSE.2017.23
+
+6. D.-C. Yan, Z.-W. Wei, X.-P. Han, B.-H. Wang, Empirical analysis on the human dynamics of blogging behavior on
+github. Physica A. 465, 775-781 (2017). https://doi.org/10.1016/j.physa.2016.08.054
+
+7. Y. Hu, S.Wang, Y. Ren, K.-K. R. Choo, User influence analysis for github developer social networks. Expert Syst. Appl.
+108, 108-118 (2018). https://doi.org/10.1016/j.eswa.2018.05.002
+
+8. Q. Xuan, C. Fu, L. Yu, Ranking developer candidates by social links. Adv. Complex Syst. 17, 1550005 (2014). https://
+doi.org/10.1142/S0219525915500058
+
+9. L. Page, S. Brin, R. Motwani, T. Winograd, The pagerank citation ranking: bringing order to the web. Technical report
+(1999). Stanford InfoLab
+
+10. J.M. Kleinberg, Authoritative sources in a hyperlinked environment. J. ACM. 46(5), 604-632 (1999). https://doi.org/
+10.1145/3241 33.324140
+
+11. X. He, M. Gao, M.-Y. Kan, D. Wang, Birank: towards ranking on bipartite graphs. IEEE Trans. Knowl. Data Eng. 29(1),
+57-71 (2016). https://doi.org/10.1109/TKDE.2016.261 1584
+
+12. H.Liu, H. Kou, C. Yan, L. Qi, Keywords-driven and popularity-aware paper recommendation based on undirected
+paper citation graph. Complexity (2020). https://doi.org/10.1155/2020/2085638
+
+13. A. Halu, R. J. Mondragén, P. Panzarasa, G. Bianconi, Multiplex pagerank. PloS One. 8(10), 78293 (2013). https://doi.
+org/10.1371/journal.pone.0078293
+
+14. J. lacovacci, C. Rahmede, A. Arenas, G. Bianconi, Functional multiplex pagerank. EPL. 116(2), 28004 (2016). https://
+doi.org/10.1209/0295-5075/1 16/28004
+
+15. Y. Zhang, Y. Zhou, F. Wang, Z. Sun, Q. He, Service recommendation based on quotient space granularity analysis and
+covering algorithm on spark. Knowledge-Based Syst. 147, 25-35 (2018). https://doi.org/10.1016/j.knosys.2018.02.014
+
+16. Y. Zhang, G. Cui, S. Deng, F. Chen, Y. Wang, Q. He, Efficient query of quality correlation for service composition. IEEE
+Trans. Serv. Comput. (2018). https://doi.org/10.1109/TSC.2018.2830773
+
+17. Y. Zhang, K. Wang, Q. He, F. Chen, S. Deng, Z. Zheng, Y. Yang, Covering-based web service quality prediction via
+neighborhood-aware matrix factorization. IEEE Trans. Serv. Comput. (2019). https://doi.org/10.1109/TSC.2019.
+2891517
+
+18. Y. Zhang, C. Yin, Q. Wu, Q. He, H. Zhu, Location-aware deep collaborative filtering for service recommendation. IEEE
+Trans. Syst., Man, Cybern. Syst. (2019). https://doi.org/10.1109/TSMC.2019.2931723
+
+19. L. Qi, X. Wang, X. Xu, W. Dou, S. Li, Privacy-aware cross-platform service recommendation based on enhanced
+locality-sensitive hashing. IEEE Transactions on Network Science and Engineering (2020). https://doi.org/10.1109/
+TNSE.2020.2969489
+
+20. C. Zhou, A. Li, A. Hou, Z. Zhiwang, Z. Zhang, P. Dai, F. Wang, Modeling methodology for early warning of chronic
+heart failure based on real medical big data. Expert Syst. Appl. 151, 113361 (2020). https://doi.org/10.1016/j.eswa.
+2020.113361
+
+21. D.Chen,L. LU, M.-S. Shang, Y.-C. Zhang, T. Zhou, Identifying influential nodes in complex networks. Physica A. 391(4),
+1777-1787 (2012). https://doi.org/10.1016/j.physa.2011.09.017
+
+22. D.-B. Chen, H. Gao, L. Lt, T. Zhou, Identifying influential nodes in large-scale directed networks: the role of clustering.
+PLoS One. 8(10) (2013). https://doi.org/10.1371/journal.pone.0077455
+Yan et al. EURASIP Journal on Wireless Communications and Networking (2020) 2020:215 Page 18 of 18
+
+23.
+
+24,
+
+25.
+
+26.
+
+2/.
+
+28.
+
+29.
+
+30.
+
+31.
+
+32.
+
+33.
+
+34.
+
+35.
+
+36.
+
+37.
+
+38.
+
+39.
+
+ 
+
+ 
+
+H. Liu, H. Kou, C. Yan, L. Qi, Link prediction in paper citation network to construct paper correlation graph. EURASIP J.
+Wireless Com. Network. 2019(1) (2019). https://doi.org/10.1186/s13638-019-1561-7
+
+S. X. Zhao, R. Rousseau, Y. Y. Fred, h-degree as a basic measure in weighted networks. J. Informetr. 5(4), 668-677
+(2011). https://doi.org/10.1016/j.joi.201 1.06.005
+
+Q. Liu, Y-X. Zhu, Y. Jia, L. Deng, B. Zhou, J.-X. Zhu, P. Zou, Leveraging local h-index to identify and rank influential
+spreaders in networks. Physica A. 512, 379-391 (2018). https://doi.org/10.1016/j.0hysa.2018.08.053
+
+L. Lu, T. Zhou, Q.-M. Zhang, H. E. Stanley, The h-index of a network node and its relation to degree and coreness. Nat.
+Commun. 7, 10168 (2016). https://doi.org/10.1038/ncomms10168
+
+G, Sabidussi, The centrality index of a graph. Psychometrika. 31(4), 581-603 (1966). https://doi.org/10.1007/
+BFO2289527
+
+L. C. Freeman, A set of measures of centrality based on betweenness. Sociometry. 40(1), 35-41 (1977). https://doi.
+org/10.2307/3033543
+
+K. Stephenson, M. Zelen, Rethinking centrality: methods and examples. Soc. Networks. 11(1), 1-37 (1989). https://
+doi.org/10.1016/0378-8733(89)90016-6
+
+D. Wang, H. Wang, X. Zou, Identifying key nodes in multilayer networks based on tensor decomposition. Chaos.
+27(6), 063108 (2017). https://doi.org/10.1063/1.4985185
+
+D. Wang, X. Zou, A new centrality measure of nodes in multilayer networks under the framework of tensor
+computation. Appl. Math. Model. 54, 46-63 (2018). https://doi.org/10.1016/j.apm.201 7.07.012
+
+L. LU, Y.-C. Zhang, C. H. Yeung, T. Zhou, Leaders in social networks, the delicious case. PloS One. 6(6) (2011). https://
+doi.org/10.1371/journal.pone.0021 202
+
+W. Zhong, X. Yin, X. Zhang, S. Li, W. Dou, R. Wang, L. Qi, Multi-dimensional quality-driven service recommendation
+with privacy-preservation in mobile edge environment. Comput. Commun. 157, 116-123 (2020). https://doi.org/10.
+1016/j.comcom.2020.04.018
+
+R. Liang, X. Jiang, in Proceedings of the Thirtieth AAAI Conference on Artificial Intelligence, Scientific ranking over
+heterogeneous academic hypernetwork (AAAI Press, Phoenix, Arizona, 2016), pp. 20-26
+
+H. Zhao, X. Xu, Y. Song, D. L. Lee, Z. Chen, H. Gao, Ranking users in social networks with motif-based pagerank. IEEE
+Trans. Knowl. Data Eng. (2019). https://doi.org/10.1109/TKDE.2019.2953264
+
+G. Gousios, in Proceedings of the 10th Working Conference on Mining Software Repositories, The ghtorrent dataset and
+tool suite (IEEE, San Francisco, 2013), pp. 233-236. https://dl.acm.org/doi/10.5555/2487085.2487 132
+
+X. Xu, S. Fu, L. Qi, X. Zhang, Q. Liu, Q. He, S. Li, An iot-oriented data placement method with privacy preservation in
+cloud environment. J. Netw. Comput. Appl. 124, 148-157 (2018). https://doi.org/10.1016/j.jnca.2018.09.006
+
+J. Hauke, T. Kossowski, Comparison of values of Pearson’s and Spearman’s correlation coefficients on the same sets
+of data. Quaestiones geographicae. 30(2), 87-93 (2011). https://doi.org/10.2478/v10117-011-0021-1
+
+J. Li, T. Cai, K. Deng, X. Wang, T. Sellis, F. Xia, Community-diversified influence maximization in social networks. Inf.
+Syst. 92, 101522 (2020). https://doi.org/10.1016/j.is.2020.101522
+
+R. Yang, B.-H. Wang, J. Ren, W.-J. Bai, Z.-W. Shi, W.-x. Wang, T. Zhou, Epidemic spreading on heterogeneous networks
+with identical infectivity. Phys. Lett. A. 364(3-4), 189-193 (2007). https://doi.org/10.1016/j.physleta.2006.12.021
+
+X. Xu, R. Mo, F. Dai, W. Lin, S. Wan, W. Dou, Dynamic resource provisioning with fault tolerance for data-intensive
+meteorological workflows in cloud. IEEE Trans. Ind. Inform. 16(9), 6172-6181 (2019). https://doi.org/10.1109/TII.2019.
+2959258
+
+P. Bonacich, Factoring and weighting approaches to status scores and clique identification. J. Math. Sociol. 2(1),
+113-120 (1972). https://doi.org/10.1080/0022250X.1972.9989806
+
+R. Pastor-Satorras, C. Castellano, P. Van Mieghem, A. Vespignani, Epidemic processes in complex networks. Rev. Mod.
+Phys. 87(3), 925 (2015). https://doi.org/10.1 103/RevModPhys.87.925
+
+Publisher’s Note
+
+Springer Nature remains neutral with regard to jurisdictional claims in published maps and institutional affiliations.
+
+ 
+
+Submit your manuscript to a SpringerOpen®
+journal and benefit from:
+
+> Convenient online submission
+
+> Rigorous peer review
+
+> Open access: articles freely available online
+> High visibility within the field
+
+> Retaining the copyright to your article
+
+Submit your next manuscript at > springeropen.com
+
+ 
+
+ 
+
+ 

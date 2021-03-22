@@ -1,0 +1,1103 @@
+Liu et al. Hum. Cent. Comput. Inf. Sci.
+https://doi.org/10.1186/s13673-020-00218-w
+
+(2020) 10:13 © Human-centric Computing
+
+and Information Sciences
+
+RESEARCH Oy oT-Ta waa -55 4
+
+®
+
+Information cascades prediction coi
+with attention neural network
+
+Yun Liu'’, Zemin Bao!?, Zhenjiang Zhang!, Di Tang? and Fei Xiong!
+
+ 
+
+*Correspondence:
+liuyun@bjtu.edu.cn
+
+' Key Laboratory
+
+of Communication
+
+and Information
+Systems,Beijing Municipal
+Commission of Education,
+Beijing Jiaotong University,
+Beijing 100044, China
+
+Full list of author information
+is available at the end of the
+article
+
+Q) Springer Open
+
+Abstract
+
+Cascade prediction helps us uncover the basic mechanisms that govern collective
+human behavior in networks, and it also is very important in extensive other applica-
+tions, such as viral marketing, online advertising, and recommender systems. However,
+it is not trivial to make predictions due to the myriad factors that influence a user's
+decision to reshare content. This paper presents a novel method for predicting the
+increment size of the information cascade based on an end-to-end neural network.
+Learning the representation of a cascade in an end-to-end manner circumvents the dif-
+ficulties inherent to blue the design of hand-crafted features. An attention mechanism,
+
+which consists of the intra-attention and inter-gate module, was designed to obtain
+and fuse the temporal and structural information learned from the observed period
+
+of the cascade. The experiments were performed on two real-world scenarios, i.¢.,
+predicting the size of retweet cascades on Twitter and predicting the citation of papers
+in AMiner. Extensive results demonstrated that our method outperformed the state-
+of-the-art cascade prediction methods, including both feature-based and generative
+approaches.
+
+Keywords: Information diffusion, Deep learning, Attention network, Cascade
+prediction
+
+ 
+
+Introduction
+
+Online social networks are very popular among people, and they are changing the way
+people communicate, work, and play, mostly for the better. One of the things that fasci-
+nates us most about social network sites is the resharing mechanism that has the potential
+to spread information to millions of users in a matter of few hours or days. For instance,
+a user can share the content (e.g., videos on YouTube, tweets on Twitter, and photos on
+Flickr) with her set of friends, who subsequently can potentially reshare the content, result-
+ing in the development of a cascade of resharing. Such information cascades play a signifi-
+cant role in almost every social network phenomenon, which include, but are not limited
+to, the diffusion of innovation, persuasion campaigns, and spreading rumors. Information
+cascade prediction is to infer some key properties of information cascades, such as their
+sizes and shapes, which indicate the extent to which the information can reach in the social
+network. This prediction task can be valuable, and it can be applied in an array of areas,
+
+such as content recommender systems and monitoring the consensus opinion. However,
+
+© The Author(s) 2020. This article is licensed under a Creative Commons Attribution 4.0 International License, which permits use, sharing,
+adaptation, distribution and reproduction in any medium or format, as long as you give appropriate credit to the original author(s) and the
+source, provide a link to the Creative Commons licence, and indicate if changes were made. The images or other third party material in this
+article are included in the article’s Creative Commons licence, unless indicated otherwise in a credit line to the material. If material is not
+included in the article's Creative Commons licence and your intended use is not permitted by statutory regulation or exceeds the permit-
+ted use, you will need to obtain permission directly from the copyright holder. To view a copy of this licence, visit http://creativecommons.
+org/licenses/by/4.0/.
+Liu et al. Hum. Cent. Comput. Inf. Sci. (2020) 10:13 Page 2 of 16
+
+cascade prediction is challenging due to the myriad factors that influence a user’s decision
+to reshare content.
+
+The problem of cascade prediction has been studied extensively [1—3], but most of the
+studies either depended heavily on the quality of the carefully designed hand-crafted fea-
+tures or made various strong assumptions about the generative processes of the resharing
+events and oversimplified reality, leading to impaired predictive power. On the other hand,
+deep learning methods, such as convolutional neural networks (CNNs) [4] and recurrent
+neural networks (RNNs) [5], have achieved great success in various complicated tasks
+[6—8], and some studies have used neural networks as a transformer to leverage various
+informative features for cascade prediction [9]. Nevertheless, these methods ignore the
+temporal properties for cascade prediction, which are regarded as the valuable information
+that is needed to improve cascade prediction in traditional works.
+
+In this paper, we propose to predict the information cascade within a neural network
+framework, by incorporating an attention mechanism using temporal and structural infor-
+mation learned from the observed period of the cascade. Our proposed method consists of
+three layers. In the first layer, the structure embedding is obtained by representing the cas-
+cade graph as a set of random walk paths that carry information about the propagator of the
+message and the local and global topologies among them. Inspired by the recent successes
+of the point process model in a cascade dynamic modeling task [10], temporal embedding
+is a series of hidden representations of reshared events ordered ascendingly by time. The
+challenge is how to assemble paths or events into the effective representation of each factor.
+Thus, in the second layer, we designed a novel attention mechanism that contains intra-
+attention and inter-gate modules. The assembly problem is solved via the intra-attention
+mechanism with respect to (w.rt.) the topological structure and the temporal properties.
+Further, a gate mechanism is proposed to fuse the structure and temporal representation
+by capturing the importance of the two factors for cascade prediction. Finally, the top layer
+introduces a multi-layer perceptron (MLP) to output the prediction (increment size of the
+cascade in our case). We performed extensive experiments on two representative real-
+world datasets, a Twitter dataset and an AMiner citation network dataset. Our results indi-
+cated that our proposed method outperformed state-of-the-art cascade prediction models.
+
+The remainder of this paper is organized as follows. “Related work” section presents a
+survey of the related work. “Preliminaries” section formulates the cascade prediction prob-
+lem and introduces the recurrent neural network. “Approach” section presents the details of
+the proposed model. The experimental results are presented in “Experiments” section, and
+
+conclusions and plans for future work are reported in “Conclusions” section.
+
+Related work
+We reviewed and presented relevant studies to our work from two aspects, i.e, cascade pre-
+
+diction and attention mechanism.
+
+Cascade prediction
+
+Information cascade prediction has been explored in recent years and is still an open
+problem. Existing methods for cascade prediction can be categorized into two broad
+types, i.e., feature-based and model-based approaches.
+Liu et al. Hum. Cent. Comput. Inf. Sci. (2020) 10:13 Page 3 of 16
+
+Feature-based approaches [2, 3, 11-15] make the connection between the prediction
+and various types of hand-crafted features that are extracted from the information cas-
+cade, including the structural features of the social network, content features, temporal
+features, and user features. To predict the popularity of news articles in Yahoo News,
+Arapakis et al. [16] used 10 different features that they extracted from the content of the
+news articles as well as external sources. To predict the popularity of online videos in
+YouTube and Facebook, Trzcinski et al. [17] utilized both the visual clues and the early
+popularity patterns of the videos once they were released. Instead of predicting the total
+volume or level of popularity, Kong et al. [18] focused on the popularity evolution of
+online contents and consider the dynamic factors that influenced how the popularity
+evolved. Nevertheless, there is no principled way to design and extract these features,
+and the accuracy of the predictions is sensitive to the quality of the extracted features.
+
+Model-based approaches [1, 19-22] are devoted to directly characterizing and mode-
+ling the formation of an information cascade in the network. These approaches often are
+optimized to provide intuitive explanations for the prediction due to the interpretable
+factors that are incorporated in them. Yu et al. [21] proposed a novel NEtworked Weibull
+Regression model for modeling microbehavioral dynamics that significantly improved
+the interpretability and generalizability of traditional survival models. Bao et al. [23]
+modeled the popularity dynamics of the tweet in Twitter using the Hawkes process.
+They also proposed a method for exploring an adaptive peeking window for each tweet,
+which can synthesize all of the global dynamic information within the observed period
+into the predicted peek point. However, using the model-based approach for cascade
+prediction often is sub-optimal, because strong assumptions often are made about the
+process of information flow during a diffusion, and they lack the size of the future cas-
+cade as a guide.
+
+Inspired by the recent success of deep learning in various complicated tasks, several
+studies [9, 24] have adopted deep learning methods to leverage various features for cas-
+cade prediction, which achieves satisfactory results. Our work is closely related to the
+above works. While in our work, learning the representation of cascade in an end-to-
+end manner circumvents the difficulties inherent to the hand-crafted features design
+step. We also incorporate the temporal properties, which has been ignored in previous
+
+work [9].
+
+Attention mechanism
+
+The concept of attention was first introduced in Neuroscience and Computational Neu-
+roscience [25, 26]. For instance, visual attention is the process by which humans focus
+on specific portion of their visual inputs for computing the adequate responses. Simi-
+larly, in training neural networks, the attention mechanism allows models to learn align-
+ments between different parts of the input. Attention mechanism has gained popularity
+recently in various tasks, such as neural machine translation [27], image caption [28],
+image/video popularity prediction [24, 29], and question answering [30, 31]. To predict
+video popularity, Bielski et al. [29] proposed a model with self-attention mechanism to
+hierarchically attend both video frames and textual modalities. To the best of our knowl-
+edge, we are the first to propose the attention mechanism into cascade prediction by fus-
+
+ing temporal and structural information.
+Liu et al. Hum. Cent. Comput. Inf. Sci. (2020) 10:13 Page 4 of 16
+
+Preliminaries
+In this section, we first present a formal definition of the cascade prediction problem
+(“Problem definition” section), and then we briefly describe the recurrent neural network
+
+that is used in our proposed method (“Recurrent neural network” section).
+
+Problem definition
+
+Let G = (V, €) be a social network (e.g., Twitter or the academic paper network), where V
+is the set of vertices of G, and € C V x Vis the set of edges of G. A vertex u € V represents
+a user in the social network and an edge (u, v) € E represents that there exists a feedback
+relationship (e.g., using a like, comment, share, or cite) between user u and user v.
+
+Suppose we have M cascades that start in G after time to. At time t, we denote the i-th cas-
+cade as gi = (V!, T/',E!), where V! is the subset of Y who have taken part in the cascade,
+T/! _— {ti, Leng tii) represents the time when a user in vi takes part in the cascade, and
+El = EN (Vv! x V') represents the feedback relationships between users in V’.
+
+In this work, we first obtain g! ’s detailed representation as {S‘, H“}, where S! and H!
+correspond to structure representation and temporal representation, respectively. We
+denote the cascade size of g! as R' = |V'|. Thus, our aim is to predict the incremental size
+AR: = Vo — Vi |. In other words, the target is to learn a function f that maps {S!, H*} to
+ARi, f : S',H’ > AR.
+
+Note that throughout this paper, we denote vectors by bold lowercase letters and matri-
+ces by bold capital Roman letters. In what follows, we will omit the superscript i of related
+
+notations for simplicity.
+
+Recurrent neural network
+
+Recurrent neural network (RNN) [5, 32] is a type of deep neural network with cycle and
+internal memory units that capture sequential information, which is a more general model
+than the feed-forward network. In practice, RNN has been shown to be a powerful tool for
+modeling sequences [33]. Long short-term memory (LSTM) [34] and gated recurrent unit
+(GRU) [35] are recurrent mechanisms that are used extensively. According to Chung et al.
+[35], GRU has been shown to exhibit better performance with less computation, and it is
+used as the basic recurrent unit in our proposed approach. The updating formulation of
+GRU is as follows:
+
+uj = 0 (Wx; + Uyhi-1 + by)
+o(W,x; + U;hi_-1 + by)
+tanh(W,,«; + r;Uy;hi_1 + by)
+hj = uj-hy-1 + A — uj) «hia
+
+=
+|
+
+where 4; is current input, 4j-1 is previous hidden state, o(-) is the sigmoid activation
+function, - denotess element-wise multiplication, W,, W,, W),, Uy, Uy, Uyand by, by, by
+are GRU parameters learned during training, and h; is the updated hidden state. The
+above system can be reduced into an GRU equation: h; = GRU (aj, hj-1)
+Liu et al. Hum. Cent. Comput. Inf. Sci. (2020) 10:13 Page 5 of 16
+
+Approach
+
+In this section, we introduce our proposed method (presented in Fig. 1). It consists of
+three major components: (1) input embedding (“Input embedding” section ); (2) atten-
+tion mechanism (“Attention mechanism” section); and (3) output layer (“Output layer”
+
+section).
+
+Input embedding
+Extracting structure representation
+The cascade graph g; is first represented as a set of cascade paths that are sampled
+through multiple random walk processes. Each of the cascade paths not only carry the
+information about who are the information propagators, but they also capture the infor-
+mation flow. Thus, we then feed them into a gated recurrent neural network to obtain
+the hidden representation.
+
+We follow previous work [9, 36] and use a fixed path length L and a fixed number
+of sequences K. Concisely speaking, for each random walk process, we first sample the
+
+starting node with a probability by the following equation:
+
+deg.(u) + a
+
+P(u) = —— 2
+OOS SS cy, (des) + a) ”
+
+where a is a smoother, deg, (u) is the out-degree of vertex u in G, and V, is the set of nodes
+in g;. Following the starting node, the neighbor node is sampled with the probability:
+
+deg.(u) + a
+dUsen,(v) (deg, (s) + a) (3)
+
+ 
+
+PueN-(v) |v) =
+
+The sampling of one selected sequence stops either when we reach the predefined length
+L or when we reach a vertex that has no outgoing neighbors. Whenever the length of
+one sequence is smaller than T, the sequence is padded by a special vertex ‘+’ This pro-
+cess of sampling sequences continues until we sample K sequences.
+
+Each node in the sequence is represented as a one-hot vector, q € R”, where N is the
+total number of nodes in G. Before we feed the one-hot vector into GRU, we first covert
+each of them into a low-dimensional dense vector x by a embedding matrix W, € R”*%:
+x = Wyq where H is an adjustable dimension of embedding.
+
+ 
+
+ 
+
+ 
+
+ 
+
+ 
+
+  
+
+ 
+
+( >
+\4~ ~ Lnodes - ~~ +!
+
+= —F' ao 3 —— om
+: ! @ OOO | 3 go[.:)
+
+K = © o
+| rwwo-ore-o7 8: 1) Il. go.
+é . *| L8_] | Fey 2) =e 3
+
+1 ®OO@ ee ee
+
+1 1
+
+ 
+
+ 
+
+  
+  
+
+ 
+
+Intra-
+attention
+
+i : : i i i Mean pooling
+Timeline Mitt ho 7 | Incremental
+ntra- .
+— i Ly, size
+t, tg t. ty t t, | cru L +e eee —| attention |— Inter-gate — MLP
+
+prediction
+
+ 
+
+ 
+
+ 
+
+ 
+
+ 
+
+ 
+
+Temporal information
+
+ 
+
+ 
+
+Fig. 1 Main architecture of our proposed method
+XN SD
+Liu et al. Hum. Cent. Comput. Inf. Sci. (2020) 10:13 Page 6 of 16
+
+Then we feed the sequence into GRU to generate sequential hidden states. We
+adopt the bi-directional GRU [37], where a forward GRU reads the sequence node by
+node, from left to right, and generates a sequence of forward hidden vectors (nk ].
+Similarly, a backward GRU reads from right to left, node by node and generates a
+sequence of backward hidden vectors (h*). This encoder can be used to simulate
+the process of information flow during a diffusion. For the i-th node in the sequence,
+the updated hidden state is computed as the concatenation of the forward and back-
+
+ward hidden vectors:
+
+= —> <_
+h*=h* oh (4)
+where © denotes the concatenation operation.
+=
+Hence, we can obtain the k-th sequence’s representation [ h Ky. We assume mul-
+tinomial distribution a 1,...,a@z, over L nodes so that Soi (i) = 1. Thus, the k-th
+
+sequence is represented as:
+L
+>;
+Sk = Sai h ; (5)
+i=1
+
+Note that the weight a; is also learned through the deep learning process.
+Finally, from the perspective of topological structure, a cascade graph can be
+
+expressed as S = [s1,...,SK], Sk € R27,
+
+Extracting temporal representation
+
+When we consider about the temporal information of cascade graph g;, the adoption
+process is either a time series or a point process. The former series is indexed with
+fixed and equal time intervals, which can be used to capture the dependence in the
+time-varying features in a timely manner. The latter are generated asynchronously
+with random timestamps, and the precise time interval between two adoption events
+carries a great deal of information about the underlying dynamics. Capturing this
+information will be crucial for predicting the increment size of the cascade graph.
+Thus, as Fig. 1 shows, we used the point process form. The effectiveness of the point
+process form is demonstrated in “Experiments” section.
+
+Specifically, for adoption event i, we can extract the associated temporal features
+(e.g., the inter-event duration dj; = t; — t;_1) and obtain the corresponding temporal
+sequence J; = {d,...,d)y,)}. Then, we feed the sequence, 7;, into GRU, where the
+hidden state of adoption event i (denoted as h;) can be updated by:
+
+hi = GRU, hi-1) (6)
+
+We should emphasize that, in this case, the current input vector degenerates into a sca-
+lar. After recurrent computation for each time step, we gather a series of hidden states
+T =[h,...,hp,], him € R".
+
+In summary, we have a structure representation S and a temporal representation T
+
+as inputs for the attention mechanism to be proposed below.
+Liu et al. Hum. Cent. Comput. Inf. Sci. (2020) 10:13 Page 7 of 16
+
+Attention mechanism
+
+Our attention mechanism consists of two parts: intra-attention module and inter-gate
+module. Through these we can obtain a more suitable representation of cascade g; for
+prediction.
+
+Intra-attention mechanism
+
+Attention computation for topological structure Intra-attention w.r.t. topological struc-
+ture (presented in Fig. 2) aims at assembling the sampled cascade paths into the effective
+representation of the structure information of g;. First, we convert the temporal embed-
+
+ding matrix into a vector representation # via a mean pooling mechanism:
+
+_ 1 Rt
+h= — 1 (7)
+Ry ,
+
+MoM
+
+The weight a, is formalized as
+
+exp(w (sx, h)
+Ak =
+
+— 8
+Sh exp(w (sx, h)) 8)
+
+where a, is the attention to the hidden state representation of the k-th sequence in the
+
+graph g;, and w(sx, h) is set using the following function
+(sx, h) = Astanh(Wssx + Ush) (9)
+
+where the parameter matrices of intra-attention satisfy Ags € Rix?) Ws and
+Us € R242", The above equation essentially is used to calculate the relevance of each
+sequence in graph g; to temporal embedding. The intuition lies in the aspect that dif-
+ferent temporal properties have diverse influences on the topological structure of the
+cascade. For instance, when compared with adoption events that occur occasionally,
+intensive adoption events will bring more potential adoption base for the selected mes-
+sage, which in turn leads to a more complex cascade network. Hence, here we used tem-
+poral embedding to guide the combined weights learning of sequences extracted in the
+cascade graph. Consequently, we can get the attended whole structure embedding s via
+the weighted sum pooling mechanism:
+
+K
+§= Sax + 8 (10)
+k=1
+
+ 
+
+ 
+
+Fig. 2 Architecture of the intra-attention mechanism w.rt. topological structure
+
+ 
+Liu et al. Hum. Cent. Comput. Inf. Sci. (2020) 10:13 Page 8 of 16
+
+Attention computation for temporal properties Intra-attention w.r.t. temporal proper-
+ties (presented in Fig. 3) aims to assemble event into the effective representation of the
+temporal information of g;. Similarly, we first convert the structure embedding matrix
+
+into a vector representation s via a mean pooling mechanism:
+i «
+S=— )_sk 11
+Ku uy)
+
+The attention weight a, for the m-th hidden vector h,y is formalized as:
+
+exp(@ (hm, S)
+
+Am = =p. 12
+yoke exp(o (ms) (12)
+
+where
+w(Nm,s) = Artanh(Wrh,, + Urs) (13)
+
+scores the extent of the dependence between the i-th adoption behavior and the struc-
+ture embedding, and the parameter matrices satisfy Ay € R1X24 WrandUr € R27 *2,
+Complex cascade network topology will improve the reception and visibility of the mes-
+sage, and thus promote the occurrence of adoption events. Reflected in the time dimen-
+sion is the aggregation of adoption events, which is also called bursting diffusion of the
+message. In our previous work [23], we demonstrated that different parts of the diffusion
+history have diverse influences on the future cascade size, and we proposed a method
+for obtaining the most effective part of the history to make an accurate prediction. Ana-
+logically, the pooling weights for the temporal property of different adoption events are
+automatically learned based on the structural embedding of the cascade graph g; to opti-
+mize the prediction of cascade growth.
+
+Hence we can obtain the attended whole temporal embedding h via the following
+
+equation:
+
+Rt
+h=S_ om - lin (14)
+m=1
+
+Inter-gate mechanism
+
+Having obtained the attended whole structure embedding s and temporal embedding
+h, we can feed these two embeddings into the inter-gate mechanism to effectively com-
+bine these two factors. The proposed inter-gate mechanism can capture the different
+
+ 
+
+ 
+
+ 
+
+ 
+
+Fig. 3 Architecture of the Intra-attention Mechanism w.rt. temporal properties
+XN SD
+Liu et al. Hum. Cent. Comput. Inf. Sci. (2020) 10:13 Page 9 of 16
+
+importance of the two factors when predicting the cascade growth. Instead of setting a
+fixed weight, the proposed inter-gate mechanism can adaptively tune the combination
+weight. Specifically, the final representation c of cascade graph g; when combing tempo-
+ral and structure factor is assembled by:
+
+c=B-h+(1-8)-3 (15)
+where the adaptive combination weight f € (0, 1) is computed by:
+
+B = 0(Wch + Uc3) (16)
+
+R24 x2H
+
+where the parameter matrices satisfy Wc and Uc € , and they are both learned
+
+through the deep learning process.
+
+Output layer
+Finally, our output module consists of a multi-layer perceptron (MLP), taking the cas-
+cade representation c as input and generating the final incremental size prediction:
+
+AR = MLP(c) (17)
+
+The benefit of this fully connected layer is that it does not incur much model complexity
+and ensures the capacity of nonlinear modeling.
+
+Experiments
+This section presents the experiment setup (“Experiment setup” section) and results
+
+analysis (“Experiment results” section).
+
+Experiment setup
+
+Dataset and processing
+
+Twitter The dataset contains tweets and retweets on Twitter from September 1 to Octo-
+ber 1, 2016. Here we focus on a subset of popular tweets that have at least 50 retweets for
+easier calibration in our model. For each retweet cascade, the datasets include the publish
+time of the original tweet, time of retweet, and ID of users who participated in the cas-
+cade. The global social network G was constructed using the same tweet stream from July
+and August 2016. To evaluate the performance of our model, we split the original data
+chronologically into a training dataset, a validation dataset and a test dataset. Specifically,
+cascades whose original tweets were published during the first 11 days were used for
+training, cascades that originated on September 12 were used for validation, and cascades
+that originated from September 13 to September 15 were used for testing. The rest of the
+days were used for unfolding the twitter cascade over the network.
+
+AMiner AMinerhe scientific paper datasets were publicly available in https://www.
+ami-ner.cn/citation. We constructed the global network G using the citations between
+1985 and 1995. Specifically, we drew an edge from author A to author B if B ever cited
+A’s paper. A citation cascade of a given paper thus contains all authors who have written
+or cited the paper. We also split the datasets in chronological order. Papers published
+Liu et al. Hum. Cent. Comput. Inf. Sci. (2020) 10:13 Page 10 of 16
+
+between 1996 and 2000 were included in the training set. Papers published in 2001 and
+2002 were used for validation and testing, respectively.
+
+In summary, Table 1 gives an overview of the basic statistics of the Twitter dataset and
+the AMiner dataset.
+
+Evaluation metrics
+We used the mean squared error (MSE) and mean absolute errors (MAE), two standard
+
+measurements for regression tasks, to evaluate the prediction performance:
+
+1 M
+
+MSE = — So 04-5" (18)
+i=1
+1 M
+
+MAE = — S|, —5i (19)
+M i=1
+
+where jj; and y; are the predicted value and ground truth value of cascade i, respectively.
+Note that, following the practice of [9], we also predict a scaled version of the actual
+
+increment of the cascade size, i.e. y; = logo(AR’ + 1).
+
+Comparison methods
+The comparison methods are as follows:
+
+Features-linear We extract a bag of hand-crafted features that were used in previous
+work [3, 38-41] and which can better represent the temporal factor and structure factor
+for cascade prediction. There features are then fed into a linear regression with L2 regu-
+
+larization. These features include:
+
+« Temporal feature This type of feature has to do with the speed of adoptions during
+the prefix cascade. We extract the five point summary (min, median, max, 25-th and
+75-th percentile) of waiting times between reshare events, the First Half Rate (mean
+time between adoptions for the first half of the adoptions), Second Half Rate [38],
+and the cumulative popularity [42].
+
+¢ Structural features This type of feature includes the structural features of the entire
+social network around early adopters and the structural features of the cascade. Thus,
+we extracted the indegree of the each node, connection between g; and G, number of
+edges in g;, number of leaf nodes in g;, and average and max length of reshare path
+[38].
+
+Table 1 Statistics of the data set
+
+ 
+
+Data #node inG #cascades (train) #cascades (val) #cascades (test) Avg. cascade size
+
+ 
+
+Twitter 429,347 23,786 2604 6275 182.3
+AMiner 126,422 31,257 6139 6071 19.1
+
+ 
+Liu et al. Hum. Cent. Comput. Inf. Sci. (2020) 10:13 Page 11 of 16
+
+Support vector regression (SVR) We follow previous work [17, 43] and adopt SVR
+model using linear kernel to predict cascade size with time series data as features.
+
+SEISMIC [44] This is one of state-of-the-art generative models on cascade predic-
+tion. The model is based on a self-exciting point process producing final cascade size
+forecasts using the early adoption activity of a selected message. Note that its predictor
+is based on a branching process, and thus this method can only be applied to predict
+the final size of the retweet cascade. In contrast, our proposed end-to-end method can
+be easily extended to predict the dynamic of the retweet cascade.
+
+DeepCas [9] This is the first end-to-end, deep learning method for information cas-
+cades prediction. It mainly utilizes the information of the structure of the cascade
+graph and node identities for prediction. The attention mechanism is designed to
+assemble a cascade graph representation from a set of random walk paths.
+
+Platform and parameter setting
+
+For the length ¢t of the observed initial period of the information cascade, we consider
+three settings, ie., £ = 1,2,3 hours for Twitter and t = 1,2,3 months for AMiner. To
+instantiate our models, we used the high-level neural network library Keras [45] with
+Theano [46] as the computational back-end. The code is running on a Linux server
+with 32G memory, 2 CPUs with 4 cores for each: Inter®) Core! i7-7700K CPU @4.50
+GHz. The GPU in use is the Nvidia™ GeForce GTX TITAN 1080 Ti.
+
+Experiment results
+
+We evaluated our proposed model with the comparison methods on the Twitter and
+AMiner dataset to present the performance of our method. The prediction results
+are reported in Table 2, which shows that irrespective of the dataset (Twitter and
+AMiner) and prefix cascade (1, 2, 3 h for Twitter, and 1, 2, 3 months for AMiner), our
+proposed method outperformed other comparison methods, since it achieved a lower
+MSE.
+
+Table 2 shows that Features-linear provides worse results than our proposed method,
+which indicates the limitation of hand-crafted features. The Features-linear method
+selects the most predictive features for cascade prediction, which was demonstrated in
+past studies [38]. This is especially obvious when compared with our proposed method,
+which automatically learns joint and effective representation from temporal and struc-
+tural factors.
+
+Table 2 also shows that our proposed method outperformed SEISMIC, a state-of-the-
+art generative model, since our method uses more powerful attention mechanisms and
+is likely to yield better performance. Specifically, our model uses an attention mecha-
+nism to automatically learn the pooling weights for the temporal properties of different
+adoption events, while SEISMIC uses a constant peeking period within a prefix cascade
+for different messages when making predictions. In addition, SEISMIC lacks the future
+cascade size as a guide and makes various stronger assumptions about the diffusion pro-
+cess, which are common disadvantages of generative prediction methods.
+Liu et al. Hum. Cent. Comput. Inf. Sci. (2020) 10:13 Page 12 of 16
+
+Table 2 Overall prediction performance
+
+ 
+
+ 
+
+t= 1* t= 2* t= 3*
+MSE MAE MSE MAE MSE MAE
+Twitter
+Features-linear 3.821 1.536 3.511 1.479 3.423 1.42
+SVR 3.798 1.529 3.028 1.384 3,382 1.41]
+SEISMIC 3.770 1.527 2.954 1.313 3.319 1.408
+1.462
+DeepCas 3.725 1.493 3.496 3.308 1.395
+Proposed 2.609 1.265 2.349 1.167 2.300 1.14
+AMiner
+Features-linear 2.429 1.197 2.136 1.089 1.880 1.067
+SVR 2.419 1.194 2.195 1.123 1.865 1.066
+SEISMIC 2.417 1.193 2.282 1.136 1.852 1.061
+DeepCas 2.239 1.127 1.987 1.072 1.674 1.056
+Proposed 2.172 1.116 1.672 1.042 1.534 1.003
+
+ 
+
+p.s. t= 1*, where ’*’ denotes hour for Twitter (year for AMiner)
+
+Among all of the methods that were compared, DeepCas had the best performance
+because it benefits from end-to-end learning from the data to the prediction. Our pro-
+posed method leads to a certain reduction of prediction errors when compared with
+DeepCas, due to the introduction of temporal information, which is ignored in DeepCas.
+
+Comparing the performance of using different prefix t, we can make the conclu-
+sion that applies to all methods for both twitter cascade and citation cascade: As we
+increased the observation time, the prediction errors tended to decrease, suggesting that
+more accessible information will make prediction easier. In addition, we can observe
+that prediction errors are much bigger in Twitter (the top-half of the Table 2) than that
+in AMiner (the bottom-half of Table 2), which indicates that predicting the twitter cas-
+cade size is a more difficult scenario of information cascade prediction.
+
+To study the effects of temporal factor and structural factor on cascade prediction
+in more detail, we compared the proposed method and the Feature-linear method and
+their variants that do not consider one of these factors. We also ran these methods on
+the two datasets and aimed to predict the incremental size of information cascade using
+a fixed observation window ranging from 1 to 3 h (months for AMiner). For ease of
+results presentation, we denote temporal factor as T and structural factor as S, respec-
+tively. Thus “no T” means removing temporal factor for corresponding methods, and it
+is similar for “no S”.
+
+The prediction results of these methods are summarized in Table 3. This results show
+that our proposed method and Feature-linear both outperform their variants, which
+indicates the usefulness of these factors. For instance, by testing “Proposed (no T)’, we
+can see a notable decrease in performance compared with our proposed method, with
+MSE = 3.772 and 2.609 when observing for 1 h on Twitter. This phenomenon shows that
+feeding temporal features into deep neural networks is indeed meaningful.
+
+We also found that Feature-linear (no S) performs better than Feature-linear (no T),
+which is consistent with previous research [38]. However, “Proposed (no S)” and “Pro-
+
+posed (no T)” have very similar performances for most situations, which suggests that
+Liu et al. Hum. Cent. Comput. Inf. Sci. (2020) 10:13 Page 13 of 16
+
+Table 3 Effects of temporal factor and structural factor on cascade prediction
+
+ 
+
+ 
+
+MSE (t = 1*) MSE (t = 2*) MSE (t = 3*)
+Twitter
+Features-linear (no T) 4.106 3.823 3.715
+Features-linear (no S$) 3.976 3.640 3.524
+Features-linear 3.821 3.511 3.423
+Proposed (no T) 3.772 3.503 3,328
+Proposed (no S) 3.716 3.540 3.407
+Proposed (time series T) 3.809 3.621 3.463
+Proposed 2.609 2.349 2.300
+AMiner
+Features-linear (no T) 2.621 2407 2.092
+Features-linear (no S$) 2.561 2.312 1.986
+Features-linear 2429 2.136 1.880
+Proposed (no T) 2411 2.050 1.799
+Proposed (no S) 2.307 2.186 1.838
+Proposed (time series T) 2457 2.129 1.906
+Proposed 2.172 1.672 1.534
+
+ 
+
+p.s. t= 1*, where ’*’ denotes hour for Twitter (year for AMiner)
+
+there potentially is still room to improve the utilization of temporal factors (the most
+predictive information) in our proposed method. Thus, we examined the effects of differ-
+ent ways to integrate temporal information. The method of “Proposed (time series T’)” is
+to form a time series of the cascade size for each message and to feed the time series into
+our neural network, instead of temporal embedding of individual nodes. Table 3 shows
+that “Proposed (time series T)” performs worse than “Proposed (no S)”. This is consist-
+ent with our expectation, since the precise time interval between two adoption events is
+more informative than a time series dataset. Note that when making predictions at the
+beginning of the information cascade, “Proposed (no T’)” performed worse than “Pro-
+posed (no S)’, which may be due to the fact that a "simple” topology is inadequate for
+providing an effective forecast. Finally, our proposed method had the best performance,
+suggesting that temporal information and structural information are complimentary for
+cascade prediction.
+
+To demonstrate the effectiveness of the components of attention mechanism and gate
+mechanism in the proposed method, we compare the proposed method and its variants
+that remove one of the components. For ease of results presentation, we denote atten-
+tion mechanism as attention and gate mechanism as gate, respectively. The correspond-
+ing results are presented in Table 4. We find that our proposed method outperforms its
+
+variants, which demonstrates the positive contribution of each component.
+
+Conclusions
+
+In this paper, we proposed a novel method for information cascade prediction based
+on an end-to-end neural network. Learning the representation of a cascade in an
+end-to-end manner circumvented the difficulties inherent to hand-crafted features
+design. To efficiently obtain and fuse the temporal and structural information, we care-
+
+fully designed an attention mechanism, which involves intra-attention and inter-gate
+Liu et al. Hum. Cent. Comput. Inf. Sci. (2020) 10:13 Page 14 of 16
+
+Table 4 Contribution of different components of our proposed method
+
+ 
+
+ 
+
+MSE (t = 1*) MSE (t = 2*) MSE (t = 3*)
+
+Twitter
+
+Proposed (no gate) 2.956 2.811 2.513
+
+Proposed (no attention) 3,226 3.124 2.825
+
+Proposed (noattention + gate) 3.726 3.419 3.376
+
+Proposed 2.609 2.349 2.300
+AMiner
+
+Proposed (no gate) 2.285 1.706 1.592
+
+Proposed (no attention) 2.339 1.816 1.763
+
+Proposed (no attention + gate) 2462 1.928 1.809
+
+Proposed 2.172 1.672 1.534
+
+ 
+
+p.s. t= 1*, where ’*’ denotes hour for Twitter (year for AMiner)
+
+modules. We conducted experiments on two scenarios, i.e., predicting the size of cas-
+cade of Tweet on Twitter and predicting the citation of papers in AMiner. Compared
+with the other three state-of-the-art prediction methods, our proposed method offered
+small prediction error. Future works include the incorporation of other predictive infor-
+mation within the attention framework. Cascade dynamics modeling with our attention
+
+neural network is also of interest.
+
+Abbreviations
+
+CNN: Convolutional neural network; RNN: Recurrent neural network; MLP: Multi-layer perceptron; LSTM: Long short-term
+memory; GRU: Gated recurrent unit; SVR: Support vector regression; MSE: Mean squared error; MAE: Mean absolute
+errors.
+
+Acknowledgements
+Not applicable.
+
+Authors’ contributions
+
+YL carried out design of the proposed framework, managed and supervised this paper. ZB conducted the experiments,
+analyzed the results and drafted the document. ZZ and DT provided valuable suggestions on improving the standards of
+the manuscript. All authors read and approved the final manuscript.
+
+Funding
+
+This research was funded by the National Key Research and Development Program of China (Grant No.
+2018YFC0832304), the National Science Foundation for Young Scientists of China (Grant No. 61801125) and the Funda-
+mental Research Funds for the Central Universities (Grant No. 2017JBZ107) .
+
+Availability of data and materials
+The datasets used in this study are available from the corresponding author on reasonable request.
+
+Competing interests
+The authors declare that they have no competing interests.
+
+Author details
+
+Key Laboratory of Communication and Information Systems,Beijing Municipal Commission of Education, Beijing Jiao-
+tong University, Beijing 100044, China. * National Computer Network Emergency Response Technical Team/Coordination
+Center of China, Beijing 100029, China. * The Third Research Institute of Ministry of Public Security, Shanghai 200031,
+China.
+
+ 
+
+Received: 20 April 2019 Accepted: 26 March 2020
+Published online: 11 April 2020
+
+References
+
+1. Zaman T, Fox EB, Bradlow ET (2014) A bayesian approach for predicting the popularity of tweets. Ann Appl Stat
+8(3):1583-1611
+
+2. Cheng J, Adamic LA, Dow PA, Kleinberg JM, Leskovec J (2014) Can cascades be predicted. In: International world
+wide web conferences. 925-936
+Liu et al. Hum. Cent. Comput. Inf. Sci. (2020) 10:13 Page 15 of 16
+
+20.
+
+21.
+
+22.
+
+23.
+
+24.
+
+25,
+
+26.
+2/.
+
+28.
+
+29,
+
+30.
+
+31.
+
+32.
+
+33.
+
+34.
+35.
+
+Martin T, Hofman JM, Sharma A, Anderson A, Watts DJ (2016) Exploring limits to prediction in complex social sys-
+tems. In: International conference on world wide web pp 683-694
+
+LeCun Y, Bottou L, Bengio Y, Haffner P (1998) Gradient-based learning applied to document recognition. Proc IEEE
+86(1 1):2278-2324
+
+Pascanu R, Mikolov T, Bengio Y (2013) On the difficulty of training recurrent neural networks. In: International confer-
+ence on machine learning. p. 1310-1318.
+
+Pandarinath C, O'Shea DJ, Collins J, Jozefowicz R, Stavisky SD, Kao JC, Trautmann EM, Kaufman MT, Ryu SI, Hochberg
+LR et al (2018) Inferring single-trial neural population dynamics using sequential auto-encoders. Nat Methods
+15(10):805-815
+
+Cornia M, Baraldi L, Serra G, Cucchiara R (2018) Predicting human eye fixations via an Istm-based saliency attentive
+model. IEEE Trans Image Process 27(10):5142-5154
+
+Afouras T, Chung JS, Senior A, Vinyals O, Zisserman A (2018) Deep audio-visual speech recognition. In: IEEE transac-
+tions on pattern analysis and machine intelligence
+
+Li C, Ma J, Guo X, Mei Q (2017) Deepcas: An end-to-end predictor of information cascades. In: Proceedings of the
+26th international conference on world wide web. pp 577-586 . International World Wide Web Conferences Steer-
+ing Committee
+
+Du N, Dai H, Trivedi R, Upadhyay U, Gomez-Rodriguez M, Song L (2016) Recurrent marked temporal point processes:
+embedding event history to vector. In: Proceedings of the 22nd ACM SIGKDD international conference on knowl-
+edge discovery and data mining. pp 1555-1564 . ACM, New York
+
+. Aghababaei S, Makrehchi M (2017) Activity-based twitter sampling for content-based and user-centric prediction
+
+models. Hum Cent Compu Inf Sci 7(1):3
+
+Weng L, Menczer F, Ahn Y-Y (2014) Predicting successful memes using network and community structure. In:
+ICWSM
+
+Loyola-Gonzalez O, Lopez-Cuevas A, Medina-Pérez MA, Camina B, Ramirez-Marquez JE, Monroy R (2019) Fusing pat-
+tern discovery and visual analytics approaches in tweet propagation. Inf Fusion 46:91-101
+
+Jia AL, Shen S, Li D, Chen S (2018) Predicting the implicit and the explicit video popularity in a user generated con-
+tent site with enhanced social features. Comput Netw 140:112-125
+
+Kursuncu U, Gaur M, Lokala U, Thirunarayan K, Sheth A, Arpinar IB (2019) Predictive analysis on twitter: techniques
+and applications. In: Emerging research challenges and opportunities in computational social network analysis and
+mining. pp 67-104. Springer, Berlin
+
+Arapakis |, Cambazoglu BB, Lalmas M (2017) On the feasibility of predicting popular news at cold start. J Assoc Inf
+Sci Technol 68(5):1149-1164
+
+Trzcinski T, Rokita P (2017) Predicting popularity of online videos using support vector regression. IEEE Trans Mul-
+timed 99:1-1
+
+Kong QO, Mao W, Chen G, Zeng D (2018) Exploring trends and patterns of popularity stage evolution in social media.
+IEEE Trans Syst Man Cybern Syst 99:1-11
+
+Engelhard M, Xu H, Carin L, Oliver JA, Hallyburton M, McClernon FJ (2018) Predicting smoking events with a time-
+varying semi-parametric hawkes process model. Proc Mach Learn Res 85:312
+
+LiL, Zha H (2014) Learning parametric models for social infectivity in multi-dimensional hawkes processes. In:
+Twenty-eighth AAAI conference on artificial intelligence. p. 101-107
+
+Yu L, Cui P Wang F, Song C, Yang S (2017) Uncovering and predicting the dynamic process of information cascades
+with survival model. Knowl Inf syst 50(2):633-659
+
+Saito K, Nakano R, Kimura M (2008) Prediction of information diffusion probabilities for independent cascade model.
+In: International conference on knowledge-based and intelligent information and engineering systems. pp 67-75.
+Springer, Berlin
+
+Bao Z, Liu Y, Zhang Z, Liu H, Cheng J (2019) Predicting popularity via a generative model with adaptive peeking
+window. Phys A Stat Mech Appl 522:54-68
+
+Zhang W, Wang W, Wang J, Zha H (2018) User-guided hierarchical attention network for multi-modal social image
+popularity prediction. In: Proceedings of the 2018 world wide web conference on world wide web. pp. 1277-1286 .
+International World Wide Web Conferences Steering Committee
+
+Iti L, Koch C, Niebur E (1998) A model of saliency-based visual attention for rapid scene analysis. IEEE Trans Pattern
+Anal Mach Intell 20(11):1254-1259
+
+Desimone R, Duncan J (1995) Neural mechanisms of selective visual attention. Ann Rev Neurosci 18(1):193-222
+Choi H, Cho K, Bengio Y (2018) Fine-grained attention mechanism for neural machine translation. Neurocomputing
+284:171-176
+
+Lopez PR, Dorta DV, Preixens GC, Sitjes JMG, Marva FXR, Gonzalez J (2019) Pay attention to the activations: a modu-
+lar attention mechanism for fine-grained image recognition. IEEE Trans Multimed
+
+Bielski A, Trzcinski TP (2018) Understanding multimodal popularity prediction of social media videos with self-
+attention. IEEE Access 6:74277-/74287
+
+Xiong C, Merity S, Socher R (2016) Dynamic memory networks for visual and textual question answering. In: Interna-
+tional conference on machine learning. p. 2397-2406
+
+Kumar A, Irsoy O, Ondruska P, lyyer M, Bradbury J, Gulrajani |, Zhong V, Paulus R, Socher R (2016) Ask me anything:
+dynamic memory networks for natural language processing. In: International conference on machine learning. p.
+1378-1387
+
+Elman JL (1990) Finding structure in time. Cognit Sci 14(2):179-211
+
+Sutskever |, Vinyals O, Le QV (2014) Sequence to sequence learning with neural networks. In: Advances in neural
+information processing systems, pp 3104-3112
+
+Hochreiter S, Schmidhuber J (1997) Long short-term memory. Neural Comput 9(8):1735-1780
+
+Chung J, Gulcehre C, Cho K, Bengio Y (2014) Empirical evaluation of gated recurrent neural networks on sequence
+modeling. arXiv preprint arXiv:1412.3555
+Liu et al. Hum. Cent. Comput. Inf. Sci. (2020) 10:13 Page 16 of 16
+
+36. Perozzi B, Al-Rfou R, Skiena S (2014) Deepwalk: Online learning of social representations. In: Proceedings of the 20th
+ACM SIGKDD International conference on knowledge discovery and data mining. pp 701-710. ACM, New York
+
+37. Schuster M, Paliwal KK (1997) Bidirectional recurrent neural networks. IEEE Trans Signal Process 45(11):2673-2681
+
+38. Shulman B, Sharma A, Cosley D (2016) Predictability of popularity: gaps between prediction and understanding. In:
+International conference on weblogs and social media. pp 348-357
+
+39. Ugander J, Backstrom L, Marlow C, Kleinberg J (2012) Structural diversity in social contagion. Proceedings of the
+national academy of sciences 201116502
+
+40. Mishra S, Rizoiu MA, Xie L (2016) Feature driven and point process approaches for popularity prediction. In: ACM
+
+international on conference on information and knowledge management, pp 1069-1078
+
+41. Souri A, Hosseinpour S, Rahmani AM (2018) Personality classification based on profiles of social networks’ users and
+
+the five-factor model of personality. Hum cent Comput Inf Sci 8(1):24
+
+42. Szabo G, Huberman BA (2010) Predicting the popularity of online content. Commun ACM 53(8):80-88
+
+43. Khosla A, Das Sarma A, Hamid R (2014) What makes an image popular? In: Proceedings of the 23rd international
+
+conference on world wide web, pp 867-876
+
+44, Zhao Q, Erdogdu MA, He HY, Rajaraman A, Leskovec J (2015) Seismic: a self-exciting point process model for pre-
+dicting tweet popularity. In: ACM SIGKDD international conference on knowledge discovery and data mining, pp
+1513-1522
+
+45. Chollet F et al (2015) Keras: deep learning library for theano and tensorflow. https://keras.io/k. 7(8)
+
+46. Team TTD, Al-Rfou R, Alain G, Almahairi A, Angermueller C, Bahdanau D, Ballas N, Bastien F, Bayer J, Belikov A,
+et al (2016) Theano: a python framework for fast computation of mathematical expressions. arXiv preprint arXiv
+:1605.02688
+
+ 
+
+ 
+
+Publisher’s Note
+
+Springer Nature remains neutral with regard to jurisdictional claims in published maps and institutional affiliations.
+
+ 
+
+Submit your manuscript to a SpringerOpen”®
+journal and benefit from:
+
+> Convenient online submission
+
+> Rigorous peer review
+
+> Open access: articles freely available online
+> High visibility within the field
+
+> Retaining the copyright to your article
+
+ 
+
+Submit your next manuscript at > springeropen.com
+
+ 
+
+ 
+
+ 

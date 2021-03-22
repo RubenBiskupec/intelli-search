@@ -1,0 +1,1953 @@
+Gao et al. Cybersecurity (2020) 3:3
+https://doi.org/s42400-020-0045-8
+
+Cybersecurity
+
+RESEARCH Open Access
+
+Efficient electro-magnetic analysis of a
+GPU bitsliced AES implementation
+
+Yiwen Gao! ®, Yongbin Zhou!” and Wei Cheng!
+
+Abstract
+
+Check for
+updates
+
+ 
+
+The advent of CUDA-enabled GPU makes it possible to provide cloud applications with high-performance data
+security services. Unfortunately, recent studies have shown that GPU-based applications are also susceptible to
+side-channel attacks. These published work studied the side-channel vulnerabilities of GPU-based AES
+implementations by taking the advantage of the cache sharing among multiple threads or high parallelism of GPUs.
+Therefore, for GPU-based bitsliced cryptographic implementations, which are immune to the cache-based attacks
+referred to above, only a power analysis method based on the high-parallelism of GPUs may be effective. However,
+the leakage model used in the power analysis is not efficient at all in practice. In light of this, we investigate
+electro-magnetic (EM) side-channel vulnerabilities of a GPU-based bitsliced AES implementation from the perspective
+
+of bit-level parallelism and thread-level parallelism in order to make the best of the localization effect of EM leakage
+with parallelism. Specifically, we propose efficient multi-bit and multi-thread combinational analysis techniques based
+on the intrinsic properties of bitsliced ciphers and the effect of multi-thread parallelism of GPUs, respectively. The
+experimental result shows that the proposed combinational analysis methods perform better than
+non-combinational and intuitive ones. Our research suggests that multi-thread leakages can be used to improve
+attacks if the multi-thread leakages are not synchronous in the time domain.
+
+Keywords: GPU-based cryptographic implementations, Side-channel analysis (SCA), Electro-magnetic attacks (EMA),
+
+Micro-architectural vulnerabilities, Combinational analysis
+
+Introduction
+
+Nowadays as the most widely used parallel computing
+platform, Graphics Processing Unit (GPU) has evolved
+from a special hardware for graphics rendering into a
+general-purpose computing device for various applica-
+tions as biomedical analysis, signal processing, scien-
+tific computing and so on. GPU executes program in a
+Single-Instruction, Multiple-Thread (SIMT) fashion, so it
+is well suited for cryptographic applications deployed in
+cloud computing environment to provide the Security-
+as-a-Service (SECaaS). Unfortunately, GPU-based appli-
+cations are vulnerable to many known attacks as pro-
+posed in Di et al. (2016); Naghibijouybari et al. (2018);
+Jiang et al. (2016). Among those published vulnerabilities
+
+ 
+
+*Correspondence: zhouyongbin@iie.ac.cn
+
+'State Key Laboratory of Information Security, Institute of Information
+Engineering, Chinese Academy of Sciences, Beijing, China
+
+*School of Cyber Security, University of Chinese Academy of Sciences, Beijing,
+China
+
+g) Springer Open
+
+ 
+
+of GPUs, side-channel vulnerabilities are the most seri-
+ous ones due to their non-invasiveness to target devices.
+In recent years, the study on the side-channel attacks
+against cryptographic implementations have always been
+a research hotspot of cryptanalysis beyond algebraic
+analysis methods. As the most popular block cipher,
+AES has been widely deployed on a variety of hard-
+ware platforms. The side-channel attacks against CPU-
+based AES software implementations and FPGA-based
+hardware implementations have been deeply investigated.
+Until very recently, some literatures mentioned that GPU-
+based cryptographic implementations are also susceptible
+to side-channel attacks through electro-magnetic (EM)
+emanation (Gao et al. 2018; Gao et al. 2018), power con-
+sumption (Luo et al. 2015) or execution time leakages
+(Jiang et al. 2016; 2017). Thanks to the bitsliced cipher
+proposed by Biham Biham (1997) as well as the efficient
+GPU-based bitsliced AES implementations proposed by
+Lim et al. Lim et al. (2016) and Nishikawa et al. Nishikawa
+et al. (2017), we are capable of deploying GPU-based AES
+
+© The Author(s). 2020 Open Access This article is distributed under the terms of the Creative Commons Attribution 4.0
+International License (http://creativecommons.org/licenses/by/4.0/), which permits unrestricted use, distribution, and
+reproduction in any medium, provided you give appropriate credit to the original author(s) and the source, provide a link to the
+
+Creative Commons license, and indicate if changes were made.
+Gao et al. Cybersecurity (2020) 3:3
+
+cryptosystems that are resistant to cache-timing attacks
+(Jiang et al. 2016; 2017) and cache-based EM attacks
+(Gao et al. 2018; Gao et al. 2018). However, it does not
+mean that GPU-based AES implementation is not vulner-
+able to other side-channel attacks, for example the power
+analysis attack proposed in (Luo et al. 2015), though it is
+not efficient at all in practice. In light of this, we study
+more efficient side-channel attacks against a GPU-based
+bitsliced AES implementation in order to give a deeper
+insight into the side-channel vulnerabilities of GPU-based
+cryptographic implementations in the perspective of
+parallelism.
+
+Related work
+
+Luo et al. proposed the first power analysis attack against a
+GPU-based AES implementation in (Luo et al. 2015). They
+inserted a resistor in series with power supply in order to
+measure the power consumption of GPU card. They tar-
+geted a T-table-based GPU AES implementation and built
+a simplified leakage model to avoid the synchronization
+of power traces in the time domain. They employed cor-
+relation power analysis (CPA) to recover 16-byte secret
+key of AES with 160,000 power traces. Their attack is
+performed in a chosen-thread mode, which requires the
+adversary be capable of encrypting the same plaintexts for
+all block threads. In fact, it is almost impossible to con-
+duct side-channel attacks successfully in known-plaintext
+or highly-occupied scenarios against GPU-based crypto-
+graphic implementations. After that Jiang et al. proposed
+two cache-based timing attacks against T-table-based
+GPU AES implementation based on the time differences
+induced by L1 cache line access serialization (Jiang et
+al. 2016) and shared memory bank conflict (Jiang et al.
+2017). They recovered the 16-byte secret key of a GPU-
+based AES implementation by correlation timing anal-
+ysis and differential timing analysis, respectively. Very
+recently, Gao et al. proposed electro-magnetic analysis
+attacks against a GPU-based AES implementation based
+on the cache line access coalescing (Gao et al. 2018; Gao
+et al. 2018), which are proved to be much efficient.
+
+Contributions
+
+To the best of our knowledge, this is the first work
+that investigates EM side-channel vulnerabilities of GPU-
+based bitsliced cryptographic implementation in the per-
+spective of both bit-level parallelism and thread-level
+parallelism. The contributions are as follows:
+
+First, we study the vulnerabilities of bit-level paral-
+lelism in a GPU-based bitsliced AES implementation.
+With the help of a multi-bit EM leakage features extracted
+from non-profiled t-test, we construct two special multi-
+bit combinational analysis methods, namely multi-bit
+feature combinational analysis and multi-bit decision
+combinational analysis, which take the full advantage of
+
+Page 2 of 17
+
+the bit-level parallelism of bitsliced ciphers and are exper-
+imentally proved to be more efficient than traditional
+single-bit CEMA.
+
+Second, we also study the vulnerabilities of thread-level
+parallelism in the same AES implementation referred to
+above. In the study, a profiled correlation-based leak-
+age detection test is employed to extract a multi-thread
+EM leakage feature, which is later used to construct spe-
+cial multi-thread combinational analysis methods. The
+proposed methods make the best of the thread-level paral-
+lelism of GPUs and our experimental result shows that the
+proposed combinational methods outperform traditional
+non-combinational ones.
+
+Organization
+
+The rest of this paper is organized as follows. In
+“Preliminary” section, we give a brief introduction
+of CUDA-enabled GPUs, a GPU-based bitsliced AES
+implementation, and definitions and notations involved
+in this paper. In “EM measurement” section, we present
+special techniques for leakage acquisition and preprocess-
+ing. In “The vulnerabilities of bit-level parallelism” and
+“The vulnerabilities of thread-level parallelism” sections,
+we investigate the side-channel vulnerabilities of bit-level
+parallelism and thread-level parallelism of the GPU-based
+bitsliced AES implementation, respectively. Finally, con-
+clusions are given in “Conclusions” section.
+
+Preliminary
+
+In this section, we give a brief introduction to the architec-
+ture of CUDA-enabled GPUs, the features of GPU-based
+bitsliced AES implementation as well as the definitions
+and notations involved in this paper.
+
+CUDA-enabled GPU
+
+Compute Unified Device Architecture (CUDA) is a
+general-purpose parallel computing framework and pro-
+gramming model developed by NVIDIA for its GPUs. In
+a physical view, the CUDA-enabled GPU is composed of
+Mx Streaming Multiprocessors (SM) and a global mem-
+ory. Each SM has Nx Scalar Processor (SP), a shared
+memory, several 32-bit registers, and a shared instruction
+unit. In an abstract view, CUDA defines the threading
+model, calling conventions and memory hierarchy for
+programmers.
+
+Warps are the basic unit of execution in an SM. When
+you launch a grid of thread blocks, the thread blocks in
+the gird are distributed among SMs. Once a thread block
+is scheduled to an SM, threads in the thread block are
+further partitioned into warps. A warp consists of 32 con-
+secutive threads and all threads in a warp are executed in
+SIMT fashion; that is, all threads execute the same instruc-
+tion, and each thread carries out that operation on its own
+private data.
+Gao et al. Cybersecurity (2020) 3:3
+
+GPU-based bitsliced AES implementation
+
+The terminology bitsliced cipher was first proposed by
+Biham Biham et al. (1998) referring to the AES can-
+didate Serpent. Precisely speaking, bitsliced cipher is a
+concept about cryptographic implementation instead of
+cryptographic algorithm or scheme itself.
+
+The AES implementation of bitsliced version could pro-
+cess more than one 128-bit plaintext in a parallel fashion.
+The parallelism is determined by the word-length of a pro-
+cessor. For 32-bit processors, 32 128-bit plaintexts can be
+encrypted in parallel, which is also mentioned as bit-level
+parallelism. The first step of a bitsliced AES implementa-
+tion is to transpose multiple plaintexts by bit in order to
+adapt bitsliced execution fashion. As showed in Fig. 1, 32
+128-bit plaintexts are arranged by row, and each plaintext
+is written to or read from four 32-bit registers within GPU.
+The 32128 matrix is transposed before the first round
+encryption, and the inverse transposition is performed
+after the final round encryption. Obviously, only one
+forward transposition and one inverse transposition are
+needed to finish one bitsliced AES encryption on a single
+GPU thread. For multiple thread executions on GPU, each
+thread executes the above process independently, which
+is also referred to as thread-level parallelism. In a word,
+GPU-based bitsliced AES implementation achieves paral-
+lelism in two dimensions, namely bit-level parallelism and
+thread-level parallelism.
+
+Definitions and notations
+Definition 1 For a bitsliced AES implementation on a
+32-bit processor, 32 16-byte standard AES state is mapped
+
+Page 3 of 17
+
+as Fig. 1 to an (8 x 16)-sized matrix:
+
+1 2 3 16
+Wo Wo Wo Wo
+WA we we owas
+Wy Wy Wy --- Wy (1)
+Wr We We --- W5®
+
+where w! is a 32-bit value. The matrix is called bitsliced
+AES state, which is opposite to standard AES state. In
+
+addition, each bit of Ww) is also called one slice.
+
+Definition 2 For a side-channel attack to a multi-
+thread cryptographic implementation, if an attacker is
+able to choose the same random plaintexts for some
+threads and collect the corresponding ciphertexts and side-
+channel leakages, then the attack is called Chosen-Thread
+Side-Channel Attack (CTSCA). Please note that attack-
+ers cannot choose specific plaintext for any thread in
+CTSCA mode, which is different from chosen-plaintext
+side-channel attack.
+
+Definition 3 For a CTSCA to an (mxn)-thread par-
+allel cryptographic implementation, if an attacker is able
+to assign the same random plaintext to every consecu-
+tive m threads, the CTSCA is called n-group multi-thread
+CTSCA or TnG CTSCA for short, and the chosen-thread
+encryption is called n-group multi-thread encryption or
+TnG encryption for short.
+
+ 
+
+bi ~ b! 1 4! 1 1
+0 3 32 63 64 ~ Y95
+
+32 plaintext blocks
+
+32 32 32 32
+by ~ bs; 32 ~~ %63
+
+ 
+
+128-bit plaintext block (4 32-bit registers)
+
+ 
+
+ 
+
+1
+2 p2 2 42 7 7 2 22 1 32
+3 3 3 3
+
+3 _ 3 3 3
+
+ 
+
+ 
+
+32-bit register
+
+  
+
+1 32
+bo ~ by
+
+96 “127
+
+—_
+NO
+”
+S.
+cr
+oS
+—
+_)
+a a or
+a a oO
+x<
+a a —
+a a oO
+a a oO
+a a OQ
+~~
+1 7 32
+127 127
+
+Fig. 1 Transposition in bitsliced AES implementation. On the left side, it shows the normal byte ordering of 32 128-bit plaintext block layout in
+registers. On the right side, it is the bit-oriented transposed bitsliced ordering layout in registers. The transformation from the left to the right and
+the reverse are made only once at the beginning of encryption and at the end of encryption, respectively
+
+ 
+Gao et al. Cybersecurity (2020) 3:3
+
+Definition 4 For a side-channel attack to a bitsliced
+cipher implemented on an mxn-bit word-length processor,
+if an attacker is able to give the same plaintext for every
+consecutive m Slices, the attack is called n-group multi-
+slice CSSCA or SnG CSSCA for short, and the chosen-slice
+encryption is called n-group multi-slice encryption or SnG
+encryption for short.
+
+Notations.
+
+In this paper, - and * denote quantifier all and any,
+respectively. For example, if M is a5 x 10 matrix, then
+M|[2,-] denotes the 10 elements of the second row of the
+M, which is also a 10-dimensional vector, and M|[ x, 3]
+denotes any one of the 5 elements in the third column
+of the M, which is also regarded as a set composed of 5
+elements.
+
+Bit,(R): the function outputs the j-th bit of each com-
+ponent of F in its original format. For example, if R =
+[ 0x10010101, 0x01011101], then Bit,(R) =[0x1,0«1]
+and Bitg(7F) =[ 0x0, 0x1].
+
+EM measurement
+
+Electro-magnetic emanation around electronic devices
+can be captured without any difficulties, but it is not so
+easy to measure useful signals. Compared with power
+analysis, EM analysis enables us to take the advantage of
+localization effects, which makes EM attacks more effi-
+cient than power analysis attacks. We use two small mag-
+netic probes Rohde Schwarz RF B 3-3 and Rohde Schwarz
+RS H 2.5-2 instead of larger ones in order to probe local-
+ized leakages from near-field emanation (Agrawal et al.
+2002). Theoretically, the region located less than 1/27 of
+wavelength away from the source is called near-field. All
+our probings in this work are conducted in this region.
+
+Set-ups The testbed in this work is set up with the fol-
+lowing configurations:
+
+- We target an NVIDIA’s GeForce GT 620 graphics
+card connected to the host with PCI-e bus. Though
+the device is of low performance, it is enough to show
+the vulnerability of NVIDIA’s GPU to EM attacks.
+Specifically, the device has one streaming
+multiprocessor of 48 SPs, an L2 cache of 64KiB, and it
+is equipped with an off-chip device memory of
+454MiB. The device is running at 1.27GiHz.
+
+- We port a bitsliced AES implementation of an open
+source community (Patrick) into the GPU. Since it is
+a table-free implementation, we do not need to
+consider the efficiency of table look-up with respect
+to different types of memory. The device memory in
+our GPU is used to store the plaintexts to be
+encrypted as well as the ciphertexts to be produced.
+
+Page 4 of 17
+
+- Weemploy an Agilent DSO9104A digital
+oscilloscope, which is capable of measuring signals
+with a sampling rate up to 20GHz (20GSa/s). We set
+our sampling rate as 200MSa/s, which turns out to be
+enough for our experiments.
+
+Our testbed is set up in a client/server mode which
+is widely used for internet applications. Specifically, in
+cloud computing environment, cloud devices that pro-
+vide SECaaS work as servers, and inside attackers (Duncan
+et al. 2015) are authorized to encrypt any plaintexts P-s
+then obtain the corresponding ciphertexts C-s and mea-
+sured EM traces 7-s. With a sufficient number of triples
+(P,C,7), the attackers attempt to recover the preset
+secret key of our GPU bitsliced AES implementation.
+
+Locate Signals A printed circuit board such as GPU card
+is usually composed of hundreds of electronic compo-
+nents like chips, resistors, capacitors, inductors and so
+on. However, it is not necessary to check all of them to
+locate target signals. Generally speaking, only the right
+above of GPU chip and the capacitors on the back of
+GPU chip should be checked, because these positions
+or components tend to produce useful leakages, which
+is also confirmed afterwards in our experiments. More
+specifically, we start up the CUDA program and run the
+encryption procedure in a loop. We adjust EM probe on
+the candidate components within their near-field zones
+until we find a position in which the oscilloscope captures
+a periodic signal. If some patterns within the signal repeat
+nine to ten times, leakage positions are found. A repeated
+signal in our experiments is showed in Fig. 2. We call it
+target signal.
+
+Collect Signals Although the target signal is identified,
+it is still not easy to capture it without external triggers.
+In fact, it is impractical to provide an external trigger
+controlled within program, so we design a delicate trig-
+ger with another magnetic probe. As shown in Fig. 2,
+two signals measured at different probing positions look
+similar, and the amplitude in the upper one is basically
+less than that in the lower one. However, the two signals
+share a signal pattern of the same high voltage marked
+as Trigger A and Trigger B, so the more significant dif-
+ference between Trigger signal and other signals in the
+upper channel makes Trigger A a better choice to work as
+a trigger to capture target signal.
+
+Align Signals Now we have measured almost aligned EM
+traces with our delicate trigger, but it is still not enough
+to perform a successful attack. More accurate trace align-
+ment techniques are necessary. By zooming in the first
+round encryption of the lower signal in Fig. 2, more details
+of the first round encryption are showed in Fig. 3. First
+Gao et al. Cybersecurity (2020) 3:3
+
+Page 5 of 17
+
+ 
+
+ 
+
+   
+ 
+ 
+
+   
+
+ 
+
+ 
+
+ 
+
+  
+
+ 
+
+ 
+
+  
+  
+
+ 
+  
+
+ 
+
+    
+
+ 
+
+ 
+
+Trigger Channel
+0.2 _ 71 —=— ee Te eee SS SS SS SS SS TS TS ss ss = | —-7
+| | | |
+rigger 1 l
+0.1 [ | | |
+> |
+© ae 10 rounds a
+2 0 Transposition Reverse transposition
+S
+> |
+-0.1 -
+|
+| |
+0.26 | i 2h Bt). a hn UA!
+0.004 0.006 0.008 0.01 0.012 0.014 0.016 0.018 0.02
+Time (sec)
+Data Channel
+O.2F I I | T r I I | ~y 4
+|
+|
+Trigger eo |
+0.1 - 4
+>
+2 4 Dues aCe iye
+& (target round)
+oO
+>
+-0.1 -
+aT 1
+0.25 | | el | all | 4
+0.004 0.006 0.008 0.01 0.012 0.014 0.016 0.018 0.02
+Time (sec)
+Fig. 2 Overall EM measurement of our GPU-based bitsliced AES implementation
+
+of all, we observe the special patterns on the signal and
+find a two-trough (C in Fig. 3) pattern that is shared by
+all traces. The pattern is very likely an ideal reference to
+align all traces. Second, we match the pattern among sev-
+eral traces and find that the pattern in different traces
+
+   
+
+  
+
+ 
+
+are strongly correlated (Pearson Correlation Coefficient,
+PCC > 0.70). Third, for all traces we search the pattern by
+fixing one trace and sliding the others within a small range
+to find the position at which the pattern hold the maxi-
+mum PCC with the pattern in the fixed trace. We exclude
+
+ 
+
+The First Round AES Encryption
+
+0.2
+
+0.15
+
+0.1
+
+> 0.05
+S-Box
+
+Voltage
+
+-0.05
+-0.1
+-0.15
+
+Nn ee —
+
+"
+
+-0.2
+
+Time (sec)
+
+Fig. 3 Overview of the EM measurement of the first round AES encryption
+
+ 
+
+ 
+  
+
+ShiftRow and MixColumn
+
+4
+
+ 
+Gao et al. Cybersecurity (2020) 3:3
+
+the traces whose maximum PCC is less than 0.70. Then
+the traces with the maximum PCC no less than 0.70 will
+be aligned properly.
+
+The vulnerabilities of bit-level parallelism
+
+Bitsliced implementation features bit-level parallelism,
+which means that the bits located at the same position
+of multiple plaintexts are processed simultaneously at any
+moment. As known, the 16-byte state of standard AES
+implementation is processed byte by byte, so its EM leak-
+ages at any moment is a function of a byte. However, for
+bitsliced AES implementation the bits at the same position
+of the standard states from multiple slices are gathered
+into a single register of a processor, so the EM leakages
+at any moment is a function of several bits from the stan-
+dard states of multiple slices. Therefore, for the bitsliced
+version each secret key byte is likely leaked at eight differ-
+ent moments at least, which makes it possible for specific
+multi-bit combinational analysis methods to be effective.
+In this section, we investigate the side-channel vulner-
+abilities of a GPU-based bitsliced AES implementation
+from the perspectives of bit-level parallelism provided by
+the intrinsic properties of bitsliced ciphers with combina-
+tional analysis techniques.
+
+We analyze the output of SubByte in the first AES
+round of a bitsliced AES implementation (Patrick). The C
+code snippet of the SubByte of the implementation is
+shown in Fig. 4, where U and S are the input and output of
+
+Page 6 of 17
+
+the function, respectively, and Tx and Lxx are temporary
+variables. The function processes the SubByte of one
+byte for multiple slices. The length of a word_t is 32-bit
+for the target GPU, so 32 slices are processed simultane-
+ously in any single GPU thread.
+
+We know from S[0], S[ 1], S[ 2], S[3], S[4], S[5], S[6]
+and S[7] that for each byte in standard AES state the eight
+bits are processed independently, and the same bit of mul-
+tiple slices are processed simultaneously. The fact is of
+great importance for the research in this section.
+
+Non-profiled leakage detection test
+
+Since the 128 bits in standard AES state are processed at
+different instants of time, the leakages from the 128 bits
+are not overlapped in the time domain. Therefore, it is
+possible for a non-profiled leakage detection test to each
+of the 128 bits to evaluate the amount of EM leakages from
+each individual bit. For other specific bitsliced AES imple-
+mentations, the test results may differ much from ours,
+but the method itself works as well.
+
+Specifically, Welch’s t-test (Goodwill et al. 2011) is
+employed to detect the EM leakages from each of the 128
+bits. Non-profiled leakage detection test requires specify-
+ing intermediates to be tested. In our test, we suppose that
+the 128 bits after the SubByte operation be the target
+intermediates.
+
+Because of the multi-slice plaintexts used in bitsliced
+AES, we take into account of the CSSCA and CTSCA
+
+ 
+
+void bs_sbox(word_t U[8])
+{
+
+word _t S[8];
+
+word t
+
+Ths (25 TSs Thulos 16, 775185
+
+T25, 126, 127;
+
+U[7] * U[4];
+U[7] * U[2];
+U[7] * U[1];
+U[4] * U[2];
+U[3] * U[1];
+T1 * 15;
+U[6] * U[5];
+U[e] * T6;
+U[@] * 17;
+
+ 
+
+Fig. 4 The C code snippet of the SubBytes of a bitsliced AES
+
+T9,710,711,112,713,714,715,116,
+T17,718,719,120,121,122,723,1724,
+
+ 
+
+L3 * L12;
+L18 * L2;
+L15 * L9;
+L6 * L10;
+
+L7 * L9;
+L8 * L10;
+L11 * L14;
+L11 * L17;
+
+L6 * L24;
+~(L16 * L26);
+~(L19 * L28);
+L6 * L21;
+
+L2@ * L22;
+L25 * L29;
+~(L13 * L27);
+~(L6 * L23);
+
+S[7]
+s[6]
+s[5]
+s[4]
+s[3]
+s[2]
+s[1]
+S[@]
+
+memmove(U,S,sizeof(S));
+
+ 
+
+ 
+Gao et al. Cybersecurity (2020) 3:3
+
+mode when performing a test. As showed in Fig. 1, the
+state of 32-slice bitsliced AES encryption can be formal-
+ized as a 128 x 32 binary matrix:
+
+1 2 3 32
+Py Py Dy o> Po
+my ee
+T= bs bs by me b5 (2)
+PoR oe gS
+Dio7 Pja7 Bi27 ++ OY 27
+
+where bi corresponds to the (i+ 1)-th bit in standard AES
+state of the j-th slice. The 32 bits in each row of Z are
+stored into an independent register, so 128 registers are
+required to hold the (128 x 32)-bit bitsliced AES state.
+To reduce noises, our test is conducted in S1G encryption
+mode, in which 32 slices are fed with the same plaintexts,
+so that each of the 128 registers hold either 32 zeros or 32
+ones instead of 2°* possible values. The rationale is that
+to distinguish one of two values from the other is much
+easier than to distinguish one of 2°? values from the oth-
+ers. To further reduce noises, 32 threads in a warp also
+run the same plaintexts, which is also referred to as T1G
+encryption mode.
+
+Test Method The procedure of t-test consists of three
+steps. For our target implementation, t-test will be per-
+formed on each of the 128 intermediate bytes, say
+bo, by, bo, .... b127, where b; := bi b?b? a b??. Now take the
+first intermediate byte bo for example.
+
+First, N EM trace samples of M sampling points in the
+time domain are partitioned into two groups, namely Go
+and G1, with respect to their corresponding intermediate
+byte bp = 0 or bo = 232 — 1,
+
+Then, t-statistic at each sampling point is computed:
+
+_ Holt) ~ wale)
+
+2 2
+So(t) , s7(t)
+0 ny
+
+t(T) (3)
+
+where [o(T), [41(T) are the means of Go and G) at tT in
+time (or the t-th sample point, so t €[1,M]NMZ), and
+so(t) and s;(T) are the standard deviations of Go and G at
+tT in time, and vp and 7, are the cardinality of Go and Gj.
+
+Last, it is time to determine whether the two sets Go
+and G,; are sampled from the same population or not.
+Generally speaking, two sets are assumed to be sampled
+from two distinct populations, if the statistical quantity
+|t(t)| > 4.5 at some t-s (Schneider and Moradi 2015). We
+also follow this convention in our test.
+
+The same tests are carried out for the leakages from the
+other 127 intermediate bytes, say bj, bo, ... , bi27. As a
+result, 128 x M t-statistics are obtained:
+
+Page 7 of 17
+fo1 to2 3 to,M
+hi 2 13 t1,M
+
+To—| 21 2 hb t2,M (4)
+f127,1 €127,2 f127,3 --: f27,.M
+
+where ¢,,; corresponds to f(j).
+
+Test Results and Discussions As mentioned above,
+there are 128 registers to hold the (128 x 32)-bit state of
+bitsliced AES encryption. We perform the t-test on each
+of the 128 32-bit intermediate stored in the 128 registers.
+The test results are showed in Fig. 5. We observe that 16
+peaks are clearly visible, and they are far beyond the preset
+thresholds [ —4.5, 4.5] for deciding if the value in a register
+is leaked or not. The 16 peaks in different colors repre-
+sent the leakages of 16 SubByte outputs in the first round
+encryption of the bitsliced implementation.
+
+As a matter of fact, the values of t-statistic in the time
+domain is not that important, because we intend to deter-
+mine whether rather than when any of 128 intermediate
+bytes is leaked or not. Hence, the maximum of the values
+in each row of T is sufficient, so we define
+
+ 
+
+ 
+
+ 
+
+ty max otléo,l}
+ty maxi" 9 {\t1, }
+to _ maxi" 9 {|t2, } (5)
+t127 maxj9{\t127, }
+
+ 
+
+Each consecutive 8 values, for example fo, t, ...t7, in
+(to, t1, to, .... 127)? (Eq. 5) corresponds to one byte of stan-
+dard AES state. As is known from standard AES algo-
+rithm, the 8 values all depend on the same key byte, so we
+say that each key byte is leaked through at least 8 interme-
+diate bytes that are executed the same operation. This is
+also the essence of the distinctive leakage feature provided
+by the bit-level parallelism. In this study, the distinctive
+leakage feature is formally defined as a (16 x 8) matrix:
+
+tf tt b t7
+tg to 0 t15
+Tr: | f6 fi7 hig -:: h3 (6)
+
+£120 £121 £123 ++: £127
+
+The matrix describes the leakages on each of the 128 inter-
+mediate bytes. The experimental results for I’ are also
+showed in Fig. 6. P corresponds to the histogram, but the
+t-s that are beyond [ —4.5, 4.5] in T’ are reduced to zeros in
+Gao et al. Cybersecurity (2020) 3:3
+
+Page 8 of 17
+
+ 
+
+Pee ieee (ite, Roe |e ee et
+
+oe Pee cee ee ee ee
+
+t statistic
+
+ 
+
+0 0.5 1 1.5 2
+Time (sec) x1074
+
+Fig. 5 Experimental results of Welch's t-test for all 128 bits of 16 intermediate bytes in 71G-S1G encryption mode
+
+ 
+
+ 
+
+ 
+
+IN
+oO
+
+GO
+©
+
+ 
+
+NO
+oO
+
+5
+
+   
+
+maximal t
+
+16 bytes
+
+ey
+
+15
+7
+8 bits 8
+
+Fig. 6 Maximum of t(z) in the time domain for all 128 individual bytes of the SubByte output in 71G-S1G encryption mode
+
+ 
+
+ 
+
+ 
+
+ 
+Gao et al. Cybersecurity (2020) 3:3
+
+the histogram. We also define another matrix based on I:
+
+Co O41 2 +++ 07
+
+fg fo «(fio e+ C15
+Fiz] Sie $17 S18 ++ S23 (7)
+$120 $121 $123 +++ €127
+
+where for any i € {0,1,2,...,127}, the variable ¢; = 1 if
+t; ¢[ —4.5, 4.5]; otherwise the variable ¢; = 0. In addition,
+we define a Multi-Bit Leakage Feature (MBLF):
+
+I :=[Ns Ja; P35 Sr6] (8)
+
+where 7, C {1,2,...,8} denotes a set of indices of scalars
+that equals to 1 in F[ 7, -].
+
+A simple single-bit correlation analysis
+
+We learn from the above that all 16 secret key bytes are
+leaked from the most significant bit (MSB) of the respec-
+tive intermediate bytes, because all elements in the 8th
+column of F are equal to 1. Therefore, it is possible to
+recover all 16 secret key bytes if an MSB-based correlation
+EM analysis (Brier et al. 2004) (MSB-CEMA) is employed.
+The leakage model of the MSB-CEMA is
+
+32
+Ly=a-) T[8-n,] +Nnoise (9)
+J=1
+
+where L,, denotes the predicted EM leakage of n-th inter-
+mediate byte, Z[-,-] denotes the intermediate matrix in
+Eq. 2, and a is a scale factor, the value of which is insignif-
+icant. In addition, Noise is a Gaussian noise.
+
+The single-bit CEMA related above makes use of the
+leakages from the MSB of each intermediate byte. In fact,
+each secret key byte is leaked from more than one bit of
+relevant intermediate byte. For example, the first secret
+key byte is leaked from the 1st, 2nd, 6th and 8th bit and
+the second secret key byte is leaked from the 1st and
+4th bit. Therefore, it is possible to take full advantage of
+the multi-bit leakages of a certain key byte to improve
+performance.
+
+Multi-bit combinational analysis
+
+The first combinational method is proposed to be multi-
+bit feature combinational analysis (MB-FCA). Just as its
+name suggests, MB-FCA makes the best of I showed in
+Eq. 6 to determine which of the eight bits is used to com-
+pute the predicted leakage. Specifically, the bit is selected
+as follows:
+
+by, = argmax (max I [, J] ) (10)
+
+j I=
+The rationale is that the intermediate bit with the max-
+imum amount of EM leakage is the best candidate to
+predict the measured EM leakages.
+
+Page 9 of 17
+
+Let B :=[ by, bo, b3,...,b16], and it is called combined
+multi-bit leakage feature (CMBLF). The B is the essence of
+the MB-FCA and used to construct the following leakage
+model:
+
+32
+Ly =a- YT 1) x 8 + by f] +Nnoise
+j=l
+
+(11)
+
+With the leakage model derived from cMBLF, a simple
+CEMA will suffice to recover the 16-byte secret key.
+
+The second combinational method is proposed to be
+multi-bit decision combinational analysis (MB-DCA).
+Compared with MB-FCA, MB-DCA does not care about
+the selection of intermediate bit before modeling leakages
+but tries on every leaked bits then makes a decision on the
+results of their respective analysis.
+
+The first step of MB-DCA is to perform analysis on
+every leaked intermediate bits based on the MBLF, so the
+leakage model is:
+
+32
+Lam) = a- SUT 1) x 8+ Infi}s/) +Nnvise (12)
+j=l
+
+where .7,,{i} denotes the i-th element in %,, and Lents
+denotes the predicted leakage of the .7,,{i}-th bit of the
+n-th intermediate.
+
+To recover the v-th secret key byte, |.7,| CEMAs should
+be performed before making a decision:
+
+max
+i€{1,2....,| Fu|},kE[0,255]NZ
+
+ky = argmax ( |ointh i) (13)
+k
+
+where (py nti} (k) is a matrix of Pearson Correlation Coef-
+
+ficient obtained from CEMAs based on the model contd
+
+Obviously, it is feasible to recover the 16 secret key bytes
+
+of AES. More details about the MB-DCA is showed in
+
+Algorithm 1.
+
+Experimental results and discussion
+
+Since the number of multi-slice groups and multi-thread
+groups for the GPU-based bitsliced AES encryption of
+(32 x 32 x 16)-byte plaintext within a GPU warp have
+nothing to do with MB-FCA and MB-DCA, our experi-
+ments are performed in a simplified mode, say T1G-S1G
+encryption mode. Therefore, only one 128-bit plaintext is
+required in order to obtain one EM trace. As mentioned
+above, an MBLF and cMBLF must be extracted from F
+and I’, respectively, before the MB-FCA or MB-DCA is
+applied. Finally, we obtain an MBLF 7 anda cMBLF 6 in
+our setting:
+
+J = {1,3, 7, 8}, {5, 8}, (3, 7, 8}, {4 7, 8}, {1, 3, 7, 8}, {5, 8},
+{3, 7, 8}, {4, 7, 8}, {1, 3, 7, 8}, (5, 8}, {3, 7, 8}, {4 7, 8},
+{1, 3,7, 8}, {5, 8}, {3, 7, 8}, {4 7, 8}]
+Gao et al. Cybersecurity (2020) 3:3
+
+Algorithm 1 Multi-Bit Decision Combinational Analysis
+(MB-DCA)
+Input:
+[py ielt2 joe N},j€{1,2,...32},n€[0,15]9Z: 32 x N plaintexts.
+l cijlieti,2 - N},j€{1,2,...}: N EM traces with M sampling
+points on every traces.
+JI =([Ns Ja). St6|: MBLF from t-test.
+Output:
+[ Ko, k1,...,k15]: 16-byte secret key recovered.
+1: forn < 0tol5do
+2 for k — 0 to 255 do
+3 r <— sBox(p9) 6 k)
+4: fori<1toNdo
+5 for j < 1to8do
+6 Sij <— yy Bit,(r\”)
+
+7: for B —1to|%,41| do
+
+8: b< TIn+1{B}
+
+9: form <— 1toM do
+
+10: Pm,p < |\Corr(¢..mS.,p)|
+11: @p <— max{/1,B, P2,B) +» PMB}
+12: we — max{d1, b2) P| Fn411}
+
+13: ky < argmax max{Wo, W1,...5 W255}
+
+k
+return [ ko, kj, ..., k15]|
+
+B =[1,8,7, 8, 1,8, 8, 8, 1,8, 7, 8, 1, 8,7, 8]
+
+We compare the performance of MB-FCA and MB-
+DCA with MSB-CEMA in our experiments. The experi-
+mental results shows that a complete key-recovery attack
+with MSB-CEMA requires 900 EM traces at least (Fig. 7),
+while MB-FCA and MB-DCA are almost equivalent and
+require 500 EM traces at least. In fact, any scalar of B is
+very likely to be null if all values of the corresponding row
+in I’ are within | —4.5, 4.5]. In this case, 16 key bytes can
+
+Page 10 of 17
+
+not be recovered completely. Formally, a complete key-
+recovery with MB-FCA or MB-DCA is feasible only if F
+satisfies
+
+16 8
+S- | \V Flaal | = 16 (14)
+i=1 \j=1
+
+We have to note that the MB-FCA or MB-DCA can
+not work if no prior leakage detection test is available,
+because both methods are based on the prior knowl-
+edge of I. That is to say, MB-FCA and MF-DCA are
+essentially profiled side-channel analysis techniques like
+template attacks (Chari et al. 2002). However, our meth-
+ods are more practical than template attacks, because for
+devices of certain architectural model the profiling is done
+only once to extract I’ of the architecture before attack-
+ing any device of this architecture, while both profiling
+and attacking in template attacks usually target identi-
+cal device, which makes template attacks less practical
+than our methods. In addition, template attacks require
+very low noise level, so they are almost ineffective for
+GPU-based cryptographic implementations.
+
+The vulnerabilities of thread-level parallelism
+
+GPU-based bitsliced implementation achieves thread-
+level parallelism because of the SIMT execution fashion
+of GPUs, which means multiple threads execute the same
+program in parallel. For simplicity, we consider the paral-
+lelism within a GPU warp, because the threads in a warp
+execute the same instruction at any moment if warp diver-
+gence does not happen. In other words, the threads in a
+warp achieve a full synchronization in the time domain.
+However, the full synchronization among multiple thread
+executions does not necessarily imply a full synchroniza-
+tion of their respective EM leakages. In this section, we
+investigate the vulnerabilities of a GPU-based bitsliced
+
+ 
+
+15
+
+10
+
+Number of Key Bytes Recovered
+
+0 500
+
+ 
+
+      
+  
+
+ON CaCO
+ee |
+
+T
+
+|
+|
+|
+|
+|
+|
+|
+| 900
+|
+
+|
+
+—@— MB-FCA —l— MB-DCA MSB-CEMA
+
+ 
+
+1000
+Number of Traces
+Fig. 7 Experimental results of MB-FCA, MB-DCA and MSB-CEMA, where MSB-CEMA denotes the single-bit CEMA with the MSB
+
+1500
+
+ 
+
+ 
+Gao et al. Cybersecurity (2020) 3:3
+
+implementation from the perspective of thread-level
+parallelism.
+
+Developing a simple attack
+
+As mentioned above, multiple thread executions within a
+GPU warp are synchronous, so their leakages are always
+considered to be synchronous as well. Suppose the Ham-
+ming weight leakages in multiple thread executions be
+summable, say E(x HW(,)) = yy E(HW(,)),
+where Jj, Io, I3, ... IN are some intermediates within N
+threads, and E denotes an ideal EM leakage model with-
+out any noise, say E(x) = a- «x for a positive a. Then we
+construct a simple synchronous model (SSM) for multi-
+thread leakages in a warp:
+
+32
+LM = a-) HW (Z'[(1— 1) x 8 + m, i] )+Nyoise. (15)
+i=l
+
+T’ in the Equation is defined as follows:
+
+1 2 3 32
+Bo Fg Bg BQ
+By Py Bp By
+T= | Bo By By: By (16)
+be pe pee
+Bro By o7 By o7 st By 59
+
+where £7” denotes the predicted leakages based on the
+m-th intermediate bit, B* := b}b?...b?* is a 32-bit value,
+
+. . . . T
+and 7’[ -,j]:= | Bh, BY, By, ess By, | corresponds to the Z
+(Eq. 2) within the j-th thread of a warp.
+
+Page 11 of 17
+
+The above SSM is based on another assumption, that is,
+the Hamming weight leakages in different threads are of
+the same scale. Otherwise, the model should be:
+
+32
+
+£m = S° (aj HW(Z'[(n — 1) x 8 +m, i] )) + Nnvise.
+i=1
+
+(17)
+
+The model essentially gives different weights to the pre-
+dicted leakages from 32 threads, which should be more
+accurate than the previous SSM. Nevertheless, we will not
+study any analysis methods based on this model, because
+the value of ad] : do : 43: ... : 432 has to be known
+somehow in advance, which we think is not very practical
+unless exhaustion.
+
+SSM assumes that the EM leakage of multiple threads
+are synchronous. If all of multi-thread leakages are not
+synchronous, it comes to another leakage model called
+Partial Synchronous Model (PSM):
+
+Le = a) > HW (Z'[ (n—1)x8+m,i|] )4Nnoise: (18)
+ieL
+where Z C {1,2,...,32} ifthe EM leakages of 32 threads are
+considered. Obviously, the key problem of constructing a
+PSM is to obtain the Z some way.
+
+Evaluations and Discussions In order to evaluate the
+performance of SSM-based CEMA (SSM-CEMA) to
+the GPU-based bitsliced AES implementation, we set
+up experiments in T2G-S1G, T8G-S1G and T32G-S1G
+encryption modes. As shown in Fig. 8, the 16 secret key
+bytes of AES can be recovered with about 1,500 EM traces
+
+ 
+
+= = «a
+Oo ND Ff
+
+Number of Key Bytes Recovered
+©
+
+0 S00 1000
+
+1500
+
+Number of Traces
+Fig. 8 [he experimental results of SSM-CEMA in 72G-S1G, T8G-S1G and 132G-S1G encryption mode, respectively
+
+ 
+
+X
+
+ 
+
+2000
+
+=—@— SSM-CEMA, T2G-S1G
+=!==SSM-CEMA, T8G-S1G
+
+ 
+
+=e SSM-CEMA, T32G-S1G
+
+2500 3000 3500 4000
+
+ 
+Gao et al. Cybersecurity (2020) 3:3
+
+in T2G-S1G mode, while none of the 16 secret key bytes
+is recovered with up to 4,000 EM traces in T8G-S1G
+or T32G-S1G mode. This suggests that the performance
+of SSM-CEMA becomes worse in more grouped thread
+encryption mode, because more noises are introduced
+and less accurate the SSM becomes. The latter reason will
+be verified in the next experiment.
+
+In order to verify the accuracy of the SSM in T2G-S1G
+encryption mode. we compare the SSM with a PSM select-
+ing half of 32 threads in a warp. As shown in Fig. 9, the
+PSM-CEMA with the first half of 32 threads performs bet-
+ter than the SSM-CEMA, which suggests that the PSM
+is more accurate than SSM. Therefore, the EM leakages
+in a warp may not be synchronous and a further study is
+needed.
+
+Profiled correlation-based leakage detection test
+
+To further understand the nature of the above paral-
+lel EM leakage, we employ a profiled leakage detection
+test method to analyze the individual leakages of multi-
+ple threads in a warp. With profiled methods, we do not
+have to make any assumptions about the leakage model of
+the target implementation, which thereby lowers the pre-
+requisite for an attack and simplifies the procedure. The
+profiled p-test method we use is originally due to Durvaux
+and Standaert Durvaux and Standaert (2016). The method
+takes advantage of the cross-validation techniques intro-
+duced in Durvaux et al. (2014) and applies to the leakage
+detection of all threads in a warp. For the leakage test
+of one thread, the leakages from any other threads are
+
+Page 12 of 17
+
+treated as random noises. Specifically, the o-test is carried
+out in three steps:
+
+First, N EM traces with random plaintext inputs are
+sampled. For k-fold cross-validation, the set of acquired
+traces 7 is split into k (we set k = 10) non-overlapping
+subsets T'),7,....7 of (approximately) the same
+size. For i = 1, 2,3,...,k, we define the profiling sets Ty? =
+
+ig; T© and the test sets qT, = T\Tp. For each tar-
+get plaintext byte variable X,,,, with m ¢€ {1,2,3,...,32},
+n € {1,2,3,...,16} and for each cross-validation set j with
+j € {1, 2, 3,...,k}, a model is estimated: model”) (Ximn) <—
+Tp) (t,m, n). For 8-bit plaintext bytes, this model cor-
+responds to the sample means of the leakage sample t
+corresponding to each value of the plaintext bytes.
+
+Next, we compute the Pearson correlation coefficient
+between this model and the leakage sample in the test sets
+
+7,” (c,m, n):
+
+k
+1 , ~ Gj
+Tmnn(T) = c S~ corr(T,” (tm, n), model” (Xinn))
+j=l
+(19)
+
+where m € {1, 2, 3,...,32} andn € {1, 2, 3,..., 16}.
+Last, the p-statistic of standard normal distribution is
+evaluated:
+
+Pmn(T) = . -In (20)
+
+(ee) N
+5 a mn),
+
+— —3
+1 —Pryn(t) k
+
+ 
+
+Number of Key Bytes Recovered
+
+0 500
+
+ 
+
+ 
+
+1000
+
+Number of Traces
+
+Fig. 9 The experimental results of SSM-CEMA and PSM-CEMA in T2G-S1G encryption mode. PSM-CEMA(T), 72, ..., 46) and PSM-CEMA(T17, 18, ««, [32)
+denote CEMAs with PSM based on the leakages from respectively the first half and the second half of threads in a warp
+
+—@— SSM-CEMA
+
+—g— PSM-CEMA(T, ,T,,,....T,¢)
+
+—A— PSM-CEMA(T, 7, 5 ...T a9)
+
+1500 2000
+
+ 
+
+ 
+Page 13 of 17
+
+Gao et al. Cybersecurity (2020) 3:3
+
+ 
+
+ 
+
+Points of Interest (POls)
+
+ 
+
+ 
+
+ 
+
+X
+
+ 
+
+ 
+
+   
+
+25
+20
+o 15
+D
+= 10
+a 5
+0
+-5
+Time (sec) x1074
+Fig. 10 The experimental results of p-test in 732G-S1G encryption mode. Point of Interest (POI) represents the point-in-time at which leakage
+happens
+6
+O O
+~s 4 S
+2 D
+—_ —_
+© 9 ©
+—_— _—
+Y) “”)
+Q Q
+O
+-2
+20
+15
+2 Oo
+@ 10 D
+—_ —
+O 5 ©
+—_ —
+“”) Y)
+Q 0 Q
+-5
+O 2 4 6
+Time (sec) =x 10°” Time (sec) =x 10°"
+
+ 
+
+X
+
+Fig. 11 The experimental results when zooming in POI, POl2, POl4 and POls. 14, Tz, 117 and T1g represent the POls from the 1st, 2nd, 17th and 18th
+
+thread within a warp, respectively
+
+ 
+Gao et al. Cybersecurity (2020) 3:3
+
+where N is the number of EM traces. Since pjy,,(T)
+satisfies standard normal distribution at any time T,
+|Omn(T)| > 4.5 can conclude the existence of leakage at
+t with a much high probability (Schneider and Moradi
+2015).
+
+For each m € ({1,2,3,...,32} anda e€ {1,2,3,..., 16},
+we define p/” := max; |Pmn(T)|, so the following two
+matrices are obtained:
+
+PL PL PE PR El gp gp. &P?
+
+Py Py PE o> py? & 8S bp + EY?
+
+1 2 3 32 1 22 23 32
+
+T’:= | 93 63 03 °° 3° LF | 83 83 S383
+1 2 3 32 1 22 3 32
+
+P16 P16 P16 °°" P16 516 S16 Si6 °° Si6
+(21)
+
+where for i = 1, 2,3,...,16 and j = 1, 2,3,...,32, é/ = 1, if
+0; > 4.5; otherwise, é/ = 0. In addition, the corresponding
+moments of occurrence is:
+
+1 22 23 32
+4
+Y':= ] 7% 3 73 77° T3 (22)
+1 22 23 32
+T16 "16 "16 °° "16
+where t? := argmax. max; |/mn,(t)|. We define a weak
+Ll T p ’
+
+Multi-Thread Leakage Feature (WMTLF) A based on F’:
+
+A =[Ay4, Aa... Ar6] (23)
+
+Page 14 of 17
+
+Table 1 Multi-thread combinational methods and
+
+non-combinational methods
+
+ 
+
+ 
+
+ 
+
+ 
+
+Method Leakge Feature LeakageModel Type
+
+SSM-CEMA - SSM Non-combinational
+wPSM-CEMA > WMITLF PSM Non-combinational
+MT-DCA WMTLF PSM Combinational
+SPSM-CEMA SMTLF PSM Non-combinational
+MT-HCA SMTLF PSM Combinational
+
+ 
+
+ 
+
+where A, C {1, 2,...,32} denotes a set of indices of scalars
+
+that equals to 1 in F’[n,-]. At the same time, we also
+define a strong Multi-Thread Leakage Feature (SMTLF) Q
+based on F’ and Y’:
+
+Q =[Qy, Qy,..., Q16] (24)
+
+where (2, denotes a partition of A,. The notation Q,, {i, j}
+denotes the j-th element in the i-th subset of Q,,. For any
+i € {1,2,...,|Qy|} andx,y € Qy{i,-}, |t7 — | < 6 satis-
+fies, while for any i,j € {1,2,...,|Qul},i A j,«% € Qyfi,-}
+andy € Qyf{j,-}, |t — T| > 6 satisfies. 6 is a threshold
+that determine whether the leakages of two threads are
+thought to be synchronous or not.
+
+In our experiment, the p-statistic of 32 individual tests
+at each time T are evaluated and plotted within a single
+figure as Fig. 10. It shows that there are approximately
+five groups of leakage points marked as POI), POh,
+POI3, POI, and POIs, respectively. Around any of the five
+groups, multiple colors are accumulated, which seems that
+the leakages from 32 threads happen at the same time.
+
+ 
+
+Number of Secret Key Bytes Recovered
+
+0 500 1000 1500 2000
+
+ 
+
+ 
+
+ 
+
+—A— SSM-CEMA
+=@- wPSM-CEMA\(T, )
+
+——m- wPSM-CEMA(T,,)
+—#— MT-DCA(T, ,T,,T,,,T 5)
+
+2500 3000 3500 4000 4500 #=«5000
+Number of Traces
+
+Fig. 12 The experimental results of SSM-CEMA, wPSM-CEMA and MT-DCA in T32G-S1G encryption mode
+
+ 
+
+ 
+Gao et al. Cybersecurity (2020) 3:3
+
+However, it is not like this when zooming in any of the
+five groups of leakage points. As is showed in Fig. 11,
+the detail of POI;, POIz, POI, and POIs tells that not
+all leakages from multiple threads are synchronous as we
+usually think. This discovery is so important because we
+always expect synchronous executions to generate syn-
+chronous leakages instead of asynchronous ones. It is
+obvious that the executions of T; and T> are almost
+overlapping, the same with 717 and Tjg. Since we can-
+not deny the existence of leakages when there is not any
+indication in the figure, we still do not know whether
+any leakage happens or not in other threads except 7},
+T2, T17 and T1g. We do not know why the device leaks
+information in these special threads, and we think it
+may have something to do with the hardware architec-
+ture of CUDA-enabled GPU as well as the target software
+implementation.
+
+Multi-thread combinational analysis
+
+The above experiments have demonstrated that the EM
+leakages from multiple threads in a warp is not exactly
+synchronous. To make full use of the EM leakages from
+multiple asynchronous threads, we propose two combina-
+tional methods.
+
+The first method we propose is Multi-Thread Decision
+Combinational Analysis (MT-DCA) based on the wMTLF.
+If the j-th bit of a intermediate byte is used to model the
+leakage of single thread, then the MT-DCA is based on the
+following leakage model:
+
+LAND — q-HW(Z'[ (n—1) x 8+), Anf{i}) + Nnoise (25)
+
+where £7” denotes the predicted leakage of the j-th bit
+of the n-th intermediate in the A, {i}-th thread.
+
+To recover the n-th secret key byte, | A,,| CEMAs should
+be performed before making a decision:
+
+255 Duic {1.2 Anl)
+ky, = argmax \ max
+k k=0 |An|
+
+ 
+
+on (ke) |
+(26)
+
+where on nti} (k) is a matrix of Pearson Correlation Coef-
+ficient obtained from CEMAs based on the model cant
+Obviously, it is feasible to recover the 16 secret key bytes
+of AES.
+
+The above MT-DCA depends on wMTLF that indi-
+cates which of the 32 threads in a warp is leaky rather
+than whether these leakages are synchronous or not.
+To make full use of the synchronization of leakages, we
+propose the second combinational method called Multi-
+Thread Hybrid Combinational Analysis (MT-HCA) based
+on sMTLF. If the j-th bit of a intermediate byte is used to
+model the leakage of single thread, then the MT-HCA is
+based on the following leakage model:
+
+Page 15 of 17
+
+Le=a- Y > BW’ —1) x 8+ ),m)) + Nnoise
+mEQy{w,-}
+
+(27)
+
+where w € {1,2,...,|Qu{w,-}|} and LY denotes the pre-
+dicted leakage of the j-th bit of the m-th intermediate in
+the w-th grouped threads whose leakages are thought to
+be synchronous.
+
+The same way as MT-DCA does, |&2,| CEMAs should
+be performed before making a decision:
+
+ 
+
+|Q2y| Ww k
+ky = argmax (i eh) ; (28)
+N
+
+i k=0
+
+where p, is a matrix of Pearson Correlation Coeffi-
+cient obtained from CEMAs based on the model LY.
+Obviously, it is feasible to recover the 16 secret key
+bytes of AES. More details of MT-HCA is showed in
+Algorithm 2.
+
+Experimental results and discussion
+
+Since both MT-DCA and MT-HCA take the advantage of
+EM leakages from multiple threads, our experiments are
+performed in T32G-S1G encryption mode. MT-DCA and
+MT-HCA depend on wMTLF and sMTLF, respectively, so
+we extract the wMTLF and sMTLF of our experimental
+
+Algorithm 2 Multi-Thread Hybrid Combinational Analy-
+sis (MT-HCA)
+NOTE: The attack is based on the leakage of the MSB of
+each intermediate, so a = 8 in the following procedure.
+Input:
+(pe lieti2 jee N},j1€{1,2,032},n€[0,15]0Z: 32 X 32 x N plaintexts.
+cig lie(1,2,..,N},je{1,2,..,.M}: N EM traces with M sampling
+points on every traces.
+Q =[ Qy, Qa, ..., Q16]: SMTLF from p-test.
+Output:
+[ ko, k1,...,k15]: 16-byte secret key recovered.
+
+1: forn — Oto 15do
+
+2 for k — 0 to 255 do
+
+3 pO SBox(p\;,) ® k)
+
+4: fori < 1toNdo
+
+5 for j <— 1 to |QQy,41| do
+6
+
+Sy — Dee yar tie) Wet Bitalry’”)
+7: form <1toM do
+8: Om <— tal ; yl Corr(¢.mS.,w)
+9: We <— Max{/1, P2, +» PM}
+10: kn <— argmax(max{Wo, W1,....W255})
+k
+
+11: return [ ko; ki, eoey ky5]
+
+ 
+Gao et al. Cybersecurity (2020) 3:3
+
+Page 16 of 17
+
+ 
+
+Number of Secret Key Bytes Recovered
+
+0 500 1000 1500 2000
+
+ 
+
+ 
+
+2500
+Number of Traces
+Fig. 13 The experimental results of SSM-CEMA, sPSM-CEMA and MT-HCA in 732G-S1G encryption mode
+
+ 
+
+—A— SSM-CEMA
+~ ©» sPSM-CEMA(T,,T,)
+
+je sPSM-CEMA(T,.,T,,)
+
+ 
+
+3000 3500 4000 4500 5000
+
+ 
+
+setting by p-test before attacking. The extracted wMTLF
+A and sMTLF Q are as follows:
+
+A =[{1, 2,17, 18}, {1, 2, 17, 18}, ..., {1, 2,17, 18}]
+Q =[ {{1, 2}, (17, 18}}, {{1, 2}, (17, 18}, ..., {{1, 2}, (17, 18}}]
+(29)
+
+that is, Ay = Ag =... = Ajo = {1,2,17,18} and Q] =
+Qo =... = Qy6 = {{1, 2}, {17, 18}}.
+
+We compare the performance of five methods showed
+in Table 1. wPSM-CEMA computes predicted leakages
+by one thread in WMTLF and sPSM-CEMA computes
+predicted leakages by one grouped threads in sMTLF.
+In fact, both wPSM-CEMA and sPSM-CEMA are non-
+combinational methods.
+
+First, we compare the performance of combinational
+method with non-combinational ones when wMTLF is
+available. The experimental results are showed in Fig. 12.
+WPSM-CEMA is a wMTLF-based non-combinational
+method and it performs worse than the wMTLF-based
+combinational method MT-DCA.
+
+Second, we compare the performance of combinational
+method with non-combinational ones when sMTLF is
+available. The experimental results are showed in Fig. 13.
+sPSM-CEMA is a sMTLF-based non-combinational
+method and it perform worse than the sMTLF-based
+combinational method MT-HCA.
+
+Both MT-DCA and MT-HCA performs better than
+their non-combinational counterparts because they make
+use of multi-thread leakages instead of a single one. It is
+reasonable that more usable leakages make better perfor-
+mance. In addition, the experimental results show that
+
+SSM-CEMA is not effective at all with up to 5,000 traces,
+because SSM-CEMA does not depend on any leakage fea-
+ture, thus more noises are introduced when modelling
+with SSM.
+
+Conclusions
+
+In this paper, we investigate efficient electro-magnetic
+analysis of a GPU bitsliced AES implementation in
+order to give a deep insight into the vulnerabilities
+of bit-level parallelism and thread-level parallelism. We
+propose GPU-specific efficient combinational analysis
+methods and the methods are experimentally proved to
+be more efficient than the non-combinational ones. Our
+research suggests that multi-thread leakages can be used
+to improve attacks if the multi-thread leakages are not
+synchronous in the time domain.
+
+Acknowledgements
+
+This work was supported in part by National Natural Science Foundation of
+China (No. 61632020, UI936209) and Beijing National Science Foundation (No.
+4192067).
+
+Authors’ contributions
+
+YG provided the general idea of the work and write the whole manuscript, YZ
+provided valuable advices on the organization and expression of the paper;
+WC gave a great help on the experimental setups and the optimization of
+analysis methods. All authors read and approved the final manuscript.
+
+Funding
+Not applicable.
+
+Availability of data and materials
+Not applicable.
+
+Received: 16 January 2019 Accepted: 5 February 2020
+Published online: 19 February 2020
+
+ 
+Gao et al. Cybersecurity (2020) 3:3
+
+References
+
+Agrawal D, Archambeault B, Rao JR, Rohatgi P (2002) The EM side-channel(s).
+In: Cryptographic Hardware and Embedded Systems - CHES 2002, 4th
+International Workshop, Revised Papers, Redwood Shores. pp 29-45.
+https://doi.org/10.1007/3-540-36400-5_4
+
+Biham E (1997) A fast new DES implementation in software. In: Fast Software
+Encryption, 4th International Workshop, FSE ’97, Proceedings, Haifa.
+pp 260-272. https://doi.org/10.1007/BFb0052352
+
+Biham E, Anderson RJ, Knudsen LR (1998) Serpent: A new block cipher
+proposal. International workshop on fast software encryption. Springer,
+Berlin, Heilderberg
+
+Brier E, Clavier C, Olivier F (2004) Correlation power analysis with a leakage
+model. In: Cryptographic Hardware and Embedded Systems - CHES 2004:
+6th International Workshop Cambridge, MA, USA, August 11-13 2004.
+Proceedings. pp 16-29. https://doi.org/10.1007/978-3-540-28632-5_2
+
+Chari S, Rao JR, Rohatgi P (2002) Template attacks. In: Cryptographic Hardware
+and Embedded Systems - CHES 2002, 4th International Workshop,
+Redwood Shores, CA, USA, August 13-15 2002, Revised Papers. pp 13-28.
+https://doi.org/10.1007/3-540-36400-5_3
+
+Di B, Sun J, Chen H (2016) A study of overflow vulnerabilities on GPUs. In:
+Network and Parallel Computing - 13th IFIP WG 10.3 International
+Conference, NPC 2016, Xi‘an, China, October 28-29 2016, Proceedings.
+pp 103-115. https://doi.org/10.1007/978-3-319-47099-3_9
+
+Duncan AJ, Creese S, Goldsmith M (2015) An overview of insider attacks in
+cloud computing. Concurr Comput Pract Experience 27(12):2964-2981.
+https://doi.org/10.1002/cpe.3243
+
+Durvaux F, Standaert F (2016) From improved leakage detection to the
+detection of points of interests in leakage traces. In: Advances in
+Cryptology - EUROCRYPT 2016 - 35th Annual International Conference on
+the Theory and Applications of Cryptographic Techniques, Vienna, Austria,
+May 8-12 2016, Proceedings, Part |. pp 240-262. https://doi.org/10.1007/
+978-3-662-49890-3_10
+
+Durvaux F, Standaert F, Veyrat-Charvillon N (2014) How to certify the leakage
+of a chip? In: Advances in Cryptology - EUROCRYPT 2014 - 33rd Annual
+International Conference on the Theory and Applications of Cryptographic
+Techniques, Copenhagen, Denmark, May 11-15 2014. Proceedings.
+pp 459-476. https://doi.org/10.1007/978-3-642-55220-5_ 26
+
+Gao Y, Cheng W, Zhang H, Zhou Y (2018) Cache-collision attacks on
+gpu-based AES implementation with electro-magnetic leakages. In: 17th
+IEEE International Conference On Trust, Security And Privacy In Computing
+And Communications / 12th IEEE International Conference On Big Data
+Science And Engineering, TrustCom/BigDataSE 2018, New York, NY, USA,
+August 1-3 2018. pp 300-306. https://doi.org/10.1109/TrustCom/
+BigDataSE.2018.00053
+
+Gao Y, Zhang H, Cheng W, Zhou Y, Cao Y (2018) Electro-magnetic analysis of
+GPU-based AES implementation. In: Proceedings of the 55th Annual
+Design Automation Conference, DAC 2018, San Francisco, CA, USA, June
+24-29 2018. pp 121:1?-121:6. https://doi.org/10.1 145/3195970.3196042
+
+Goodwill JG, Jaffe J, Rohatgi P (2011) A testing methodology for side-channel
+resistance validation. In: NIST non-invasive attack testing workshop, Vol. 7
+
+Jiang ZH, Fei Y, Kaeli DR (2016) A complete key recovery timing attack on a
+GPU. In: 2016 IEEE International Symposium on High Performance
+Computer Architecture, HPCA 2016, Barcelona, Spain, March 12-16 2016.
+pp 394-405. https://doi.org/10.1 109/HPCA.2016.7446081
+
+Jiang ZH, Fei Y, Kaeli DR (2017) A novel side-channel timing attack on GPUs. In:
+Proceedings of the on Great Lakes Symposium on VLSI 2017, Banff, AB,
+Canada, May 10-12 2017. pp 167-172. https://doi.org/10.1145/3060403.
+3060462
+
+Lim RK, Petzold LR, Ko¢g CK (2016) Bitsliced high-performance AES-ECB on
+GPUs. In: The New Codebreakers - Essays Dedicated to David Kahn on the
+Occasion of His 85th Birthday. pp 125-133. https://doi.org/10.1007/978-3-
+662-49301-4_8
+
+Luo C, Fei Y, Luo P, Mukherjee S, Kaeli DR (2015) Side-channel power analysis
+of a GPU AES implementation. In: 33rd IEEE International Conference on
+Computer Design, ICCD 2015, New York City, NY, USA, October 18-21 2015.
+pp 281-288. https://doi.org/10.1109/ICCD.2015.7357115
+
+Naghibijouybari H, Neupane A, Qian Z, Abu-Ghazaleh NB (2018) Rendered
+insecure: GPU side channel attacks are practical. In: Proceedings of the
+2018 ACM SIGSAC Conference on Computer and Communications
+
+Page 17 of 17
+
+Security, CCS 2018, Toronto, ON, Canada, October 15-19 2018.
+pp 2139-2153. https://doi.org/10.1145/3243734.3243831
+
+Nishikawa N, Amano H, Iwai K (2017) Implementation of bitsliced AES
+encryption on cuda-enabled GPU. In: Network and System Security - 11th
+International Conference, NSS 2017, Helsinki, Finland, August 21-23 2017,
+Proceedings. pp 273-287. https://doi.org/10.1007/978-3-319-64701-2_20
+
+Patrick C A bitsliced implementation of ECB and CTR AES. https://github.com/
+conorpp/bitsliced-aes. Accessed Mar 2016
+
+Schneider T, Moradi A (2015) Leakage assessment methodology - A clear
+roadmap for side-channel evaluations. In: Cryptographic Hardware and
+Embedded Systems - CHES 2015 - 17th International Workshop,
+Saint-Malo, France, September 13-16 2015, Proceedings. pp 495-513.
+https://doi.org/10.1007/978-3-662-48324-4 25
+
+Publisher’s Note
+Springer Nature remains neutral with regard to jurisdictional claims in
+published maps and institutional affiliations.
+
+ 
+
+Submit your manuscript to a SpringerOpen”®
+journal and benefit from:
+
+> Convenient online submission
+
+> Rigorous peer review
+
+> Open access: articles freely available online
+> High visibility within the field
+
+> Retaining the copyright to your article
+
+ 
+
+Submit your next manuscript at > springeropen.com
+
+ 
+
+ 
+
+ 

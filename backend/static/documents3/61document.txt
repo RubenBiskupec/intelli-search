@@ -1,0 +1,1404 @@
+Computers and Electronics in Agriculture 179 (2020) 105795
+
+ 
+
+Contents lists available at ScienceDirect
+
+Computers
+
+F-Valo =) [Tos ve) g] (er)
+in agriculture
+
+   
+
+Computers and Electronics in Agriculture
+
+Bs
+
+ELSEVIER
+
+ 
+
+journal homepage: www.elsevier.com/locate/compag
+
+ 
+
+Modelling internal knot distribution using external log features
+
+Check for
+updates
+
+ 
+
+Fedor Zolotarev’, Tuomas Eerola’, Lasse Lensu’, Heikki Kalviainen’, Tapio Helin’,
+Heikki Haario*, Tomi Kauppi”, Jere Heikkinen”
+* Lappeenranta-Lahti University of Technology LUT, School of Engineering Science, Department of Computational and Process Engineering, Computer Vision and Pattern
+
+Recognition Laboratory & Uncertainty Quantification and Inverse Problems Laboratory, P.O. Box 20, FI-53851 Lappeenranta, Finland
+> Finnos Oy, Tukkikatu 5, FI-53900 Lappeenranta, Finland
+
+ 
+
+ARTICLE INFO ABSTRACT
+
+ 
+
+ 
+
+The quality of the end product in the sawmill industry is highly dependent on the distribution of knots. If the
+internal structure of the logs used as raw material were known it would be possible to optimize the sawing
+process by controlling the locations of individual knots in the resulting boards. Methods such as Computer
+Tomography or Magnetic Resonance Imaging can be used to gain reliable information about the internal
+structure of the logs prior to sawing. Such scanners are, however, expensive or slow, which renders the use of
+these methods ill-suited to online integration in sawmill operations. Laser range scanners, on the other hand, are
+very fast but provide only external information. A method to estimate the internal log structure using only
+external information provided by a laser range scanner is proposed in this paper. The method comprises five
+major steps: point cloud filtering and centreline estimation, log surface heightmap generation, knot segmenta-
+tion, volumetric reconstruction of knots and virtual sawing. The end result is the generation of images of virtual
+boards for the given sawing parameters. The method was evaluated on debarked softwood logs. The experi-
+mental part of the work demonstrates that the pixel intensities of the virtual boards generated using the proposed
+method correlate well with the probabilities of knots appearing in the corresponding locations in the final
+product. Virtual sawing allows exhaustive evaluation of different sawing parameters, thus making it possible to
+
+Keywords:
+Machine vision
+Computer vision
+Sawmill industry
+Virtual sawing
+Board quality
+
+optimize sawing parameters prior to sawing.
+
+ 
+
+1. Introduction
+
+Process optimization in the sawmill industry is, as in other major
+industries, an ongoing endeavour that aims to derive maximum benefit
+from advancements in measurement technology and process control.
+Recent progress in timber tracing methods in the sawmill environment
+(Zolotarev et al., 2019) have opened novel possibilities for optimizing
+the sawing process via feedback loops. The most important step to be
+optimized is the actual sawing, i.e., selecting the optimal sawing pat-
+tern and sawing angle for each individual log. There is a considerable
+evidence that sawing pattern optimization can lead to an increase in
+profit and yield (Rais et al., 2017; Lundahl and Gronlund, 2010; Chang
+and Gazo, 2009; Stangle et al., 2015). The main raw timber feature
+affecting the quality of the end product is the distribution of knots in-
+side the log (places where the branches grow inside the tree). Since the
+full log is used in sawmilling operations, it is impossible to fully avoid
+the knots. However, it is desirable to control where the knots appear in
+the resulting boards. Ideally, the knots should be on either of the faces,
+
+* Corresponding author.
+
+while knots on the edges of the board, especially arris knots, should be
+avoided as they compromise the structural integrity. A straightforward
+way to acquire the information needed for the sawing optimization is to
+use sensors capable of extracting comprehensive details about the in-
+ternal structure of the log, e.g. as Computed Tomography (CT) scanners
+or Magnetic Resonance Imaging (MRI) scanners. The downside of such
+sensors is that they are typically either very expensive or rather slow,
+rendering them ill-suited for online usage in the streamlined sawmill
+process. Though, there exist specifically developed high speed CT
+scanners suitable for such tasks (Johansson et al., 2013). Unfortunately,
+such scanners also have their drawbacks, such as, for example, the cost.
+Laser scanners provide a more practical and affordable alternative as
+they can be easily integrated into the sawmill production process.
+However, unlike CT and MRI devices, laser scanners are only able to
+obtain information about the external features of a log.
+
+This work proposes a method for estimation of the internal structure
+of logs that utilizes only external features information from laser range
+scanner data. The proposed method starts with log centreline
+
+E-mail addresses: Fedor.Zolotarev@lut.fi (F. Zolotarev), Tuomas.Eerola@lut.fi (T. Eerola), Lasse.Lensu@lut.fi (L. Lensu), Heikki.Kalviainen@lut.fi (H. Kalvidinen),
+Tapio.Helin@lut.fi (T. Helin), Heikki.Haario@lut.fi (H. Haario), Tomi.Kauppi@finnos.fi (T. Kauppi), Jere.Heikkinen@finnos.fi (J. Heikkinen).
+
+https://doi.org/10.1016/j.compag.2020.105795
+
+Received 6 July 2020; Received in revised form 10 September 2020; Accepted 14 September 2020
+0168-1699/ © 2020 The Authors. Published by Elsevier B.V. This is an open access article under the CC BY-NC-ND license
+
+(http://creativecommons.org/licenses/BY-NC-ND/4.0/).
+F. Zolotarey, et al.
+
+Input Filtered point
+point cloud +
+cloud centerline
+
+ 
+
+ 
+
+lic, a lc
+
+Surface heightmap
+
+Segmented knots
+
+Computers and Electronics in Agriculture 179 (2020) 105795
+
+etl
+—
+
+Volumetric log
+
+Virtual boards
+model
+
+Fig. 1. Schematic representation of the main steps of the proposed method. The example log is of Scots pine (Pinus sylvestris) species with the diameter ranging from
+
+205 mm to 245 mm and the length of 4.6 m.
+
+estimation based surface heightmap generation and proceeds to knot
+segmentation and volumetric reconstruction of the knots. Then, the
+obtained log model is utilized in virtual sawing, producing estimates for
+knot locations in the resulting boards. Virtual sawing makes it possible
+to exhaustively search for optimal sawing parameters prior to the actual
+sawing, thus aiding optimization of the sawing process. A simple
+schematic representation of the method is presented in Fig. 1 and the
+method is explained in more detail in Section 3.
+The main contributions of this paper are as follows:
+
+1. A method for external knot segmentation using laser range scanner
+data of logs. The segmentation method does not assume that the logs
+have a cylindrical shape, which makes the approach robust for logs
+with curved or otherwise irregular shape.
+
+2. The segmentation results provide explicit information about the
+confidence of the predicted knot locations.
+
+3. A method for estimation of the spatial knot distribution in the final
+product using knot growth models and external log features (seg-
+mented knots).
+
+2. Related work
+2.1. External defect segmentation using laser scanners
+
+Laser scanners have become common tools in the modern forest
+products industry. Laser scanners are found in a variety of forest in-
+dustry applications, such as airborne laser scanning for forest inventory
+assessment, laser scanning for the acquisition of information about tree
+attributes, and in sawmill production processes, laser scanning to de-
+termine log attributes. An important application of laser scanners is
+external defect segmentation of trees.
+
+A series of works by Thomas et al. (2006), Thomas and Mili (2007),
+Thomas et al. (2007), Thomas and Thomas (2011)) focus on the de-
+velopment of a method for the automated detection of the external
+defects on barked hardwood logs. The general idea is to fit circles to
+each cross section of a log, and then to use distances of points to the
+circles to generate a 2D surface map where coordinate axes correspond
+to the angle around the log and a position along the length of the log.
+Essentially a cylindrical coordinate system is applied. Areas with sig-
+nificant rises or depressions are classified as defects. The laser data are,
+however, susceptible to noise and often contain a substantial number of
+outliers. Thus, it is worth noting that the circle fitting is done using a
+specifically designed robust GM-estimator as described by Thomas and
+Mili (2007).
+
+A similar approach is used in Kretschmer et al. (2013). First, the
+authors preprocess terrestrial laser scan data using methods from
+
+Pfeifer et al. (2004) and Pfeifer and Winterhalder (2004), which results
+in approximate log shapes modelled as a chain of cylinders fitted to the
+point cloud. Next, the point clouds are converted into a cylindrical
+coordinate system for each cylindrical section. The main difference in
+their coordinate system is that instead of using the angle around the log,
+the system uses the arc length and distance to the cylinder surface. The
+converted points can be used to segment the defects using thresholding
+or similar methods.
+
+The works by Thomas et al. (2006), Thomas and Mili (2007),
+Thomas et al. (2007), Thomas and Thomas (2011) and Kretschmer et al.
+(2013) are limited by the assumption that the log shape is circular
+which is generally not the case. For logs with more irregular shapes
+these methods might be susceptible to misclassification of the log shape
+curvatures as defects. In order to avoid this assumption, Nguyen et al.
+(2016) focus on developing an algorithm for the robust estimation of
+the centreline (pith) and use an approach similar to the previously
+discussed works to convert all points to a new coordinate system, that
+describes all positions relative to the pith, using the distance to the
+centreline, the angle around the centreline, and the position along the
+centreline. Defect segmentation is performed using local patches of
+points. The idea is that with small enough areas it is possible to make a
+linear approximation of the supposed log surface. Points with large
+deviations from the approximation are thresholded and classified as
+defects. The local nature of the defect segmentation makes this parti-
+cular method more suitable for logs with non-circular shapes.
+
+Generally, the basic procedure for external defect segmentation
+based on laser range data comprises a transformation into a modified
+variant of the cylindrical coordinate system and then defect thresh-
+olding based on some assumption about the log surface. It should be
+noted that all the above-mentioned works consider barked logs or trees.
+In the sawmill environment, however, the logs are typically debarked
+before measuring.
+
+2.2. Modelling knot morphology using external features
+
+Non-invasive methods of modelling internal knot morphology of
+trees suitable for industrial-scale operations are extremely useful for the
+sawmill industry. A practical use for such methods is sawing angle
+optimization, which would enable the production of higher quality
+timber, since the quality of timber is dependent on the density and
+distribution of knots on its surface. The effectiveness of sawing angle
+optimization based on internal knot modelling is demonstrated in
+Chang and Gazo (2009), Lundahl and Gronlund (2010), Stangle et al.
+(2015), Rais et al. (2017), where it is concluded that such methods
+could lead to a substantial increase in profits. The most commonly
+studied non-invasive methods involve the use of X-ray CT scanners
+F. Zolotarey, et al.
+
+(Bhandarkar et al., 2006; Baumgartner et al., 2010; Longuetaud et al.,
+2012; Johansson et al., 2013) which all utilize CT measurements to
+detect knots inside the logs. The method described by Oja (2000) fo-
+cuses not only on the detection of knots in CT scans but also attempts to
+create a model that could be used as a description of the knots. An
+interesting idea is proposed by Duchateau et al. (2013), where the
+authors have created a model for knots growth inside a log. The prin-
+cipal difference from previous works is that the researchers have at-
+tempted to link the parameters of the model to the external features of
+the log. The relationship between defects detected using lidar data and
+internal defects is studied by Stangle et al. (2014) and Thomas (2009),
+where it is found that there is a strong correlation between the two.
+Unlike in the other works, Thomas (2009) used a destructive method
+and not a CT scan to study the inside structure of the log.
+
+While CT scanning enables the production of an accurate map of all
+knots inside a log, the approach is not suitable for the online sawing
+processes used in modern sawmills. In order to get sufficiently precise
+information, a dense projection is needed, meaning that the scanning
+process takes quite a long time, thus rendering it unfit for mass pro-
+duction of timber. Our work proposes an alternative, method for ob-
+taining an approximation of the knot distribution inside a log that uses
+the much faster laser range scanning.
+
+3. Proposed method
+
+The proposed method is illustrated in Fig. 1 and is divided into the
+following five steps:
+
+. Point cloud filtering and centreline estimation.
+. Log surface heightmap generation.
+
+. Knot segmentation.
+
+. Volumetric reconstruction of knots.
+
+. Virtual sawing.
+
+aBWN FH
+
+3.1. Point cloud filtering and centreline estimation
+
+Point clouds are collected in the sawmill environment using laser
+range scanners. Even though all the scanners are targeted at the log, the
+data generated is prone to the accumulation of noise and occasional
+artefacts from the environment such as the points corresponding to the
+metal rails that hold the log and other possible objects. Therefore, it is
+necessary to reduce the noise and artefacts to have only the points
+corresponding to the log surface. An example of a point cloud before
+and after noise and artefact filtering is presented in Fig. 2.
+
+Each point cloud consists of layers stacked along the z-axis, i.e., all
+points on a layer have the same z coordinate. Filtering of the point
+cloud is done layerwise. It is assumed that the most densely populated
+area corresponds to the log surface which is the main focus of the laser
+scanners. Using this assumption, DBSCAN (Ester et al., 1996) is used to
+cluster the layer points and the largest (densest) cluster is assumed to
+correspond to the log surface or at least to a part of it. In the literature,
+the log shape is often approximated using a cylinder (e.g. Thomas and
+Mili, 2007; Thomas et al., 2006, 2007; Thomas and Thomas, 2011;
+Kretschmer et al., 2013). While logs, in practice, typically contain more
+irregular shapes, the assumption that log cross-section is close to a
+circle can be utilized to filter out noise. Therefore, a circle is fitted to
+
+ 
+
+Computers and Electronics in Agriculture 179 (2020) 105795
+
+ 
+
+-100 0 100 200 300 400 500
+
+Fig. 3. Cross-section of a point cloud during the filtering process. Different
+clusters are plotted in different colours. The fitted circle is plotted with the solid
+line and all points outside the area defined by the threshold (dashed lines) are
+filtered out. (For interpretation of the references to colour in this figure legend,
+the reader is referred to the web version of this article.)
+
+the cluster points using least squares fitting. If the cluster size is less
+than a specified threshold or the residual error from the circle fitting
+exceeds the threshold, the layer is considered to be too noisy and is
+removed from consideration. Otherwise, if the conditions are satisfied,
+all points with a distance to the circle not exceeding the threshold are
+saved to the final point cloud, and all other points from that layer are
+considered as outliers and are removed. An example of a cross-section
+under consideration is presented in Fig. 3.
+
+The centres of fitted circles are a good approximation of the log’s
+centreline (pith). The centreline is estimated by fitting a cubic
+smoothing spline to the centres of fitted circles. A smoothing spline is
+parameterized by a trade-off parameter p: p = 0 results in a straight-
+line fit, p = 1 produces a simple cubic spline. A value p = 0.999 is
+chosen to closely fit the data while slightly smoothing the overall
+centreline shape to account for the possible noise effects in the fitted
+circles. An example of a fitted centreline is presented in Fig. 4.
+
+3.2. Log surface heightmap generation
+
+While assuming circular cross-sections and piece-wise cylindrical
+shapes is justified in the point cloud filtering and centreline estimation
+steps, to make the method robust to irregularities in log shape, such a
+strict assumption should not be made when generating the surface
+heightmap or detecting the defects (knots). Knots can be viewed as
+relatively small bumps on the surface of a log. Since the overall goal is
+to find their locations on the log, it is convenient to work with a
+function representing the log surface. The function can be defined as:
+
+f:Oxl pe op, (1)
+
+where @ is the angle around the log’s circumference, | is the position
+along the length of a log (relative to the centreline) and ¢ is the distance
+to the centreline. 6, 9 and 1 form a cylindrical coordinate system iden-
+tical to the one described in Nguyen et al. (2016). This coordinate
+system is called a log-centric coordinate system in this work.
+
+The conversion from Cartesian coordinates to log-centric co-
+ordinates is done in the same way as in Nguyen et al. (2016). First, the
+centreline is divided into a number of segments. The number of
+
+Fig. 2. Log point cloud before (a) and after (b)
+the removal of noise and artefacts.
+
+(b)
+F. Zolotarey, et al.
+
+3500
+
+ 
+
+Fig. 5. Log-centric coordinate system. The centreline (blue dashed line) is
+discretized into segments (red solid lines), and the cylindrical coordinates are
+computed locally for each segment with each section acting as the z-axis. (For
+interpretation of the references to colour in this figure legend, the reader is
+referred to the web version of this article.)
+
+segments is chosen as 0.1N, where N is the number of log layers (cross-
+sections). Next, each point in the point cloud is assigned to a segment.
+The space is divided by planes, with each plane bisecting an angle
+between the centreline segments. A point is assigned to a centreline
+segment if it is between two such planes: the first plane intersecting the
+end point of the segment and the second one intersecting the starting
+point. Each point is converted into the cylindrical coordinate system
+with a given segment acting as the z-axis, resulting in 0, p and local z
+coordinates. The coordinate | is acquired by adding the sums of the
+lengths of all previous centreline segments. A schematic depiction of
+this coordinate system is presented in Fig. 5.
+
+The heightmap is defined as the values of function f (Eq. (1))
+evaluated on an evenly spaced 2D grid of values 6 and 1. The heightmap
+is found by fitting f to the point cloud, and since the function is assumed
+to be smooth, the regularization is applied to the gradient. The fitting is
+formulated as a minimization problem as:
+
+N
+min If (6, lj) —pP +A IIVSIP,
+
+i 2 If Gb) — A, f 02)
+where N is the number of points in the point cloud, 6;, 1; and p, are the
+coordinates of the i-th point from the point cloud, and 4 is the reg-
+ularization coefficient. In practice, all values are discretized, thus, the
+objective becomes:
+min |IAf — Al? +A IIGef lh +A IG IE,
+
+f (3)
+where f is the vectorized heightmap, 6 is a vector containing p co-
+ordinates of all points in the point cloud, A is a linear operator that uses
+values from the heightmap to bilinearly interpolate values Af = f (6, 1),
+and Gg and G; are linear operators for the computation of gradients of f
+along the @ and I variables respectively. Examples of the heightmaps
+found using this approach are presented in Fig. 6. Regularization on the
+gradients not only controls the smoothness of the function, but also
+helps to interpolate the missing values.
+
+3.3. Knot segmentation
+
+As mentioned earlier, knots are slight bumps of more or less similar
+size on the surface of a log. When considering the log surface as the
+function defined in Eq. (1), the knots correspond to the areas of a
+specific elliptical shape and size with high values. In computer vision,
+
+Computers and Electronics in Agriculture 179 (2020) 105795
+
+Fig. 4. Example of a fitted centreline. Points
+obstructing the view were clipped to display the
+centreline.
+
+4500 5000 5500
+
+ 
+
+(a) \=0.5
+
+(c) A= 10
+
+Fig. 6. Log surface heightmap produced with different regularization coeffi-
+cients.
+
+such areas are referred to as blobs (Lindeberg, 1993), and they are
+extensively used in methods utilizing scale space such as SIFT (Lowe,
+1999) and SURF (Bay et al., 2006). One of the standard approaches to
+blob detection is the Laplacian of Gaussian (LoG) filter. The idea is that
+by convolving the signal with the LoG with a selected standard devia-
+tion o, zero-crossings of the response occur in areas of a certain radius
+depending ono. The area inside that circular area would then be bright
+(or dark, depending on the sign of the Laplacian).
+
+Since the approximate size of knots is known beforehand, one scale
+is enough andcomplete information on the scale-space is not needed to
+segment the knots. However, there is another problem: knots are close
+to circular in the original scale, but the heightmap is sampled along two
+dimensions as the length of the log / and the angle around the log 0.
+Consequently, the knots are not circular when scaled to the log-centric
+coordinate system. A standard approach would be to use a filter cor-
+responding to the LoG as:
+
+a(g,*f)  a°(g,*f)
+where g. is a Gaussian filter with standard deviation o, and o” is used to
+normalize the values for the scale space.
+
+In this particular case, however, it is more logical to use two dif-
+ferent standard deviations for the different dimensions so that the ra-
+dius in the original scale corresponds to the knot size. The filtered result
+then becomes:
+
+a°(g_ *f) e(g,*f)
+= og ——2— + of ———.
+1 ae? al? (5)
+
+In this way, it is possible to calculate og and g; such that the Laplacian
+segments the circles with radius equal or less than the specific radius
+defined in the original scale. Keeping in mind that the second derivative
+of the Gaussian has a zero-crossing at 0, the following values could be
+used to segment knots of maximum radius furface mm from the surface
+
+Ww
+06 = Vsurface a
+
+2x f- (6)
+F. Zolotarev, et al.
+
+   
+
+~*
+»@
+
+m sl ll I lls
+
+ 
+
+(a) Heightmap.
+
+(b) Filtered heightmap. (c) Segmentation result.
+
+Fig. 7. Knot segmentation process.
+
+Oi = "surface Imax > (7)
+where w and hare the width and height of the heightmap, respectively,
+f is the mean value of f, and Imax is the maximum log length. Also, it is
+worth noting that the convolution is performed in the Fourier domain
+since the heightmap is periodic along the 6 dimension.
+
+The final step in the knot segmentation is to set all negative values
+to zero, assuming that the positive Laplacian is used. The resulting
+image contains clearly defined areas, with the strongest filter responses
+in the areas resembling knots. An example of the knot segmentation
+process is presented in Fig. 7.
+
+3.4. Volumetric reconstruction of knots
+
+The result of the knot segmentation is an image with filter activa-
+tions corresponding to the locations of knots, where the stronger the
+activation, the more probable that a knot is located there. When nor-
+malized, the knot segmentation image can be thought of as a knot in-
+tensity value:
+
+O6xlph Ik, (8)
+
+where J, is the knot intensity. Using information about the biological
+properties of knot growth, it is possible to extend this mapping from the
+surface into the inside of the log:
+
+O6xlxpr k. (9)
+
+In order to extend the 2D maps from Eq. (8) to three dimensions, they
+are stacked along the e dimension. Then, a simplified approximation of
+a full knot model is constructed based on Duchateau et al. (2013). In
+this simplified model, the following two main properties of knot growth
+are used:
+
+1. Knot radius change: Knots experience rapid growth during the first
+stages of their life.
+2. Knot vertical position: Knots grow at a certain angle.
+
+‘Ss =
+
+Computers and Electronics in Agriculture 179 (2020) 105795
+
+Both of those properties are modelled using the same Weibull
+equations with linear terms that are used in Duchateau et al. (2013) as:
+
+__B
+Z= (Za - CPnix)(1 —e Ft?) + Co (10)
+
+for the knot vertical position and:
+
+r= 5 ( tars ~~ GPnw)(1 ~ e-Pmn-?) + 6p] (11)
+for the knot radius, where Z, is the vertical distance between the knot
+location on the surface and its starting point, z is the vertical dis-
+placement at distance p from the centreline, p,,,, is the maximum dis-
+tance from the surface to the centreline, /gurface is the radius of the knot
+at the surface, ris the radius of a knot at distance / from the centreline
+and B, C, F, G are model parameters specific for the wood species, but
+they might also vary for each individual knot within one log.
+
+Instead of modelling each knot individually, model parameters are
+fixed for all knot intensity maps and instead act as functions z(e¢) and
+r(e) of the distance from the centre. The 2D maps in the stack are
+translated along | by z(e) mm, simulating the vertical displacement of
+knot growth. The growth is modelled using morphological operations.
+The map is assumed to contain knots of maximum radius fyyzface at
+P = Pmax SINCE Kurface WaS chosen during knot segmentation in Section
+3.3 as a value defining maximum knot radius on the surface of a log. For
+other values of o, a morphological structuring element of radius
+Yaift = Veurface — r(@) that is scaled from millimetres to the 6 x1 co-
+ordinate system using the same multipliers as in Eqs. (6) and (7) is
+created for all maps. Then, this structuring element is used for mor-
+phological erosion for the respective maps. In this way all blobs are
+reduced in size from blobs with radius of approximately furface milli-
+metres to blobs with radius of about r(o) millimetres. Since the knot
+growth model from Eq. (11) permits cases where the knot radius might
+decrease slightly during the growth process (for example, if the knot
+died at some point), morphological dilation is used to increase the size
+of blobs relative to the surface in such cases. The whole process of
+applying the knot growth model to a stack of maps is schematically
+illustrated in Fig. 8.
+
+The next step is to convert the stack of knot intensity maps from the
+log-centric coordinates to the original Cartesian coordinates to get the
+volumetric reconstruction of the knot growth intensity inside the log:
+
+XXYXZH Kk. (12)
+
+This process is depicted in Fig. 9, an example of a vertical cross-section
+of a log generated with this approach is presented in Fig. 10.
+
+3.5. Virtual sawing
+
+The final step is to perform virtual sawing of the log in order to
+approximate the quality of the final product. Only predefined sawing
+patterns and the main yield are considered in this work, but the method
+can be generalized to any sawing pattern and also to side boards.
+
+The process of virtual sawing can be thought of as approximating
+the values of & on the planes corresponding to the locations of the
+board surfaces inside the log. A schematic representation of this idea is
+shown in Fig. 11. Boards are thin, thus, most of the surface area is
+located on just two sides of the board which are called the upper side
+and lower side. Since the log is naturally aligned along the z-axis during
+the laser scan, it would be reasonable to assume that the planes
+
+Fig. 8. Shift and erosion applied to a stack of
+knot intensity maps.
+
+ 
+F. Zolotarey, et al.
+
+ 
+
+ 
+
+0
+
+Computers and Electronics in Agriculture 179 (2020) 105795
+
+ 
+
+Fig. 9. Conversion from a stack of knot intensity maps in the log-centric coordinates to the 3D Cartesian coordinates.
+
+| |
+
+ 
+
+Fig. 10. Generated vertical cross-section of a log.
+
+corresponding to the upper and lower board sides would also be aligned
+along the z-axis. Thus, the sawing angle, i.e., the rotation around the z-
+axis, remains the only adjustable parameter. On the other hand, in the
+case of extremely curved logs there might be a situation where the
+board planes clip through the log into the air, which would be un-
+desirable. In order to mitigate this issue, additional degrees of freedom
+are added to the virtual sawing. Overall, there are five degrees of
+freedom for the virtual sawing: a is the sawing angle (the rotation
+around the sawing axis), and x, y, and »%, y, define coordinates for
+points p, and p, with z, = Zmin and Z2 = Zmax. These points define the
+sawing axis that is used to align the board planes.
+
+The result of virtual sawing is a set of images, each one corre-
+sponding to a side of a board. Pixel intensities in these images are
+correlated with the probability of a knot appearing in that specific lo-
+cation on the real board.
+
+ 
+
+4. Experiments and results
+4.1. Data
+
+The data for the experiments consisted of 100 debarked softwood
+logs and a total of 270 main yield boards. Only Scots pine (Pinus syl-
+vestris) logs were used. The age ranges from 60 to 80 years. The logs are
+numbered from 1 to 100. The first subset (50 logs) and the second
+subset (50 logs) were collected during separate data collection sessions,
+which were carried out in the real sawmill environment. All the logs
+were automatically graded using an existing grading system in the
+sawmill and separated into five distinct grades based on log quality and
+size. Information about the log grades in the dataset is presented in
+Table 1. The table also contains diameter ranges of the logs. Mean
+diameter refers to the average log diameter, since diameter within one
+log may vary, e.g. logs are usually much thicker closer to the bottom.
+Minimal diameter is the diameter of the log near the top, at the nar-
+rowest point.
+
+Log grades can be divided into two categories: low quality logs (A, B
+and C) and high quality logs (D, E). The quality, in this context, refers to
+the number of knots in the logs: the fewer knots, the higher the quality.
+A laser scanner was used to generate point clouds of the debarked log
+surfaces before the sawing. The minimum distance between two
+neighboring points is 0.05 mm.
+
+Logs were sawed with a predefined set of 5 sawing patterns de-
+pending on the log grade. All sawing patterns are presented in Fig. 12. It
+should be noted that the sawing patterns presented only display the
+
+Fig. 11. Schematic representation of the virtual
+sawing process. Virtual boards are planes inside
+the log with values interpolated from k.
+F. Zolotarey, et al.
+
+Table 1
+Log grades from the dataset. All sizes are presented in mm.
+Grade Quality Logs Nominal Minimum Mean Main
+diameter diameter range diameter yield
+range
+A Low 35 192 178-215 200-250 2
+B Low 10 195 193-202 206-237 3
+Cc Low 10 230 223-241 245-261 2
+D High 35 256 253-271 274-301 3
+E High 10 284 274-297 303-321 2
+
+Diameter 192 mm Diameter 195 mm Diameter 230 mm
+
+ 
+
+ 
+
+34 x 150 mm
+
+52.5 x 154.3 mm
+
+ 
+
+ 
+
+ 
+
+ 
+
+34 x 150 mm
+
+ 
+
+ 
+
+ 
+
+52.5 x 154.3 mm 34 x 150 mm
+
+ 
+
+ 
+
+ 
+
+ 
+
+ 
+
+ 
+
+ 
+
+ 
+
+ 
+
+(a) Grade A. (b) Grade B. (c) Grade C.
+
+Diameter 256 mm Diameter 284 mm
+
+ 
+
+ 
+
+39 x 204 mm
+32 x 204 mm
+39 x 204 mm
+
+ 
+
+ 
+
+ 
+
+ 
+
+ 
+
+ 
+
+ 
+
+ 
+
+ 
+
+ 
+
+ 
+
+ 
+
+ 
+
+(d) Grade D.
+
+(e) Grade E.
+
+Fig. 12. Sawing patterns for the main yield used during data collection and
+virtual sawing.
+
+main yield boards since only the main yield is considered in our study.
+The number and arrangement of side yield boards varies significantly
+depending on log shape and size.
+
+After the logs were sawn the resulting boards were imaged with an
+RGB camera system. Images of the upper and lower sides of main yield
+boards were used in this work. Along with images, an existing auto-
+mated board grading system in the green sorting line of the sawmill was
+used to perform initial knot segmentation of the boards. To ensure that
+the segmentation was correct and did not contain any false positives,
+segmentations were manually corrected using board images for those
+boards where images were available. It should be noted that the cor-
+rections were only applied to the knot segmentations produced by the
+existing automated grading system and not to the results of our pro-
+posed method. They were mostly necessary to correct false positive
+detections, such as painted numbers used during the data collection
+being recognized as knots on the boards. Around 20% of board RGB
+images were not available, and in such cases, automatically segmented
+knots data were used as such. The measurement angles were marked on
+the ends of the logs. This marking made it possible to coarsely measure
+the difference between the measurement and sawing angles, thus al-
+lowing virtual sawing with approximately the same angle as the real
+sawing.
+
+4.2. Experimental arrangements
+
+4.2.1. Parameter selection
+
+Parameters for the point cloud filtering were chosen empirically.
+The minimum cluster size was fixed at 350, the maximum residual error
+was 300, and the maximum distance to the circle was chosen as 15 mm.
+The parameters were selected such that the resulting heightmap would
+
+Computers and Electronics in Agriculture 179 (2020) 105795
+
+not contain noisy areas with large spikes in intensity.
+
+The value feurface from Section 3.3 for the knot radius was 35 mm.
+The parameter values for B, C, D, G in Eqs. (10) and (11) were set to
+mean values for jack pine (Pinus banksiana) from Duchateau et al.
+(2013), while F was set to 4 after empirical estimation based on re-
+constructions and available data. All these parameters can be chosen
+based on biological data about a specific tree species and adjusted ac-
+cordingly.
+
+4.2.2. Virtual sawing
+
+The first step was to perform virtual sawing, i.e., the process de-
+scribed in Section 3. Due to the limited availability of ground truth
+data, there was no way to test the effectiveness of sawing angle opti-
+mization with the current dataset, since that would require complete
+information about the inside of a log, e.g., from a CT scan. Instead, real
+boards were used as the ground truth.
+
+The knots were segmented from the images of the upper and lower
+sides of each board. The segmented knots were then used to estimate
+the correlation between the reconstructed (virtual) boards and the real
+boards. To do this, exact sawing parameters are needed. The approx-
+imate sawing angles were known. However, due to the difficulty in
+controlling the exact measuring and sawing angles in the sawmill en-
+vironment, as well as uncertainty in the angle of sawing axis p,p,,
+sawing parameter estimation was needed.
+
+4.2.3. Sawing parameter estimation
+
+First, optimization for x, y,, % and y, was performed. The goal was
+to ensure that all board planes are located inside the log. The sawing
+axis and four more lines corresponding to the outermost borders of the
+board stack were calculated. The fitted circles from Section 3.1 were
+used as an approximation of the log shape since they are more con-
+venient to work with and represent the overall log shape reasonably
+well. All circles are parallel to each other and perpendicular to the z-
+axis. For a circle cj with radius 7, and centre point P., = {Xe Yey> Zeids
+point p, = {Xa, ¥,, Za} was sampled along the sawing axis and the
+boundary points Py = (Xbj, Yop: Zh}, j= 1,2, 3,4 were sampled along
+the boundary lines such that z, = Zh = Zc. A deviation vector d was
+then defined as:
+
+4
+d; = >) max{o, Pb, — Pelle = ted + lly = Path
+ms (13)
+
+Illustration of this problem for a circle c; is presented in Fig. 13.
+
+The sum of squared deviations was minimized using the
+Levenberg—Marquardt (Levenberg, 1944) algorithm. The boundary line
+terms are positive when the board corners are outside the circles and
+minimized when all corners are inside. These terms were included to
+ensure that all boards remain inside the circles. This condition is ne-
+cessary for the logs with high curvature, i.e., when the circle centres do
+
+   
+
+\
+Po;
+
+Fig. 13. Problem illustration for the case when boards clip outside the log. A
+circle c; with the center in p,, is showed along with points p,, Pp; 1 <j <4 that
+
+correspond to the intersections of the sawing axis and board stack corner points
+with the circle plane.
+F. Zolotarey, et al.
+
+Computers and Electronics in Agriculture 179 (2020) 105795
+
+   
+
+a) Log 1. Main yield contains 2 boards.
+
+ 
+
+b) Log 7. Main yield contains 2 boards.
+
+ 
+
+(c) Log 18. Main yield contains 3 boards.
+
+Fig. 14. Comparison of the virtual and real boards for logs 1, 7 and 18. Depending on the number of boards in the main yield, 4 or 6 images were used, each one
+corresponding to either the upper or lower side of the board. For each side, the results are presented in pairs of the virtual (the top image in a pair) and real images
+
+(the bottom image in a pair).
+
+not lie on a straight line, resulting in situations when board stack might
+clip outside some circles. The last term was included to align the boards
+closer to the centreline of a log. This term is necessary when there is
+some degree of freedom for the main yield inside the log. For example,
+that is the case for the sawing pattern for log grade C, as is evident from
+
+For a given angle a and a sawing axis p,p,, the upper and lower
+sides of the virtual boards were interpolated from i. The weighted
+Jaccard metric was chosen to evaluate the similarity between the real
+knots and the virtual knot intensity maps as:
+
+> mini, y)
+
+Jw (x, y) = ;
+“ > max(x, y) (14)
+
+where N is the number of pixels in the images, x;, y, are the coordinates of
+the i-th pixel. There still might be a situation when some of the virtual
+boards will clip outside the log. For example, if the log is extremely
+curved, and the board stack is aligned such that the bottom board clips
+through the air even though the beginning and the end of the board are
+inside the log. Therefore, as a precaution, an additional penalty term was
+added to the final similarity metric to avoid such situations:
+
+Note;
+S(r, v) = Iw, v) ~ outside
+Nootal (15)
+
+where r is the image containing the segmented knots from the side of a
+real board, v is the side of a virtual board generated from I, Noutside is the
+number of pixels in the virtual image generated outside the bounds of a
+log, and Niotal is the total number of pixels in a virtual side image. The
+interior-point method ( ) was used to maximize the si-
+milarity metric by optimizing the sawing parameters. There is a large
+uncertainty in the measured sawing angle, since it was measured using
+videos of the log entering the sawing machine. The approximate error
+might be as high as 10’, which is significant. Therefore, optimized sawing
+angle was constrained between a, + 10°, where a,, is the measured
+sawing angle. The angle used in virtual sawing thus corresponds to the
+real one, making it possible to compare the virtual boards with the real
+boards.
+
+4.2.4. Knot locations prediction
+
+Once the reconstruction is complete it is possible to virtually ”saw”
+the log to produce boards for different sawing angles and patterns. As
+noted earlier, the ability to estimate the quality of the end product
+F. Zolotarey, et al.
+
+before the actual physical sawing is beneficial for selecting the optimal
+sawing angle and improving the quality of the final product. The most
+important factor affecting the board quality is the position of knots.
+Virtual boards can be used to estimate the probability of a knot ap-
+pearing in a specific location on a real board. The correlation between
+the pixel intensity in the virtual board and the probability of a knot
+appearing in the real board was tested by sampling the virtual and real
+boards at the same locations.
+
+The main purpose of the developed method is to acquire the ability
+to inform the sawing decision by predicting the locations of knots on
+the boards. In order to test the reliability of the prediction, virtual
+boards were ”sawn” to be as close as possible to the real boards in the
+dataset. Using available information about real knot locations, it is
+possible to determine the correlation between the probability of a knot
+appearing at a certain location on a board and the pixel intensity value
+at the same location on a virtual board. High correlation would indicate
+that minimization of the pixel values in the virtual boards during virtual
+sawing reduces the expected density of knots in the real boards, which
+could then be sawn using the same sawing parameters. The correlation
+was tested by creating a function:
+
+_ Lis Loop EP k(x, y) _ _
+AIP” P ={(x, y) | v(x, y) = a}, (16)
+
+where a@ is an intensity value, 8 is the set of board sides (images),
+k(x, y) is a knot indicator function that returns 1 if there is a knot at
+coordinates (x, y) on a given board side and 0 otherwise, and v(x, y) isa
+function of virtual board pixel intensity that returns the pixel value at
+given board side coordinates (x, y). Notice that the domain of v is re-
+presented above as identical to the domain of i and reflects the local
+coordinate system for each board side.
+
+h(a)
+
+4.3. Results
+
+4.3.1. Virtual sawing
+
+An example of comparison of the virtual and real boards is pre-
+sented in Fig. 14. On visual inspection, a clear resemblance between the
+real and generated images can be noticed. The use of the knot growth
+models described in Section 3.4 results in the elongated thin shapes that
+are usually found in boards near the centreline, where the knots start
+their growth. The simulation of the vertical growth results in knots
+rotated by a small angle on the surface of a board. Unlike other works
+on log surface defect detection using laser data such as Thomas et al.
+(2007) and Nguyen et al. (2016), the proposed approach does not
+produce discrete segmentation but rather outputs the probability of a
+certain location belonging to a knot. The benefit of this approach is that
+it gives more information about the confidence of the predictions. It
+could be argued that this information is more beneficial for the purpose
+of sawing angle estimation since it can also correctly estimate places
+that are tangential to the knot growth, i.e., when there is no well-de-
+fined knot, but the deformation of the fiber pattern shows that a knot
+grew nearby.
+
+4.3.2. Knot locations prediction
+
+The histogram h from Eq. (16) can be used to quantitatively esti-
+mate how well the virtual boards correspond to the real ones. The plot
+of this function calculated for all available logs is presented in Fig. 15.
+The relationship is almost linear for the lower intensity values, but
+becomes more unstable in the higher range. This behaviour is to be
+expected since pixels with higher intensity are rarer, therefore making
+the approximated probabilities less stable. It would be reasonable to
+assume that with more data this function would be significantly
+smoother.
+
+Histogram h could be computed for specific sets of logs, i.e., logs of
+specific grades, by using different sets of board images 8 in Eq. (16).
+The breakdown of histogram h between low and high quality logs is
+
+Computers and Electronics in Agriculture 179 (2020) 105795
+
+All 100 logs
+
+ 
+
+oO oS
+© oS
+T T
+
+Probability of a knot
+oO
+ho
+
+0.17
+
+ 
+
+Raw data
+Moving average
+
+0 ! | ! ! ! | ! ! !
+0 0.1 02 03 04 O05 O06 O07 O8 £09 1
+
+Intensity value in a virtual board
+
+ 
+
+ 
+
+ 
+
+Fig. 15. Estimated dependence of the knot probabilities on the pixel intensities
+of the virtual images for all the logs, using Eq. (16) and the window size of 30
+for the moving average.
+
+presented in Fig. 16. Pearson and Spearman correlation coefficients
+between probabilities and pixel intensities for different log categories
+are presented in Table 2. It can be seen that the relationship for low
+quality logs is much more linear according to the Pearson correlation
+coefficients, whereas for the high quality logs there is a high spike in
+the probabilities for the higher range of intensities, although the re-
+lationship is still monotonic, as is evident by the Spearman correlation.
+High quality logs are bottom logs obtained from the lower part of a tree
+and such logs do not contain noticeable numbers of knots on the sur-
+face. However, high quality log still might contain knots that did not
+grow far enough to be detected from the outside of a log. The lack of
+information about internal knots in the bottom logs is the main lim-
+itation of the proposed method and the cost of using fast laser scanning
+alone, since such scanning only provides information about external
+features. Another weak point is the usage of the same growth model for
+all knots. The possibility of precise estimation of internal knot growth
+using only the external features could be studied further. A more precise
+scanner might be required for such task. The goal of the proposed al-
+gorithm is to indicate the most likely places where the knots can grow
+inside. Using mean values for the growth model parameters falls in line
+with this goal, keeping in mind that estimating individual knot para-
+meters is impossible with the currently available data. Coupled with,
+for example, sparse CT scanning, the accuracy of the model could be
+greatly increased. Since sparse CT scanning does not provide enough
+information for detailed reconstruction, a statistical method using the
+proposed model as a prior would have to be used to solve this inverse
+problem.
+
+Overall, Pearson correlation coefficient for the whole dataset is
+close to 1, meaning that it is reasonable to assume the linear relation-
+ship between the intensities and probabilities. On the other hand, the
+maximum estimated probability is far from 1. Therefore, intensity va-
+lues could be thought of as scaled likelihoods. In terms of sawing angle
+optimization, this relationship can be enough.
+
+5. Conclusion
+
+A new approach for the volumetric reconstruction of knot growth
+inside logs using laser range data was proposed. The output of this
+method contains information about the probabilities of possible knot
+locations inside a log. The method enables virtual sawing of logs to
+generate images that correspond to the board sides. The pixel intensities
+of these images are correlated with the probability of a knot appearing
+F. Zolotarey, et al.
+
+ 
+
+Low quality (55 logs)
+
+ 
+
+ 
+
+ 
+
+ 
+
+ 
+
+ 
+
+ 
+
+ 
+
+ 
+
+ 
+
+T T T T T
+0.5
+0.4 5
+3°
+cS
+x
+©
+‘Oo 0.37
+>
+3
+©
+2
+© 0.27
+oO
+0.17
+Raw data
+Moving average
+0 1 1 1 1 1 1 1 1
+0 0.1 0.2 0.3 0.4 0.5 0.6 0.7 0.8 0.9 1
+
+Intensity value in a virtual board
+
+(a)
+
+Fig. 16. Estimated dependence of the knot probabilities on the pixel intensities
+
+Table 2
+Correlations between knot probabilities and pixel intensities of virtual boards.
+Logs Pearson Spearman
+
+All (100 logs) 0.98 1.00
+
+Low quality (55 logs) 0.99 1.00
+
+High quality (45 logs) 0.89 0.99
+
+A (35 logs) 0.99 1.00
+
+B (10 logs) 0.91 0.99
+
+C (10 logs) 0.96 0.99
+
+D (35 logs) 0.86 0.99
+
+E (10 logs) 0.94 0.98
+
+in that location on a real board. Virtual boards can be used for opti-
+mizing sawing angle with the aim of minimizing the probability of
+knots appearing in specific locations on the sawn boards. Even though
+the pixel intensities of the virtual boards do not have a one-to-one re-
+lationship with knot probabilities, they have almost linear correlation.
+The proposed method uses only laser scanner data as input to construct
+the model, and, consequently, the data collection step is rather fast,
+which makes the approach applicable to online usage in industry. The
+accuracy of the method could be improved by adding another sensor,
+for example a sparse-angle CT scanner, to collect approximate in-
+formation about the internal structure of the log. Although the ex-
+periments were carried out with debarked softwood (Scots pine) logs,
+the method should be applicable to any logs where the knots are de-
+tectable as bumps on the log surface.
+
+CRediT authorship contribution statement
+
+Fedor Zolotarev: Software, Methodology, Investigation, Writing -
+original draft, Validation. Tuomas’ Eerola: Supervision,
+Conceptualization, Methodology, Writing - original draft. Lasse Lensu:
+Conceptualization, Methodology, Writing - original draft, Supervision,
+Project administration, Funding acquisition. Heikki Kalviainen:
+Conceptualization, Methodology, Writing - original draft, Supervision,
+Project administration, Funding acquisition. Tapio Helin: Writing -
+review & editing, Formal analysis, Methodology. Heikki Haario:
+Conceptualization, Writing - review & editing. Tomi Kauppi: Writing -
+review & editing, Resources, Data curation. Jere Heikkinen: Writing -
+review & editing, Resources, Data curation.
+
+Declaration of Competing Interest
+
+The authors declare the following financial interests/personal re-
+lationships which may be considered as potential competing interests:
+[Tomi Kauppi and Jere Heikkinen are shareholders and employees of
+
+10
+
+Computers and Electronics in Agriculture 179 (2020) 105795
+
+ 
+
+High quality (45 logs)
+
+ 
+
+ 
+
+ 
+
+ 
+
+ 
+
+ 
+
+ 
+
+ 
+
+ 
+
+ 
+
+T T T
+0.5 F 7
+0.4 F
+oS
+cS
+<
+ov)
+‘Oo 0.3/7
+=
+3
+oO
+2
+20.27
+oO
+0.17
+Raw data
+Moving average
+0 1 1 1 1 1 1 1 1 1
+0 0.1 0.2 0.3 0.4 0.5 0.6 0.7 0.8 0.9 1
+
+Intensity value in a virtual board
+
+(b)
+
+of the virtual images for the low and high quality logs.
+
+Finnos Oy that develops log measurement systems. Other authors have
+no conflict of interest. ]
+
+Acknowledgements
+
+The research was carried out in the DigiSaw project (No. 2894/31/
+2017) funded by Business Finland and participating companies, as well
+as the DeepTimber project (No. 334816) funded by the Academy of
+Finland. The authors would like to thank Finnos Oy, FinScan Oy, and
+Stora Enso Wood Products Oy Ltd for providing the data for the ex-
+periments.
+
+References
+
+Baumgartner, R., Briichert, F., Sauter, U.H., 2010. Knots in CT scans of Scots pine logs. In:
+The Future of Quality Control for Wood & Wood Products, The Final Conference of
+COST Action E, pp. 343-351.
+
+Bay, H., Tuytelaars, T., Van Gool, L., 2006. SURF: Speeded up robust features. In:
+European Conference on Computer Vision. Springer, pp. 404-417.
+
+Bhandarkar, S.M., Luo, X., Daniels, R., Tollner, E.W., 2006. A novel feature-based tracking
+approach to the detection, localization, and 3-D reconstruction of internal defects in
+hardwood logs using computer tomography. Pattern Anal. Appl. 9, 155-175.
+
+Byrd, R.H., Gilbert, J.C., Nocedal, J., 2000. A trust region method based on interior point
+techniques for nonlinear programming. Math. Programm. 89, 149-185.
+
+Chang, S., Gazo, R., 2009. Measuring the effect of internal log defect scanning on the
+value of lumber produced. Forest Prod. J. 59, 56-59. https://doi.org/10.13073/
+0015-7473-59.11.56.
+
+Duchateau, E., Longuetaud, F., Mothe, F., Ung, C., Auty, D., Achim, A., 2013. Modelling
+knot morphology as a function of external tree and branch attributes. Can. J. For. Res.
+43, 266-277. https://doi.org/10.1139/cjfr-2012-0365.
+
+Ester, M., Kriegel, H.P., Sander, J., Xu, X., 1996. A density-based algorithm for dis-
+covering clusters in large spatial databases with noise. In: Proceedings of the Second
+International Conference on Knowledge Discovery and Data Mining. AAAI Press, pp.
+226-231.
+
+Johansson, E., Johansson, D., Skog, J., Fredriksson, M., 2013. Automated knot detection
+for high speed computed tomography on Pinus sylvestris L. and Picea abies (L.) Karst.
+using ellipse fitting in concentric surfaces. Comput. Electron. Agric. 96, 238-245.
+https://doi.org/10.1016/j.compag.2013.06.003.. http://www.sciencedirect.com/
+science/article/pii/S0168169913001336.
+
+Kretschmer, U., Kirchner, N., Morhart, C., Spiecker, H., 2013. A new approach to asses-
+sing tree stem quality characteristics using terrestrial laser scans. Silva Fennica 47.
+https://doi.org/10.14214/sf.1071.
+
+Levenberg, K., 1944. A method for the solution of certain non-linear problems in least
+squares. Quart. Appl. Math. 2, 164-168.
+
+Lindeberg, T., 1993. Detecting salient blob-like image structures and their scales with a
+scale-space primal sketch: a method for focus-of-attention. Int. J. Comput. Vision 11,
+283-318. https://doi.org/10.1007/BF01469346.
+
+Longuetaud, F., Mothe, F., Kerautret, B., Krahenbiihl, A., Hory, L., Leban, J.M., Debled-
+Rennesson, I., 2012. Automatic knot detection and measurements from X-ray CT
+images of wood: a review and validation of an improved algorithm on softwood
+samples. Comput. Electron. Agric. 85, 77-89.
+
+Lowe, D.G., 1999. Object recognition from local scale-invariant features. In: Proceedings
+of the Seventh IEEE International Conference on Computer vision. Ieee, pp.
+1150-1157.
+
+Lundahl, C., Gronlund, A., 2010. Increased yield in sawmills by applying alternate ro-
+tation and lateral positioning. Forest Prod. J. 60, 331-338. https://doi.org/10.
+F. Zolotarev, et al.
+
+13073/0015-7473-60.4.331.
+
+Nguyen, V.T., Kerautret, B., Debled-Rennesson, I., Colin, F., Piboule, A., Constant, T.,
+2016. Segmentation of defects on log surface from terrestrial lidar data. In: 2016 23rd
+International Conference on Pattern Recognition (ICPR), IEEE. pp. 3168-3173.
+
+Oja, J., 2000. Evaluation of knot parameters measured automatically in CT-images of
+Norway spruce (Picea abies (L.) Karst.). Holz als Roh- und Werkstoff 58, 375-379.
+https://doi.org/10.1007/s001070050448.
+
+Pfeifer, N., Gorte, B., Winterhalder, D., 2004. Automatic reconstruction of single trees
+from terrestrial laser scanner data. Int. Arch. Photogramm. Remote Sens. Spatial Inf.
+Sci. 35, 114-119.
+
+Pfeifer, N., Winterhalder, D., 2004. Modelling of tree cross sections from terrestrial laser
+scanning data with free-form curves. Int. Arch. Photogramm. Remote Sens. Spatial
+Inf. Sci. 36, W2.
+
+Rais, A., Ursella, E., Vicario, E., Giudiceandrea, F., 2017. The use of the first industrial X-
+ray CT scanner increases the lumber recovery value: case study on visually strength-
+graded Douglas-fir timber. Ann. Forest Sci. 74, 28. https://doi.org/10.1007/s13595-
+017-0630-5.
+
+Stangle, S.M., Briichert, F., Heikkila, A., Usenius, T., Usenius, A., Sauter, U.H., 2015.
+Potentially increased sawmill yield from hardwoods using X-ray computed tomo-
+graphy for knot detection. Ann. Forest Sci. 72, 57-65.
+
+11
+
+Computers and Electronics in Agriculture 179 (2020) 105795
+
+Stangle, S.M., Brtichert, F., Kretschmer, U., Spiecker, H., Sauter, U.H., 2014. Clear wood
+content in standing trees predicted from branch scar measurements with terrestrial
+LiDAR and verified with X-ray computed tomography. Can. J. Forest Res. 44,
+145-153.
+
+Thomas, L., Mili, L., 2007. A robust GM-estimator for the automated detection of external
+defects on barked hardwood logs and stems. IEEE Trans. Signal Process. 55,
+3568-3576.
+
+Thomas, L., Mili, L., Thomas, E., Shaffer, C.A., 2007. Defect detection on hardwood logs
+using laser scanning. Wood Fiber Sci. 38, 682-695.
+
+Thomas, L., Shaffer, C.A., Mili, L., Thomas, E., 2006. Automated detection of severe
+surface defects on barked hardwood logs. Forest Prod. J. 57, 50-56.
+
+Thomas, L., Thomas, E., 2011. A graphical automated detection system to locate hard-
+wood log surface defects using high-resolution three-dimensional laser scan data. In:
+Proceedings, 17th Central Hardwood Forest Conference, U.S. Department of
+Agriculture, Forest Service, Northern Research Station. pp. 92-101.
+
+Thomas, R.E., 2009. Modeling the relationships among internal defect features and ex-
+ternal Appalachian hardwood log defect indicators. Silva Fennica 43, 447-456.
+Zolotarev, F., Eerola, T., Lensu, L., Kalvidinen, H., Haario, H., Heikkinen, J., Kauppiy, T.,
+2019. Timber tracing with multimodal encoder-decoder networks. In: International
+
+Conference on Computer Analysis of Images and Patterns, Springer, pp. 342-353.

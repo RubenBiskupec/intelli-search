@@ -1,0 +1,1424 @@
+np} Quantum Information
+
+ARTICLE OPEN
+
+www.nature.com/npjqi
+
+Quantum inverse iteration algorithm for programmable
+
+quantum simulators
+
+Oleksandr Kyriienko @''~**
+
+We propose a quantum inverse iteration algorithm, which can be used to estimate ground state properties of a programmable
+quantum device. The method relies on the inverse power iteration technique, where the sequential application of the Hamiltonian
+inverse to an initial state prepares the approximate ground state. To apply the inverse Hamiltonian operation, we write it as a sum
+of unitary evolution operators using the Fourier approximation approach. This allows to reformulate the protocol as separate
+measurements for the overlap of initial and propagated wavefunction. The algorithm thus crucially depends on the ability to run
+Hamiltonian dynamics with an available quantum device, and can be used for analog quantum simulators. We benchmark the
+performance using paradigmatic examples of quantum chemistry, corresponding to molecular hydrogen and beryllium hydride.
+Finally, we show its use for studying the ground state properties of relevant material science models, which can be simulated with
+existing devices, considering an example of the Bose-Hubbard atomic simulator.
+
+npj Quantum Information (2020)6:7 ; https://doi.org/10.1038/s41534-019-0239-7
+
+INTRODUCTION
+
+Quantum computing offers drastic speed up for certain
+computational problems, and has evolved as a unique direction
+in the theoretical information science.' However, the field of
+experimental quantum computing is yet at its infancy. The typical
+size of quantum chips for the reliable gate based quantum
+computation ranges from one to several tens of physical qubits,
+with the main limits posed by decoherence. Despite the
+imperfections, the algorithms of ever-increasing complexity were
+implemented on different platforms, with circuit depth exceeding
+a thousand gates,”” ultimately allowing for quantum supremacy
+demonstration.”
+
+At the same time, the vox populi of quantum engineers says that
+while experimental setups are developed and mastered rapidly,
+the theorists in the field lag behind. Whereas by now textbook
+examples of quantum algorithms with exponential and quadratic
+speed up for factoring and search serve as a great motivation,’ the
+estimates of gate counts are daunting, making them distant goals
+for the future fault-tolerant quantum computers.°? Recent devel-
+opments in this fast evolving field call for new short depth
+algorithms which can solve useful problems in the era of noisy
+intermediate scale quantum (NISQ) devices,° and in future lead to
+quantum advantage.
+
+One of the most promising directions for quantum computation
+is the field of quantum chemistry and materials.”’” Targeting the
+access to ground state properties of molecules and strongly
+correlated matter, it can offer huge gain for various technological
+applications, for instance helping to find a catalyst for the nitrogen
+fixation. To date, different quantum theoretical protocols were
+developed, and several proof-of-principle experiments on various
+platforms were performed in the simplest cases. Examples include
+simulation of molecular hydrogen with the linear optical setup,’
+superconducting circuits,'°"'* and trapped ions.'* Finally, the
+variational simulation for larger molecules (LIH and BeH2) were
+reported recently.'' From the material science perspective, the use
+of cold atom quantum simulators has shown great promise, where
+
+simulations of Fermi-Hubbard lattice dynamics,’ large scale
+
+quantum Rydberg chain'® and Ising model,'’ and two-
+dimensional many-body localization'® have been performed.
+However, in the latter cases the analog approach to simulation
+is taken, given an access to unitary dynamics, while precluding the
+study of ground state properties.
+
+To access the ground state properties of quantum chemical
+Hamiltonian, several routines can be used (see refs '7° for the
+review). First option corresponds to the quantum phase estima-
+tion algorithm (PEA),*' which exploits unitary dynamics of the
+system controlled by register qubits. Although this algorithm is
+efficient, giving logarithmic error and polynomial gate scaling, its
+implementation requires substantial circuit depth for currently
+available circuits.'° Moreover, the controlled type of operations
+require the digitization of the circuit, thus complicating the use of
+analog quantum simulators for PEA. Another approach is adiabatic
+quantum computing, which was already applied to quantum
+chemistry problems.** However, the required adiabaticity of
+dynamics typically results in the effectively long circuit depth.
+Finally, an alternative route to quantum chemistry and materials is
+offered by hybrid-classical variational approaches, which were
+proposed recently.?* They rely on term-by-term energy measure-
+ment for the prepared trial quantum state (ansatz) with
+consequent classical optimization, and are referred to as Varia-
+tional Quantum Eigensolvers (VQE).'*°** VQE can use a
+chemically inspired ansatz,7* Hamiltonian variational ansatz,7° or
+rely on the variational imaginary time evolution.*° The search for a
+simple and efficient ansatz represents an important ongoing
+research direction.*”*® In this case the depth of the quantum
+circuit is greatly reduced, though at the expense of increased
+number of measurements, being favorable strategy for NISQ
+devices. For VQE the number of variational parameters scales as
+O[(3N)*], where N is a number of qubits and k represents an
+approximation order.** While for quantum chemistry applications
+k = 2 suffices to give useful results, these approaches are yet to be
+tested for larger system sizes, where the multi-variable
+
+ 
+
+‘Department of Physics and Astronomy, University of Exeter, Stocker Road, Exeter EX4 4QL, UK. 7ITMO University, Kronverkskiy prospekt 49, Saint Petersburg 197101, Russia.
+>NORDITA, KTH Royal Institute of Technology and Stockholm University, Roslagstullsbacken 23, SE-106 91 Stockholm, Sweden. *email: kyriienko@ukr.net
+
+Published in partnership with The University of New South Wales
+
+np} nature partner
+
+journals
+np}
+
+O. Kyriienko
+
+ 
+
+quantum inverse iteration method
+
+|Wo) mL Che exPl- ip, )
+
+y= (Dk 1H lk)
+
+ak
+Wo) = (Wk|W)
+
+2 ok.A1¥41)
+
+ 
+
+al sae | an arse Tne inverse Hamiltonian as a ground state can be ae oe ectuncton everaps is estimated from
+al sae | state sum of unitary Secon eee cfuntaryepertors | Srepared by verse ersten by inverse iteration wavefunction ectuncton everaps
+
+Fig. 1
+
+Flowchart of the quantum inverse iteration algorithm. First, the initial product state is prepared and the inverse Hamiltonian
+
+operation is represented as a sum unitary evolution operators. Next, the iterated wavefunction can be formally obtained by applying the
+inverse. Finally, physical quantities (e.g., energy) are estimated as expectation values of corresponding operator, and recast as a sum of
+
+wavefunction overlaps.
+
+optimization may raise problems for the genuine ground state
+estimation.””
+
+In the following, we propose the quantum inverse iteration
+algorithm for the estimation of the ground state energy (GSE) of a
+quantum system. It is inspired by the classical inverse power
+iteration algorithm for finding the dominant eigenstate of the
+matrix, where the computationally demanding part of matrix
+inversion and multiplication is performed by a quantum circuit.
+Previously, a direct iteration approach was considered as a general
+purpose quantum algorithm,” aiming for large scale fault-
+tolerant implementation. Here, we present the protocol of the
+hybrid quantum-classical nature. It relies on performing quantum
+evolution for different propagation times and classical post-
+processing of the measured observables. The approach is applied
+to quantum chemistry examples (Hz, and BeH, molecules),
+showing favourable scaling with system parameters. Finally, when
+applied to the Bose-Hubbard quantum simulator, it allows to study
+its ground state properties, showing promise as a protocol for
+analog quantum simulators and near-term quantum devices.
+
+RESULTS
+
+We start by considering a generic interacting system, which can
+be described by the second quantized Hamiltonian. It can be
+written as sum of two-body and four-body parts
+
+H=)e vial qj + S- V ini a G} aKa, (1)
+
+ijkl
+
+where a (aj) can correspond to fermionic or bosonic creation
+(annihilation) operators, and cover broad range of models. In the
+fermionic case, Hamiltonian (1) can describe the full configuration
+interaction problems in quantum chemistry, with operator 4;
+corresponding to molecular orbital j. Using the existing mappings
+between fermionic and spin-1/2 systems, one can rewrite Eq. (1) in
+the form of a local Hamiltonian 7 for interacting qubits, which
+involves strings of Pauli operators. The task is then to find the
+lowest eigenvalue of large matrix 7, corresponding to GSE.
+
+Inverse iteration
+
+We propose the procedure which can be seen as a quantum
+version of the inverse power iteration algorithm for finding the
+dominant eigenvalue of the matrix, represented by the inverse of
+
+eo: yo oy ; ;
+
+Hamiltonian matrix #7 , which is treated as a dimensionless
+matrix in this section. Given that 7 is invertible, the order of
+eigenvalues is reversed and, with the appropriate shift of the
+diagonal to make eigenvalues positive, the power iteration allows
+to find GSE. Namely, starting with an initial state |W), which has
+nonzero overlap with the sought ground state |,,), by repetitive
+application of the inverted matrix one can prepare (unnormalized)
+
+~ . 1k
+state, |W.) = (H ') |W), such that I (Wos|Yx) |” <e for sufficiently
+
+large number of iterations k>K,*' where |p,) = |W;)/ || |Wx) ||
+(Fig. 1). We note that generally this method has favorable
+logarithmic complexity in the iteration depth, being K =log[e
+sin” 7(89)/(A, — An)I/[2 log(A2/A,)], where A,, A>, and A,, correspond
+
+to dominant, sub-dominant, and smallest eigenvalue of H
+
+    
+
+1
+. Here
+
+npj Quantum Information (2020) 7
+
+sin?@) parametrizes the overlap between |W,) and |Wgs), Marking
+that convergence of the procedure depends on the initial guess,
+and generally can be made nonzero taking |W) as a random state.
+While classical power iteration methods generally have good
+convergence in the number of iterations, the main caveat comes
+from the complexity scaling with the system size N. The
+requirement for K matrix multiplications leads to O[K27”]
+operations (for dense matrices), yielding exponential scaling. Even
+worse situation is for the inverse matrix algorithm, where an
+
+overhead comes from the H _
+operations.
+
+1 : oo
+calculation, requiring extra O[2™]
+
+Fourier approximation
+
+In the following we show that we can exploit the iterative
+procedure with logarithmic iteration depth in e, while providing
+exponential speed up for the inverse Hamiltonian multiplication
+process. The latter comes from the approximation theory,**
+observing that the inverse can be represented as an integral
+
+= [~exp(—xy)dy, which by applying the trapezoidal rule
+can be written as a sparse sum of exponents. For quantum
+systems a similar idea was proposed in ref. ** where Fourier
+approximation of the Hamiltonian inverse was presented as a
+double integral of the unitary propagator. This was further used to
+design an efficient solver for the quantum linear equation system
+problem.**** Here we extend the Fourier approximation to the k-
+th power of the inverse (k = 1), which formally reads
+
+— INK d [- d ( KT) ex ( Zz’ /2)ex ( j ZH)
+= Jan 5 y Z Zy p p y. )
+
+and Nx is a normalization factor. The integral can be then
+discretized as
+
+wap My-1
+= Me Te
+
+~ —k
+
+wt 1S astishsexpl-7202/2Jexpl “Uy Ay) Use) Al,
+
+Jz=—M,
+
+(3)
+
+where A, correspond to the discretization steps for integration
+variables, and My, represent cutoffs for integration. Notably, once
+applied to the physical Hamiltonian inverse, the discretization
+variable A, remains dimensionless, while A, has the units of
+inverse energy, serving akin to discrete time variable. The success
+of approximation (3) depends on the condition number of the
+
+Hermitian matrix H, given by the ratio of its largest to smallest
+
+eigenvalue, k= Nett, Finally, Eq. (3) can be conveniently
+redefined as
+
+—k
+
+Lk
+= So cxcexp(—ib pH) =H, , (4)
+l=1
+
+where we have rewritten the double summation in Eq. (3) using
+the superindex €(jy, j2), die = (iVAy)(j-Az) is a phase of evolution for
+parameters chosen to discretize k-th inverse, and L, = M,(2M, + 1).
+Here cx represent purely imaginary coefficients for the series, and
+lc.e| define corresponding weights. The required size and number
+of discretization steps Ay, and M,, depends on e and k (see
+
+Published in partnership with The University of New South Wales
+Methods, section A, for the details). Importantly, they set the
+maximal evolution phase ¢@max = (MyAy)(MA,), which serves as an
+equivalent of the total gate count for analog quantum simulation.
+
+As we need to prepare the approximate ground state by
+
+applying generally nonunitary operator i" to the initial state
+|W), we shall either introduce an ancillary register to perform it, or
+properly account for the normalization of the resulting wavefunc-
+tion. The former option is an excellent strategy for the future fault-
+tolerant devices, and has beneficial scaling (Methods, Section A). It
+has deep connection to linear composition of unitaries (LCU)
+methods and duality quantum computing.*° The latter is more
+suitable for programmable quantum simulators. In the following
+we present the strategy, which can be applied to estimate the
+ground state properties by sequential evaluation of terms in the
+series. Similarly to VOE approaches, this relies on performing large
+number of measurements, and thus adds an extra complexity as
+compared to the generic implementation of the inverse operator.
+At the same time, term-by-term readout offers better resilience to
+errors where even imperfect procedure can yield reasonable GSE
+estimate for quantum simulators.
+
+Sequential energy estimation
+
+Our final goal is to estimate system observables, provided that the
+approximate ground state is prepared. For any operator A it can
+be retrieved from the measurement A = (WyslA|Wgs)/ (Wgs|Pos)
+
+where the normalization is accounted for explicitly. In particular,
+we are interested in calculating the ground state energy Ags = Ay,
+
+choosing the operator A as H. This amounts to measurement of
+. . . ~—k .
+Hamiltonian expectation value for |w,) =H |W) in the form
+
+(Wy |W)
+A, =~ ))
+(ele)
+
+We proceed by considering each propagated wavefunction
+separately, such that A, can be related to wavefunction overlaps
+(see flowchart in Fig. 1). This is motivated by the Hamiltonian
+averaging procedure’° used in VOQE to reduce the circuit depth at
+the expense of larger number of sequential measurements. Using
+Fourier expansion of the inverse Hamiltonian (4), the estimated
+energy reads
+
+— Liew Yee H |e) _ dive Ch Che ole PMO" Hp)
+ee (ke x0) ee CK Ck0(Wo Je Pee Pre 0)
+(6)
+
+Note that expression (6) now includes overlaps between initial and
+evolved wavefunction for the fixed phase, which shall be
+calculated separately for the numerator (“energy”) and denomi-
+nator (“norm”). Finally, we note that the wavefunction overlap can
+be inferred using different approaches. One option corresponds to
+using the SWAP test,-”°° which represents a common quantum
+measurement strategy and requires system doubling. It can be
+conveniently realized in some near-term setups, being successfully
+demonstrated for cold atom lattices by many-body interferometry
+of two copies of a quantum state.*? The overlap measurement
+schemes continue to improve.*° Additionally, in the Methods,
+section B, we describe an alternative approach, which does not
+require extra qubits and relies on the measurements of
+observables, once the reference state for the system is chosen.
+
+In the previous section we described the general algorithm and
+discussed its key properties, namely the scaling and sequential
+operation. To show its use for the ground state estimation and
+characterize the required resources for realistic problems, we
+apply it to quantum chemistry.
+
+ 
+
+A?
+
+Published in partnership with The University of New South Wales
+
+O. Kyriienko
+
+np)
+
+ 
+
+Applications: molecular hydrogen
+
+We start with by now the standard example of molecular
+hydrogen, Hz. As a test task we consider the spinful case. This
+allows to examine the protocol for a system of higher complexity
+(N=4), comparable to lithium hydrate four-qubit simulation
+considered in ref. '' The details of mapping of quantum chemical
+structure into qubits are presented in Methods, section C. In the
+following we work with four-qubit molecular hydrogen Hamilto-
+nian Hy,, with all eigenenergies shifted to positive values. Starting
+from the Hartree-Fock (HF) energy Apo, the task is to estimate GSE
+Ags, using the protocol described in the preceding section. This
+shall be done within the chemical precision e, which is equal to
+€ = 0.0016 Hartree, and thus defines the relevant cutoff for the
+iteration procedure.
+
+We start by benchmarking the inverse power procedure in its
+general form, and define how many iteration steps one needs to
+come close to the ground state. For this, we first perform the
+inverse Hamiltonian iteration in the ideal setting, assuming that an
+exact inverse is known. Then, we compare it to the quantum
+inverse iteration, which uses the Fourier approximation (4). GSE is
+estimated using the measurement of propagated and _ initial
+wavefunction overlaps. To quantify the performance two char-
+acteristics are employed. The first, and the most natural one,
+corresponds to the difference between estimated energy value A,
+and true GSE A,., being AA/J = (A, — Ag;)/J. It allows to observe the
+convergence and provides an indication of how well the
+procedure works for a given system. The second quantity
+corresponds to the trace distance between an idealized inverse
+
+iteration matrix WH and its approximation A" defined as a half
+of trace norm for the difference of two matrices. It reveals the
+actual success of mimicking the ideal inverse in full generality. At
+the same time, this is the quantity which cannot be straightfor-
+wardly observed in the experiment, and only serves for the
+analysis.
+
+The results of the inverse power iteration for molecular
+hydrogen Hamiltonian Hu, are shown in Fig. 2a as a function of
+iteration step k. The ideal version of inverse iteration is plotted in
+red and reveals exponential convergence to GSE. The chemical
+precision is achieved already at the second iteration step, as
+depicted by the blue shaded area starting at AA= 1.6 x 10 7°J. The
+idealized case is then compared to the quantum inverse iteration
+procedure with combined measurement of wavefunction overlaps
+as stated in Eq. (6). Here, we assumed that the genuine unitary
+
+evolution with Hamiltonian Hy, is run in the analog simulation
+fashion. The case of digital evolution with associated Trotterization
+technique and its benchmarking is considered in the Supple-
+mental Material, where we also present the circuit scheme for
+digital evolution. The approximation was performed using equal
+number of steps M, = My = 30, and the discretization values A, =
+A,J were adjusted to match the maximal propagation phases of
+Pmax/2 = JI(MAy)(MA,)/27 = {0.3, 0.35, 0.6, 0.95, 1.35} (here, the
+propagation phase is taken to be dimensionless by absorbing
+energy unit prefactor J from the Hamiltonian). The corresponding
+curves show the improvement of the quantum power iteration
+estimation for increasing number of iteration steps. The conver-
+gence rate also depends on the maximal phase of the
+propagation. For small phases (top curves in Fig. 2a), the initial
+estimator does not give successful convergence, but comes closer
+to GSE for large k. As the propagation phase grows, the
+
+approximation a? starts to resemble the idealized iteration
+procedure. However, this only happens up to a certain value of k
+past which the approximate energy grows, thus deviating from
+the ideal solution. From the point of view of process fidelity, the
+
+. ~—k j~—k . .
+trace distance Trft ,H, | between ideal and approximate
+
+npj Quantum Information (2020) 7
+ 
+
+ 
+
+ 
+
+   
+
+ 
+
+ 
+
+ 
+
+ 
+
+ 
+
+ 
+
+ 
+
+ 
+
+ 
+
+ 
+
+ 
+
+ 
+
+ 
+
+ 
+
+ 
+
+ 
+
+ 
+
+ 
+
+ 
+
+  
+
+ 
+
+ 
+
+ 
+
+ 
+
+   
+  
+
+ 
+
+ 
+
+ 
+
+ 
+
+ 
+
+ 
+
+ 
+
+ 
+
+ 
+
+ 
+
+ 
+
+O. Kyriienko
+A. C. 19-1 E.
+_ 107) Dimax/2H=0.3 _
+~—s ~ 2
+S S 107) 3
+< < S
+g 104 g g
+o © 195 o
+2 Z” £
+oO 10° o 5
+> ~ S
+a D 190-7) oD
+wo ro) oO
+Cc c c
+% 108 w oD
+inverse | . . .
+0.2 4 6) 8 1012-14 0.0 0.2 04 06 08 10 12 14 0 4 4 6 8 10
+iteration step, k phase, Dinax/2% skew, AyJ/A,
+B. D. 1s F. 10
+— 25) de
+Le 2.0; Fe LO key eB
+mh ‘0.7: 6.
+TP 3 eal kaa
+s 1.0} Pima =U. 3 0.3 - = |
+F 0.5) ; = 0.2: oo f= ;
+L 1.35 | . . b . . Ss .
+0.0 2 4 6 8. 10 0.0 02 04 06 08 10 12 14 0 2 4 6 8 10
+
+iteration step, k
+
+phase, rmax/ 27
+
+skew, AyJ /A,
+
+Fig. 2 Molecular hydrogen (H-H) example for benchmarking the quantum inverse power iteration (N = 4 qubits). a Energy difference
+between the exact ground state and quantum inverse iteration estimate, shown as a function of the iteration step k for different maximal
+phases of Fourier approximation (log scale). Solid red line shows the result for the ideal inverse iteration. Blue shaded area corresponds to the
+
+. . . . . ~ —k * —k . . .
+chemically precise estimate (same in ¢, e). b Trace distance Tr/7t ,7#1, | between the ideal and approximate inverse operators shown as a
+function of iteration step number for different phases. c Energy difference AA vs maximal propagation phase at different k (log scale). d Trace
+
+distance THA H, vs phase for k = 2, 4, 7. e, f Energy difference (e) and trace distance (f) plotted for the fixed maximal phase of ¢ma,/27 =
+0.92, but different arrangement of the approximation grid defined by the skew parameter A,J/A,. Several iteration steps k=2, 4, 7 are
+
+depicted.
+
+inverse operators increases monotonically with k (Fig. 2b). The
+
+increase Of dmax allows to reduce TH “HH, at each k.
+
+The performance of the quantum inverse iteration procedure is
+further analyzed in Fig. 2c, d where energy distance to ground
+state and trace distance are shown as a function dma for several
+fixed iteration steps (k = 2, 4, 7). Calculations were performed
+accounting for two different ways of arranging the phase. First, the
+approximation grid was fixed setting My = M, = 30 while changing
+A, = A,J (solid curves in Fig. 2c, d). In the second case the fixed
+step size A, = A\J = 0.05 was combined with the increment of M_,,
+(dashed curves in Fig. 2c, d). For both energy distance (Fig. 2c) and
+trace distance (Fig. 2d) we observe no difference between two
+approximation procedures, but clear indication of the importance
+of maximal propagation phase (time). For AA one sees a non-
+monotonic dependence on ¢max, Which starts with a decrease of
+the energy difference for increasing maximal phase (¢ma,/27 <
+0.4). At larger phases the dependence experiences pronounced
+dips (note the log scale), which are more visible for many
+iterations. Overall the difference remains well-within chemical
+precision and experiences saturation. When the trace distance is
+considered, one sees that success of the approximation mono-
+tonically improves with @max. At the same time, for fixed
+approximation parameters {M_,y, A,,} it is more difficult to
+represent inverse iteration operator faithfully, in-line with scaling
+analysis discussed in Methods. Finally, the comparison of results in
+Fig. 2c, d allows to suggest that nonmonotonicity in the
+spectroscopic signatures can come from the particular structure
+of the Hamiltonian and the initial state, where certain phases
+might be preferable (i.e., not all elements of the Hamiltonian
+matrix contribute equally to the inverse iteration procedure).
+
+To decide on the optimal way to approximate the inverse, we
+consider different discretization steps for y and z auxiliary
+variables, characterized by the skewness parameter A,J/A,. The
+calculation is done for M, = My = 30 with the maximal phase fixed
+
+npj Quantum Information (2020) 7
+
+tO Pmay/27 = 0.92. The results are shown in Fig. 2e, f as a function
+of skew. The energy difference parameter shows that for
+approximating the inverse for small iteration numbers (k= 2
+curve in Fig. 2e) larger skew factors are preferable, with z variable
+requiring finer approximation. However, for increased iteration
+number the optimum flows to A,J/A, ~ 1 values, suggesting close-
+to-equal spacing can work well for varied k. Examining the trace
+distance, we see that in unbiased setting the skew ratio of A,J/A, ~
+2 is preferable.
+
+Finally, the very important issue to address is an influence of
+noise on the operation of quantum inverse iteration protocol. For
+this we have performed the analysis including relevant dephasing
+processes, which influence the estimate for overlaps (see details in
+the Supplemental Material). Although noise makes the estimation
+of energies at large iteration step k less reliable, it is possible to
+estimate the energy within chemical precision using simple noise
+mitigation techniques.
+
+Applications: beryllium hydride
+
+To test the scalability of the approach, we consider a molecule of
+bigger size, which requires larger Hilbert soace simulation. For this,
+we choose to simulate beryllium hydride (BeH,) in the full spinful
+version using N = 8 qubits (see Methods, section D, for the details).
+
+We proceed in the same manner as for Hz molecule, and
+quantify the operation of the quantum inverse iteration procedure
+for BeH. The approximation parameters were chosen as A\J =A, =
+0.05, with the number of discretization points My, adjusted
+accordingly to maintain maximal propagation phase. The results
+of the simulation are shown in Fig. 3. The first plot (Fig. 3a) shows
+that ideal iteration works well for the beryllium hydride, with
+chemically precise GSE obtained already at k=1 iteration step.
+The Fourier approximation for the inverse at small phases does
+not reach required accuracy, while for the increased iteration step
+number and @max/27 > 1 chemically accurate ground state
+
+Published in partnership with The University of New South Wales
+estimate can be attained. Figure 3b shows this behavior as a
+function of phase for several representative k’s, and yields the
+same conclusion. The increase of the required propagation phase
+is attributed to the increased condition number for BeH,
+Hamiltonian matrix, being 39.2 as compared to 3.38 for Ho.
+
+Applications: Bose-Hubbard simulator
+
+Finally, to provide an example where quantum inverse iteration
+algorithm can be largely beneficial, we consider the bosonic
+version of the Hubbard model (see sketch in Fig. 4a). The
+corresponding system Hamiltonian reads
+
+. ae Un... .
+Hen =—J>—(4)a +h.) +5) fi(fi —1)-Hu) hi, (7)
+(is) i
+
+where al (aj) corresponds to the bosonic creation (annihilation)
+
+operator at lattice site i. Here, n; = ala corresponds to the
+number operator. The first term in the Hamiltonian (7) describes
+the tunneling of bosons with rate J, which leads to their
+delocalization at the lattice. For simplicity we consider a one-
+dimensional lattice, and that tunneling happens only between
+neighbouring sites (i, j). The second term in Eq. (7) denotes the
+
+Dmax! 2n=0.6
+
+—. 0.95
+
+"  ——0—o— 2» _|
+S738)
+
+1.95
+2.55
+ideal
+
+inverse 3.22 k=7~
+
+02 4 6 8101214 02 06 10 14
+iteration step, k D man /27
+
+Fig. 3 Beryllium hydride (H-Be-H) ground state energy estima-
+tion (N = 8 qubits). a Energy difference for true GSE and quantum
+inverse iteration shown for different iteration steps k and maximal
+propagation phases ¢dmax (log scale). The red line corresponds to an
+ideal iteration procedure. b Same energy difference shown as a
+function of maximal phase at k= 2, 4, 7. In both panels the blue
+shaded area corresponds to the chemically precise estimate.
+
+ 
+
+ 
+
+>
+
+10°
+
+    
+ 
+ 
+
+AA/J
+
+ 
+
+10°
+
+ 
+  
+
+ 
+
+ 
+
+ 
+
+ 
+
+ 
+
+ 
+
+O. Kyriienko
+
+ 
+
+contact interaction between bosons with strength U. The last term
+corresponds to the chemical potential yu. Importantly, the Bose-
+Hubbard model corresponds to the paradigmatic example of hard
+material science problem,*' and received considerable attention
+from both theoretical**** and experimental perspective.* In
+particular, the model was shown to be easily solvable in the so-
+called Mott insulating regime where U > J and ground state
+corresponds to the product state of one atom per site, |Wyou) = 1
+|1);. However, going into the superfluid regime, where J becomes
+comparable to U, the ground state is entangled, and it is generally
+difficult to study the low energy properties of this system.
+
+We show that quantum inverse iteration algorithm can be
+applied to study the ground state properties of the Bose-Hubbard
+Hamiltonian in the wide range of parameters. For this, we consider
+an initial state corresponding to the Mott state, |Wo) = |Wyor),
+and perform the iteration as detailed in the “Protocol” subsection
+of Results. The numerical results for the energy deviation are
+shown in Fig. 4b, where AA/U = |A, — Ags|/U is plotted as a function
+of iteration step k. We consider N=5 lattice with p/U=0.5,
+different values of tunneling rate J, and similarly to Hy and BeH2
+examples the energies were adjusted by trivial overall shift E> to
+ensure positive eigenvalues. The Fourier approximation is
+performed using M,=M,=40 and A,=A,U=0.075. While for
+relatively small tunneling J=0.01U the product state is a good
+ground state approximation, thus giving small energy deviation
+(lowest curve in Fig. 4b), for larger J ~ 0.1U the system enters a
+superfluid phase (critical value for ~=0.5U approximately
+corresponds to Jcit/U = 0.137). Despite the qualitatively different
+initial state, the algorithm allows to distill correct energy proper-
+ties even for large J.
+
+Going beyond the ground state energy estimation, quantum
+inverse iteration can be also used to measure the correlations in
+the ground state of the model. We considered the correlation
+function of the form (W,lat, Ac|W,), where |w,) corresponds to the
+propagated state, and overall procedure is similar to the one
+described in Eq. (6). We fix c = 3 to be the central site in the lattice,
+and look for intra and intersite correlations with r=0, 1, 2. The
+results are shown in Fig. 4c, d, e where in the Mott insulator
+regime correlations fall-off rapidly (Fig. 4c), while in the superfluid
+
+ 
+
+ 
+
+   
+ 
+
+ 
+
+ 
+
+ 
+
+ 
+
+ 
+
+ 
+
+ 
+
+ 
+
+ 
+
+A. Bose-Hubbard simulator
+J/U=0.01 J/U=0.05 J/U=0.2
+D. E.
+1
+0.50
+2
+= 6 0.100
+gy ® 0.050 0.10
+5 ©
+= 5 0.05
+2 8
+Oo 0.010
+>
+5D 0.005
+c 0.01
+LU .
+k=1 2..." | | | | | | | | | |
+0 1 2 0 1 2 0 1 2
+0 2 4 6 8 10 distance distance distance
+
+iteration step, k
+
+Fig. 4 Bose-Hubbard ground state energy estimation for a chain of five atoms. a Sketch of the system, which depicts coherent tunneling
+processes with the rate J and the nonlinear interaction of strength U. Correlations are measured for a set of distances r= [0, 1, 2]. b Energy
+difference for the true GSE and quantum inverse iteration estimate are shown for different iteration steps k (log scale). Several tunneling
+values are chosen, J/U = 0.01, 0.05, 0.1, 0.2, capturing the transition between insulating and superfluid behaviour. c-e Correlation functions of
+the form (al, ac) are calculated for the approximate ground state at increasing iteration step k, and for several values of J/U (log scale).
+Correlations for true ground state are shown in blue (large dots and top curves).
+
+Published in partnership with The University of New South Wales
+
+npj Quantum Information (2020) 7
+O. Kyriienko
+
+ 
+
+case the quantum inverse iteration method allows to restore
+genuine correlations (blue dots and curve) at increased k (Fig. 4e).
+
+Importantly, the described Bose-Hubbard simulation can be
+performed experimentally using available —_ controllable
+devices.*”* First, it allows to run unitary dynamics for sufficiently
+long times and large particle numbers. Second, the many-body
+interference technique enables the convenient measurement of
+the wavefunction overlap, where part of the system is evolved and
+later is interfered with the initial copy.°? We note that our
+approach also bears similarities with recently introduced Quantum
+Virtual Cooling.*°? This study demonstrated the reduction of the
+temperature in half, while the inverse iteration offers the access to
+close-to-zero temperature. Finally, the intriguing possibility is an
+application of quantum inverse iteration to 2D models'® and
+Fermi-Hubbard model,’ which shall be possible with improved
+interference techniques.”
+
+DISCUSSION
+
+We have presented the algorithm for the ground state energy
+(GSE) estimation of a quantum Hamiltonian. It is based on the
+iterative application of the Hamiltonian inverse to the initial state,
+and can be represented as a sum of unitary evolution operators.
+Targeting near-term quantum simulators, we described the
+protocol as a separate estimation of GSE contributions from the
+wavefunction overlap measurements. Then, the results from the
+quantum dynamical simulation are post-processed classically, and
+provide energy estimate for each iteration step.
+
+The algorithm was applied to several quantum chemistry
+examples, being molecular hydrogen and beryllium hydride. Using
+the four-qubit Hz simulator, we benchmarked the performance of
+iteration and inverse approximation, showing that the most
+valuable resource for GSE estimation is a maximal available time
+for unitary evolution. Both digital and noisy operation was
+considered, and found to be sufficient for a GSE calculation with
+chemical accuracy.
+
+As an outlook, we highlight that the approach can be beneficial
+for analog quantum simulators such as cold atoms lattices,'®
+Rydberg atom simulators,'° trapped ions,'’ and superconducting
+devices.*° For instance, the analog-type fermionic quantum
+chemistry simulator*” would be much valued for the task. Future
+applications also include material science problems, with the main
+target being Fermi-Hubbard model.'° For instance, we note that
+recently proposed approach of Quantum Virtual Cooling,*? which
+was experimentally applied to Bose-Hubbard model, has similar
+iterative structure and requires interferometric measurements.
+This poses the question of connection between the measurement-
+based cooling scheme and the dynamic protocol described in the
+current study. Finally, we note growing interest to protocols,
+which exploit wavefunction overlap measurements.*®*° This can
+be seen as an emergence of hybrid algorithms, which mimic
+nonunitary operation, and together can form the base for
+dynamical quantum computing.
+
+METHODS
+Scaling and fault-tolerant implementation
+
+In this section we consider the scaling for the quantum inverse iteration
+algorithm. For k= 1 it was shown in ref. °° that the inverse Hamiltonian can
+be approximated up to an error e€ setting the discretization steps to A, =
+© (e/log(k/e)), A, = © (1/K log(k/e)), and summing up to My = © (log(k/e)
+K/e), Mz = © (k log(k/e)) (k is a condition number). The maximal evolution
+phase then scales aS ¢max = (MAy)(MA,) = O(k log(k/e)), and is an
+equivalent of the total gate count for analog quantum simulation.
+Generalizing the result to k-th inverse iteration, the upper limit on the
+maximal required phase shall be multiplied by K, where truncation of the
+inverse iteration introduces an additional error. In the study we considered
+particular examples, and quantified the validity of Fourier approximation as
+a function of {My, Ay, M,, Az} parameters.
+
+npj Quantum Information (2020) 7
+
+Considering the fault-tolerant implementation, the approximate ground
+
+state can be prepared by applying generally nonunitary operator nH" to
+the initial state |W.) using an ancillary qubit register. One possible option
+here is the amplitude amplification approach,’ which addresses the task
+of implementing the sum of unitary operators, of the same type as the one
+in Eq. (4). Moreover, since we also require simulation of Hamiltonian
+dynamics for exp(—idyH), which may be not accessible in analog-type
+simulation, the subsequent use of Hamiltonian simulation°* or qubitiza-
+tion?’ methods would lead to favourable resource scaling. The algorithm
+will require O(log(L)log(chmax/€e)/logllog(chmax/€)]) auxiliary qubits (c =
+Yelcel, L = M,(2M, + 1)) and same order of controlled unitaries. This scaling
+can be compared to the iterative modification of the quantum phase
+estimation procedure (IPEA), based on a small fixed register’ or a single
+auxiliary qubit.°? The latest represents conceptually the closest algorithm
+to the one described in the paper, and thus will serve as benchmark. The
+complexity of IPEA was discussed in ref., >? showing the requirement of O
+[log(e)log(log(e)/e)] phase iterations to approach an error of e=2°”
+(energy is rescaled such that || H || < 27, and m is the number of relevant
+bits of precision, typically limited to <20 for quantum chemistry
+applications). Each k-th IPEA step then requires implementation of the c-
+
+UX operation, defined as implementation of (ey controlled on the
+register qubit. This leads to O[N* log(e)log(log(e)/e)] gate count, compar-
+able to the inverse iteration procedure described above.
+
+Given the favorable scaling, the cost of the general purpose quantum
+inverse iteration algorithm can be small for future large scale quantum
+devices. However, generally there is no simple procedure to perform c-U
+operation, and it requires decomposition into a set of universal gates or
+multi-layer SWAP technique.°° This enlarges the actual circuit depth (while
+being polynomial), and precludes the implementation of U = exp(—i@H) in
+analog fashion. Therefore, we target programmable devices with possible
+analog-type implementation and use sequential estimation strategy
+described in the main text.
+
+Overlap measurement
+
+To measure the overlap between the evolved and initial wavefunction, we
+propose to exploit a single eigenstate |Wp) of the system as a reference,
+and measure the overlap with respect to its energy Ar (usually set to zero).
+This nicely fits the task of GSE estimation for the fermionic Hamiltonian, as
+its Hilbert space includes a vacuum state with no fermions present (unless
+space reduction procedure was performed). Similar technique was used for
+extracting spectroscopic signatures of photon localization’ The main
+steps for the measurement are as follows. The task is formulated as finding
+(WolWolt)), where |W) is the initial state (typically corresponding to the
+Hartree-Fock solution). The state |w;(t)) = U(t)|W;) is a time-propagated
+state with some unitary 7/ defined by the expansion. The HF state can be
+prepared from the reference |Wp) (vacuum or other product state) using
+the product of local operators, and we note that these states are
+orthogonal. Then, the overlap probability is measured as an expectation
+value of the operator Mp = |W) (Wo| for time-evolved wavefunction, which
+reads
+
+Tr{Mo|Yo(t)) (Wo(t)|} = |(WolPo(t))|? =: ol”. (8)
+
+Next, the superposition of the vacuum and initial state shall be prepared as
+
+|W.) = (We) + |Wo))/V2 and evolved to |p, (t)). Its overlap probability is
+measured as an expectation value of M, = ws), | operator. This can be
+written as
+
+Tr{Ma |W (t)) (W(t) } = (Wy (t))?
+
+1 |
+=> 4 (1 + Oo? + 2Re{ Oo re ie} ) =: Ox!’
+
+(9)
+
+and provides an information about real and imaginary parts of Oo;. The
+same procedure is performed for measuring an expectation value of the
+operator M; = |w;)(w;|, where |W;) = (|Wg) + i|Wo))/W2. An additional
+
+information is gained with
+Tr{MilW,(t)) (y(t) = [Wil (2)?
+
+1 _j
+=; (1 + |Ooz|? — 2lm{Oo re et ) =: |Or|’,
+
+(10)
+
+and both real and imaginary part of Oo; can be found for the known
+
+Published in partnership with The University of New South Wales
+reference Ap from the system of Eqs. (8)-(10) as
+Re{Oo1} = [2|\Ox4|? — ({Ooz|* + 1)/2]cos (Art)
+—[2|Oj4|? — (\Ooel* + 1)/2]sin(et),
+
+Im{Oor} = —[2|Oit|? — ({Oo.2|* + 1) /2]cos(Art)
+~[2|O4.|? — (\Ooel* + 1)/2]sin (Art).
+
+Note that we are mostly interested in the real part of the sought overlap
+Re{(Wo|W(t))}, as both the “norm” and “energy” terms of A, are real, and
+imaginary parts of the overlap cancel out. This can be also shown formally
+if an exact form of expansion (3) is considered. The numerator of Eq. (6)
+can written term-by-term such that terms with equal j, = j, are considered,
+
+(12)
+
+accompanied by associated exponents e and ei. Similarly, the
+terms with j, = —j, can be grouped. Combined this leads to Ay x
+
+(Wo|cos(6¢H)|W>) dependence, while odd imaginary terms have vanished.
+Thus, it is also possible to deduce the real part indirectly as
+
+IRe{Oor}| = \/|Oo.t|? — Im{Oor}’, (13)
+
+and its sign can be inferred from the measurement in Eq. (11). We note
+that in principle these are two related ways to estimate the real part of the
+overlap, corresponding to Eqs. (11) and (13). While being equivalent in the
+noiseless case, the effects of decoherence make two approaches distinct
+(see Supplemental Material for the details). For the practical purposes we
+thus refer to the overlap estimate in (11) as direct estimation approach and
+refer to (13) as the indirect estimation.
+
+Physically, the measurement procedure resembles the Bell-type
+measurement, where in the simple case of two-qubits a single CNOT
+operation and the Hadamard gate are required. For the larger system the
+measurement is generalized to GHZ-type, and consequently requires
+increasing number of two qubit operators, which depends on how much
+an initial HF state is different from the reference state.
+
+Finally, we note that direct measurement is possible in atomic setups,
+where many-body interferometry is applied to two copies. This can be
+used in the analog circuits where system size doubling plays lesser role,
+and can compensate the absence of fully addressable individual gate
+operation.
+
+Molecular hydrogen Hamiltonian
+
+The fermionic Hamiltonian Hu, is first written in the form of Eq. (1) (main
+text), where coefficients vj and Vj,; are calculated by conventional
+quantum chemistry methods. Here, we exploited the OpenFermion
+package for Python,® which allows to extract the interfermionic
+interactions for four Gaussian orbitals fit via STO-3G method and perform
+the fermions-to-qubits transformation. For the small N = 4 system we have
+chosen to use the Jordan-Wigner transformation, although other options
+may be used as the system size increases. Specifically, we consider the
+bond length for Hz to be 0.7414 (measured in Angstrém) and consider full
+excitation space. For concreteness, we provide the full form for the
+Hamiltonian, being
+
+Hy, = €o + €1(Zo +Z1) — €2(Z2 +23) + €3Z0Z1
++€4(ZoZ2 + 2123) + €5(Z0Z3 +2122) + €6Z223 (14)
+—€7(X0oX1V2V3 — XoV1Y2X3 — YoX1X2V3 + YoY1X2X3),
+
+where X;, Yj, Z; denote Pauli matrices for qubit j. The coefficients read €/J =
+—0.098864, €,/J = 0.171198, &/J = 0.222786, €3/J = 0.168622, &/J =
+0.120545, €5/J = 0.165867, &/J = 0.174348, €/J = 0.045322. The energy
+scale J for the actual Hy Hamiltonian corresponds to Hartree units, while for
+the quantum simulator J corresponds to the effective qubit coupling.
+Throughout the text, we measure energy in units of J, and the time is
+measured in J”! units. The digital implementation for the unitary evolution
+with Hamiltonian (14) is presented in the Supplemental Material. The
+Hartree-Fock (HF) solution for the problem is given by the approximate
+ground state W> = (J, |, t, t)’, and associated HF energy is —1.116684J.
+As required by the Fourier approximation approach, the reference energy
+is then shifted towards positive values by adding constant term equal to
+E,)/J = 2, and we refer to the shifted Hamiltonian as Hy, in the main text. Its
+HF energy is Ap = 0.883316/ after the shift. The task is then to estimate the
+ground state energy A,, of the Hamiltonian 7(y,, achieved by preparation
+of approximate ground state |W,). This shall be done within the chemical
+precision ¢, which is equal to « = 0.0016 Hartree, and thus defines the
+relevant cutoff for the iteration procedure.
+
+Published in partnership with The University of New South Wales
+
+O. Kyriienko
+
+Np}
+
+ 
+
+Beryllium hydride Hamiltonian
+
+The molecular data structure of beryllium hydride (BeHz) was generated
+using Psi4 quantum chemistry package’ considering equal Be—H
+distances equal to 1.33 Angstrom. While generically described by six spin
+orbitals, we set lowest and second excited orbital to be occupied, and set
+multiplicity of unity, such that the ground state energy lies close to the full
+configurational space solution (STO-3G basis). The fermionic Hamiltonian is
+then obtained using OpenFermion package, and as in the case of H, the
+Jordan-Wigner transformation was used to rewrite it in the qubit form.°?
+The problem then can be solved using N = 8 qubits. The GSE from the
+exact diagonalization of original BeH, Hamiltonian reads —1.806750
+Hartree, and analogously to the molecular hydrogen the Hamiltonian
+matrix is shifted by constant energy term of 2 Hartree. The product state
+corresponding to Hartree-Fock solution reads Wo = (J, |, ty ty ty ty ty 1)
+with associated energy for the shifted Hamiltonian being Ap/J = 0.203323.
+
+DATA AVAILABILITY
+
+The author declares that the data supporting the findings of this study are available
+within the paper and its supplementary information file.
+
+Received: 14 March 2019; Accepted: 20 December 2019;
+Published online: 17 January 2020
+
+REFERENCES
+
+1. Nielsen, M. A. & Chuang, |. L. Quantum Computation and Quantum Information,
+(Cambridge Univ. Press, 2010).
+
+2. Barends, R. et al. Digitized adiabatic quantum computing with a superconducting
+circuit. Nature (London) 534, 222 (2016).
+
+3. Martinez, E. A. et al. Real-time dynamics of lattice gauge theories with a few-qubit
+quantum computer. Nature (London) 534, 516 (2016).
+
+4. Arute, F. et al. Quantum supremacy using a programmable superconducting
+processor. Nature 574, 505-510 (2019).
+
+5. Wecker, D., Bauer, B., Clark, B. K., Hastings, M. B. & Troyer, M. Gate-count estimates
+for performing quantum chemistry on small quantum computers. Phys. Rev. A 90,
+022305 (2014).
+
+6. Preskill, J. Quantum Computing in the NISQ era and beyond. Quantum 2, 79
+(2018).
+
+7. Wecker, D. et al. Solving strongly correlated electron models on a quantum
+computer. Phys. Rev. A 92, 062318 (2015).
+
+8. Reiher, M., Wiebe, N., Svore, K. M., Wecker, D. & Troyer, M. Elucidating reaction
+mechanisms on quantum computers. PNAS 114, 7555 (2017).
+
+9. Lanyon, B. P. et al. Towards quantum chemistry on a quantum computer. Nat.
+Chem. 2, 106 (2010).
+
+10. O'Malley, P. J. J. et al. Scalable quantum simulation of molecular energies. Phys.
+Rev. X 6, 031007 (2016).
+
+11. Kandala, A. et al. Hardware-efficient variational quantum eigensolver for small
+molecules and quantum magnets. Nature (London) 549, 242 (2017).
+
+12. Colless, J. |. et al. Computation of molecular spectra on a quantum processor with
+an error-resilient algorithm. Phys. Rev. X 8, 011021 (2018).
+
+13. Ganzhorn, M. et al. Gate-efficient simulation of molecular eigenstates on a
+quantum computer, arXiv:1809.05057 (2018).
+
+14. Hempel, C. et al. Quantum chemistry calculations on a trapped-ion quantum
+simulator. Phys. Rev. X 8, 031022 (2018).
+
+15. Mazurenko, A. et al. A cold-atom Fermi-Hubbard antiferromagnet. Nature (Lon-
+don) 545, 462 (2017).
+
+16. Bernien, H. et al. Probing many-body dynamics on a 51-atom quantum simulator.
+Nature (London) 551, 579 (2017).
+
+17. Zhang, J. et al. Observation of a many-body dynamical phase transition with a 53-
+qubit quantum simulator. Nature (London) 551, 601 (2017).
+
+18. Jae-yoon Choi, S. et al. Exploring the many-body localization transition in two
+dimensions. Science 352, 1547 (2016).
+
+19. McArdle, S. Endo, S., Aspuru-Guzik, A., Benjamin, S. & Yuan, X. Quantum com-
+putational chemistry, arXiv:1808.10402 (2018).
+
+20. Yudong Cao, J. et al., Quantum Chemistry in the Age of Quantum Computing,
+arXiv:1812.09976 (2018).
+
+21. Kitaev, A. Y. Quantum computations: algorithms and error correction. Russ. Math.
+Surv. 52, 1191 (1997).
+
+22. Babbush, R., Love, P. J. & Aspuru-Guzik, A. Adiabatic quantum simulation of
+quantum chemistry. Sci. Rep. 4, 6603 (2014).
+
+23. Peruzzo, A. et al. A variational eigenvalue solver on a photonic quantum pro-
+cessor. Nat. Commun. 5, 4213 (2014).
+
+npj Quantum Information (2020) 7
+Np)
+
+O. Kyriienko
+
+ 
+
+24.
+
+25.
+
+26.
+
+27.
+
+28.
+
+29.
+
+30.
+
+31.
+
+32.
+
+33.
+
+34.
+
+35.
+
+36.
+
+37.
+
+38.
+
+39.
+
+40.
+
+41.
+
+42.
+
+43.
+
+4A,
+
+45.
+46.
+
+47.
+
+48.
+
+49.
+
+50.
+
+51.
+
+52.
+
+McClean, J., Romero, J., Babbush, R. & Aspuru-Guzik, A. The theory of variational
+hybrid quantum-classical algorithms. N. J. Phys. 18, 023023 (2016).
+
+Wecker, D., Hastings, M. B. & Troyer, M. Progress towards practical quantum
+variational algorithms. Phys. Rev. A 92, 042303 (2015).
+
+McArdle, S. et al. Variational quantum simulation of imaginary time evolution,
+arXiv:1804.03023 (2018).
+
+Ryabinkin, I. G., Yen, T. C., Genin, S. N. & Izmaylov, A. F. Iterative Qubit Coupled
+Cluster approach with efficient screening of generators. J. Chem. Theory Comput.
+14, 6317 (2019).
+
+Herasymenko, Y. & O’Brien, T. E. A diagrammatic approach to variational quantum
+ansatz construction, arXiv:1907.08157 (2019).
+
+McClean, J. R., Boixo, S., Smelyanskiy, V. N., Babbush, R. & Neven, H. Barren
+plateaus in quantum neural network training landscapes, arXiv:1803.11173
+(2018).
+
+Yimin Ge, Y., Tura, J. & Cirac, J. |. Faster ground state preparation and high-
+precision ground energy estimation on a quantum computer, arXiv:1712.03193
+(2017).
+
+Panju, M. Iterative methods for computing eigenvalues and eigenvectors.
+Waterloo Math. Rev. 1, 9 (2011).
+
+Sachdeva, S. & N. Vishnoi, N. Approximation Theory and the Design of Fast
+Algorithms, arXiv:1309.4882 (2013).
+
+Childs, A. M., Kothari, R. & Somma, R. D. Quantum algorithm for systems of linear
+equations with exponentially improved dependence on precision. SIAM J. Com-
+put. 46, 1920 (2017).
+
+Harrow, A. W., Hassidim, A. & Lloyd, S. Quantum algorithm for linear systems of
+equations. Phys. Rev. Lett. 103, 150502 (2009).
+
+Long, Guilu & Liu, Yang Duality quantum computing. Front. Comput. Sci. China 2,
+167 (2008).
+
+Romero, J. et al., Strategies for quantum computing molecular energies using the
+unitary coupled cluster ansatz, arXiv:1701.02691 (2017).
+
+Ekert, A. K. et al. Direct estimations of linear and nonlinear functionals of a
+quantum state. Phys. Rev. Lett. 88, 217901 (2002).
+
+Higgott, O., Wang, D. & Brierley, S. Variational Quantum Computation of Excited
+States, arXiv:1805.08138 (2018).
+
+Islam, R. et al. Measuring entanglement entropy in a quantum many-body sys-
+tem. Nature (London) 528, 77 (2015).
+
+Mitarai, K. & Fujii, K. Methodology for replacing indirect measurements with
+direct measurements. Phys. Rev. Res. 1, 013006 (2019).
+
+Childs, A. M., Gosset, D. & Webb, Z. The Bose-Hubbard model is QMA-complete,
+Proceedings of the 41st International Colloquium on Automata, Languages, and
+Programming (ICALP 2014), pp. 308-319 (2014); arXiv:1311.3297.
+
+Freericks, J. K. & Monien, H. Phase diagram of the Bose-Hubbard Model. EPL 26,
+545 (1994).
+
+Kuhner, T. D., White, S. R. & Monien, H. One-dimensional Bose-Hubbard model
+with nearest-neighbor interaction. Phys. Rev. B 61, 12474 (1999).
+
+Bloch, |., Dalibard, J. & Nascimbéne, S. Quantum simulations with ultracold
+quantum gases. Nat. Phys. 8, 267 (2012).
+
+Cotler, J. et al. Quantum virtual cooling. Phys. Rev. X 9, 031013 (2019).
+
+Ma, R. et al. A Dissipatively Stabilized Mott Insulator of Photons, arXiv:1807.11342
+(2018).
+
+Arguello-Luengo, J., Gonzalez-Tudela, A., Shi, T., Zoller, P. & Cirac, J. Il. Analog
+quantum chemistry simulation, arXiv:1807.09228 (2018).
+
+Huggins, W. J., Lee, J., Baek, U., O'Gorman, B. & Whaley, K. B. A non-orthogonal
+variational quantum eigensolver, arXiv:1909.09114 (2019).
+
+Huang, H.-Y., Bharti, K. & Rebentrost, P. Near-term quantum algorithms for linear
+systems of equations, arXiv:1909.07344 (2019).
+
+Childs, A. M., Kothari, R. & Somma, R. D. Quantum algorithm for systems of linear
+equations with exponentially improved dependence on precision. SIAM J. Com-
+put. 46, 1920 (2017).
+
+Brassard, G., Hoyer, P., Mosca, M. & Tapp, A. Quantum Amplitude Amplification and
+Estimation, Quantum Computation and Quantum Information, (ed. Lomonaco,
+S. J. Jr.), AMS Contemporary Mathematics, 305:53-74 (2002).
+
+Berry, D. W., Childs, A. M., Cleve, R., Kothari, R. & Somma, R. D. Simulating
+hamiltonian dynamics with a truncated taylor series. Phys. Rev. Lett. 114, 090502
+(2015).
+
+npj Quantum Information (2020) 7
+
+53. Low, G. H. & Chuang, |. L. Optimal hamiltonian simulation by quantum signal
+processing. Phys. Rev. Lett. 118, 010501 (2017).
+
+54. Aspuru-Guzik, A., Dutoi, A. D., Love, P. J. & Head-Gordon, M. Simulated quantum
+computation of molecular energies. Science 309, 1704 (2005).
+
+55. Dobsicek, M., Johansson, G., Shumeiko, V. & Wendin, G. Arbitrary accuracy
+iterative quantum phase estimation algorithm using a single ancillary qubit: a
+two-qubit benchmark. Phys. Rev. A 76, 030306(R) (2007).
+
+56. Zhou, X.-Q. et al. Adding control to arbitrary unknown quantum operations. Nat.
+Commun. 2, 413 (2011).
+
+57. Roushan, P. et al. Spectroscopic signatures of localization with interacting pho-
+tons in superconducting qubits. Science 358, 1175 (2017).
+
+58. McClean, J. R. et al. OpenFermion: the electronic structure package for quantum
+computers, arXiv:1710.07629 (2017).
+
+59. Parrish, R. M. et al. Psi4 1.1: an open-source electronic structure program
+emphasizing automation, advanced libraries, and interoperability. J. Chem. Theory
+Comput. 13, 3185 (2017).
+
+ACKNOWLEDGEMENTS
+
+| would like to thank Anders S. Sorensen for useful discussions and suggestions, and
+Bart Olsthoorn for technical advise and reading the manuscript. The work was
+partially supported by the Megagrant 14.Y26.31.0015, and ITMO Fellowship and
+Professorship Program. Open access funding provided by Stockholm University.
+
+AUTHOR CONTRIBUTIONS
+
+O.K. proposed the original idea, preformed calculations, analyzed results, and written
+the manuscript.
+
+COMPETING INTERESTS
+
+The author declares no competing interests.
+
+ADDITIONAL INFORMATION
+
+Supplementary information is available for this paper at https://doi.org/10.1038/
+S41534-019-0239-7.
+
+Correspondence and requests for materials should be addressed to O.K.
+
+Reprints and permission information is available at http://www.nature.com/
+reprints
+
+Publisher’s note Springer Nature remains neutral with regard to jurisdictional claims
+in published maps and institutional affiliations.
+
+Open Access This article is licensed under a Creative Commons
+
+ig Attribution 4.0 International License, which permits use, sharing,
+adaptation, distribution and reproduction in any medium or format, as long as you give
+appropriate credit to the original author(s) and the source, provide a link to the Creative
+Commons license, and indicate if changes were made. The images or other third party
+material in this article are included in the article’s Creative Commons license, unless
+indicated otherwise in a credit line to the material. If material is not included in the
+article’s Creative Commons license and your intended use is not permitted by statutory
+regulation or exceeds the permitted use, you will need to obtain permission directly
+from the copyright holder. To view a copy of this license, visit http://creativecommons.
+org/licenses/by/4.0/.
+
+© The Author(s) 2020
+
+Published in partnership with The University of New South Wales

@@ -1,0 +1,2782 @@
+ 
+
+computation (mpPt|
+
+Article
+
+Self-Adjusting Variable Neighborhood Search
+Algorithm for Near-Optimal k-Means Clustering
+
+Lev Kazakovtsev *, Ivan Rozhnov®, Aleksey Popov and Elena Tovbis©
+
+Reshetnev Siberian State University of Science and Technology, Institute of Informatics and Telecommunications,
+Krasnoyarskiy Rabochiy av. 31, 660037 Krasnoyarsk, Russia; ris2005@mail.ru (I.R.); vm_popov@sibsau.ru (A.P.);
+sibstu2006@rambler.ru (E.T.)
+
+* Correspondence: levklevk@gmail.com
+
+check for
+Received: 9 October 2020; Accepted: 2 November 2020; Published: 5 November 2020 g updates
+
+Abstract: The k-means problem is one of the most popular models in cluster analysis that minimizes
+the sum of the squared distances from clustered objects to the sought cluster centers (centroids).
+The simplicity of its algorithmic implementation encourages researchers to apply it in a variety
+of engineering and scientific branches. Nevertheless, the problem is proven to be NP-hard which
+makes exact algorithms inapplicable for large scale problems, and the simplest and most popular
+algorithms result in very poor values of the squared distances sum. If a problem must be solved
+within a limited time with the maximum accuracy, which would be difficult to improve using known
+methods without increasing computational costs, the variable neighborhood search (VNS) algorithms,
+which search in randomized neighborhoods formed by the application of greedy agglomerative
+procedures, are competitive. In this article, we investigate the influence of the most important
+parameter of such neighborhoods on the computational efficiency and propose a new VNS-based
+algorithm (solver), implemented on the graphics processing unit (GPU), which adjusts this parameter.
+Benchmarking on data sets composed of up to millions of objects demonstrates the advantage of the
+new algorithm in comparison with known local search algorithms, within a fixed time, allowing for
+online computation.
+
+Keywords: cluster analysis; k-means; variable neighborhood search; agglomerative clustering; GPU
+
+1. Introduction
+
+1.1. Problem Statement
+
+The aim of a clustering problem solving is to divide a given set (sample) of objects (data vectors)
+into disjoint subsets, called clusters, so that each cluster consists of similar objects, and the objects
+of different clusters have significant dissimilarities [1,2]. The clustering problem belongs to a wide
+class of unsupervised machine learning problems. Clustering models involve various similarity or
+dissimilarity measures. The k-means model with the squared Euclidean distance as a dissimilarity
+measure is based exclusively on the maximum similarity (minimum sum of squared distances) among
+objects within clusters.
+
+Clustering methods can be divided into two main categories: hierarchical and partitioning [1,3].
+Partitioning clustering, such as k-means, aims at optimizing the clustering result in accordance with
+a pre-defined objective function [3].
+
+The k-means problem [4,5], also known as minimum sum-of-squares clustering (MSSC),
+assumes that the objects being clustered are described by numerical features. Each object is represented
+by a point in the feature space R® (data vector). It is required to find a given number k of cluster centers
+
+Computation 2020, 8, 90; doi:10.3390/computation8040090 www.mdpi.com/journal/computation
+Computation 2020, 8, 90 2 of 32
+
+(called centroids), such as to minimize the sum of the squared distances from the data vectors to the
+nearest centroid.
+
+Let A;,..., Ay € R? be data vectors, N be the number of them, and S = {X1,... , Xz} C R@ be the set
+of sought centroids. The objective function (sum of squared errors, SSE) of the k-means optimization
+problem formulated by MacQueen [5] is:
+
+N
+SSE(X1,.--,Xk) = SSE(S) = )) minxex,,..,.xllAi- XIP > ming, xeme- (1)
+i=1
+Here, || - || is the Euclidean distance, integer k must be known in advance.
+
+A cluster in the k-means problem is a subset of data vectors for which the specified centroid is the
+nearest one:
+
+ 
+
+Cj = {Ai,i = TNA: — Xill = minxex,,.xllAi- XII, 7 =D.
+
+We assume that a data vector cannot belong to two clusters at the same time. At an equal distance
+for several centroids, the question of assignment to a cluster can be solved by clustering algorithms in
+different ways. For example, a data vector belongs to a cluster lower in number:
+
+Cj = {Ai = TN Ay = LF NIAi— Xp
+< ||; ~ Xj or (IIA; — X/ll = Ai — X;ll and 7 > j)}, 2)
+j=Lk
+
+ 
+
+Usually, for practical problems with sufficiently accurate measured values of data vectors,
+the assignment to a specific cluster is not very important.
+The objective function may also be formulated as follows:
+
+k
+SSE(X1,---,Xi)= YY) WAI XP > ming, yea, (3)
+J=1i=1N:AjeC;
+
+or
+
+k
+SSE(C,..CK) = YY WAI XP 9 ming,,...C¢CLAtmwANE (4)
+J=1 j=1N:AjeC;
+
+Equations (3) and (4) correspond to continuous and discrete statements of our problem, respectively.
+
+Such clustering problem statements have a number of drawbacks. In particular, the number
+of clusters k must be given in advance, which is hardly possible for the majority of practically
+important problems. Furthermore, the adequacy of the result in the case of a complex cluster shapes
+is questionable (this model is proved to work fine with the ball-shaped clusters [6]). The result is
+sensitive to the outliers (standalone objects) [7,5] and depends on the chosen distance measure and
+the data normalization method. This model does not take into account the dissimilarity between the
+objects in different clusters, and the application of the k-means model results in some solution X1,...,
+X; even in the cases with no cluster structure in the data [9,10]. Moreover, the NP-hardness [11,12] of
+the problem makes the exact methods [6] applicable only for very small problems.
+
+Nevertheless, the simplicity of the most commonly used algorithmic realization as well as the
+interpretability of the results make the k-means problem the most popular clustering model. Developers’
+efforts are focused on the design of heuristic algorithms that provide acceptable and attainable values
+of the objective function.
+Computation 2020, 8, 90 3 of 32
+
+1.2. State of the Art
+
+The most commonly used algorithm for solving problem (1) is the Lloyd’s procedure proposed in
+1957 and published in 1982 [4], also known as the k-means algorithm, or alternate location-allocation
+(ALA) algorithm [13,14]. This algorithm consists of two simple alternating steps, the first of which
+solves the simplest continuous (quadratic) optimization problem (3), finding the optimal positions
+of the centroids X1,..., X; for a fixed composition of clusters. The second step solves the simplest
+combinatorial optimization problem (4) by redistributing data vectors between clusters at fixed
+positions of the centroids. Both steps aim at minimizing the SSE. Despite the theoretical estimation of
+the computational complexity being quite high [15-17], in practice, the algorithm quickly converges
+to a local minimum. The algorithm starts with some initial solution S = {X,... , X;}, for instance,
+chosen at random, and its result is highly dependent on this choice. In the case of large-scale problems,
+this simple algorithm is incapable of obtaining the most accurate solutions.
+
+Various clustering models are widely used in many engineering applications [18,19], such as
+energy loss detection [20], image segmentation [21], production planning [22], classification of products
+such as semiconductor devices [23], recognition of turbulent flow patterns [24], and cyclical disturbance
+detection in supply networks [25]. Clustering is also used as a preprocessing step for the supervised
+classification [26].
+
+In [27], Naranjo et al. use various clustering approaches including the k-means model for automatic
+classification of traffic incidents. The approach proposed in [28] uses the k-means clustering model
+for the optimal scheduling of public transportation. Sesham et al. [29] use factor analysis methods
+in a combination with the k-means clustering for detecting cluster structures in transportation data
+obtained from the interview survey. Such data include the geographic information (home addresses)
+and general route information. The use of GPS sensors [30] for collecting traffic data provides us with
+large data arrays for such problems as the travel time prediction, traffic condition recognition [31], etc.
+
+The k-means problem can be classified as a continuous location problem [32,33]: it is aimed at
+finding the optimal location of centroids in a continuous space.
+
+If we replace squared distances with distances in (1), we deal with the very similar continuous
+k-median location problem [34] which is also a popular clustering model [35]. The k-medoids [36,37]
+problem is its discrete version where cluster centers must be selected among the data vectors only,
+which allows us to calculate the distance matrix in advance [38]. The k-median problem was also
+formulated as a discrete location problem [39] ona graph. The similarity of these NP-hard problems [40,41]
+enables us to use similar approaches to solve them. In the early attempts to solve the k-median problem
+(its discrete version) by exact methods, researchers used a branch and bound algorithm [42-44] for
+solving very small problems.
+
+Metaheuristic approaches, such as genetic algorithms [45], are aimed at finding the global
+optimum. However, in large-scale instances, such approaches require very significant computational
+costs, especially if they are adapted to solving continuous problems [46].
+
+With regard to discrete optimization problems, local search methods, which include Lloyd’s
+procedure, have been developed since the 1950s [47-50]. These methods have been successfully used
+to solve location problems [51,52]. The progress of local search methods is associated with both new
+algorithmic schemes and new theoretical results in the field of local search [50].
+
+A standard local search algorithm starts with some initial solution S and goes to a neighboring
+solution if this solution turns out to be superior. Moreover, finding the set of neighbor solutions n(S) is the
+key issue. Elements of this set are formed by applying a certain procedure to a solution S. At each local
+search step, the neighborhood function n(S) specifies the set of possible search directions. Neighborhood
+functions can be very diverse, and the neighborhood relation is not always symmetric [53,54].
+
+For a review of heuristic solution techniques applied to k-means and k-median problems,
+the reader can refer to [32,55,56]. Brimberg, Drezner, and Mladenovic and Salhi [57-59] presented local
+search approaches including the variable neighborhood search (VNS) and concentric search. In [58],
+Drezner et al. proposed heuristic procedures including the genetic algorithm (GA), for rather small
+Computation 2020, 8, 90 4 of 32
+
+data sets. Algorithms for finding the initial solution for the Lloyd’s procedure [60,61] are aimed at
+improving the average resulting solution. For example, in [62], Bhusare et al. propose an approach
+to spread the initial centroids uniformly so that the distance among them is as far as possible.
+The most popular kmeans++ initialization method introduced by Arthur and Vassilvitskii [60]
+is a probabilistic implementation of the same idea. An approach proposed by Yang and Wang [63]
+improves the traditional k-means clustering algorithm by choosing initial centroids with a min-max
+similarity. Gu et al. [7] provide a density-based initial cluster center selection method to solve the
+problem of outliers. Such smart initialization algorithms reduce the search area for local search
+algorithms in multi-start modes. Nevertheless, they do not guarantee an optimal or near optimal
+solution of the problem (1).
+
+Many authors propose approaches based on reducing the amount of data [64]: simplification of
+the problem by random (or deterministic) selection of a subset of the initial data set for a preliminary
+solution of the k-means problem, and using these results as an initial solution to the k-means algorithm
+on the complete data set [65-67]. Such aggregation approaches, summarized in [68], as well as reducing
+the number of the data vectors [69], enable us to solve large-scale problems within a reasonable time.
+However, such approaches lead to a further reduction in accuracy. Moreover, many authors [70,71]
+name their algorithm “exact” which does not mean the ability to achieve an exact solution of (1). In such
+algorithms, the word “exact” means the exact adherence to the scheme of the Lloyd’s procedure, without
+any aggregation, sampling, and relaxation approaches. Thus, such algorithms may be faster than the
+Lloyd’s procedure due to the use of triangle inequality, storing the results of distance calculations in
+multidimensional data sets or other tricks [72], however they are not intended to get the best value
+of (1). In our research, aimed at obtaining the most precise solutions, we consider only the methods
+which estimate the objective function (1) directly, without aggregation or approximation approaches.
+
+The main idea of the variable neighborhood search algorithms proposed by Hansen and
+Mladenovic [73-75] is the alternation of neighborhood functions n(S). Such algorithms include
+Lloyd’s procedure, which alternates finding a locally optimal solution of a continuous optimization
+problem (3) with a solution of a combinatorial problem (4). However, as applied to the k-means
+problem, the VNS class traditionally involves more complex algorithms.
+
+The VNS algorithms are used for a wide variety of problems [3,76,77] including clustering [78]
+and work well for solving k-means and similar problems [50,79-82].
+
+Agglomerative and dissociative procedures are separate classes of clustering algorithms.
+Dissociative (divisive) procedures [83] are based on splitting clusters into smaller clusters.
+Such algorithms are commonly used for small problems due to their high computing complexity [83-85],
+most often in hierarchical clustering models. The agglomerative approach is the most popular in
+hierarchical clustering, however, it is also applied in other models of cluster analysis. Agglomerative
+procedures [86-90] combine clusters sequentially, i.e., in relation to the k-means problem, they sequentially
+remove centroids. The elements of the clusters, related to the removed centroids, are redistributed among
+the remaining clusters. The greedy strategies are used to decide which clusters are most similar to be
+merged together [3] at each iteration of the agglomerative procedure. An agglomerative procedure starts
+with some solution S containing an excessive number of centroids and clusters k + r, where integer r is
+known in advance or chosen randomly. The r value (number of excessive centroids in the temporary
+solution) is the most important parameter of the agglomerative procedure. Some algorithms, including
+those based on the k-means model [91], involve both the agglomerative and dissociative approaches.
+Moreover, such algorithms are not aimed at achieving the best value of the objective function (1), and their
+accuracy is not high in this sense.
+
+1.3. Research Gap
+
+Many transportation and other problems (e.g., clustering problems related to computer vision)
+require online computation within a fixed time. As mentioned above, Lloyd’s procedure, the most
+popular k-means clustering algorithm, is rather fast. Nevertheless, for specific data sets including
+Computation 2020, 8, 90 5 of 32
+
+geographic/geometrical data, this algorithm results in a solution which is very far from the global
+minimum of the objective function (1), and the multi-start operation mode does not improve the
+result significantly. More accurate k-means clustering methods are much slower. Nevertheless,
+recent advances in high-performance computing and the use of massively parallel systems enable us
+to work through a large amount of computation using the Lloyd’s procedure embedded into more
+complex algorithmic schemes. Thus, the demand for clustering algorithms that compromise on the
+time spent for computations and the resulting objective function (1) value is apparent. Nevertheless,
+in some cases, when solving problem (1), it is required to obtain a result (a value of the objective
+function) within a limited fixed time, which would be difficult to improve on by known methods
+without a significant increase in computational costs. Such results are required if the cost of error
+is high, as well as for evaluating faster algorithms, as reference solutions.
+
+Agglomerative procedures, despite their relatively high computational complexity, can be
+successfully integrated into more complex search schemes. They can be used as a part of the crossover
+operator of genetic algorithms [46,83] and as a part of the VNS algorithms. Moreover, such algorithms
+are a compromise between the solution accuracy and time costs. In this article, by accuracy, we mean
+exclusively the ability of the algorithm (solver) to obtain the minimum values of the objective function (1).
+
+The use of VNS algorithms, that search in the neighborhoods, formed by applying greedy
+agglomerative procedures to a known (current) solution S, enables us to obtain good results in a fixed
+time acceptable for interactive modes of operation. The selection of such procedures, their sequence and
+their parameters remained an open question. The efficiency of such procedures has been experimentally
+shown on some test and practical problems. Various versions of VNS algorithms based on greedy
+agglomerative procedures differ significantly in their results which makes such algorithm difficult to
+use in practical problems. It is practically impossible to forecast the relative performance of a specific
+VNS algorithm based on such generalized numerical features of the problem as the sample size and
+the number of clusters. Moreover, the efficiency of such procedures depends on their parameters.
+However, the type and nature of this dependence has not been studied.
+
+1.4. Our Contribution
+
+In this article, we systematize approaches to the construction of search algorithms in neighborhoods,
+formed by the use of greedy agglomerative procedures.
+In this work, we proceeded from the following assumptions:
+
+(a) The choice of parameter r value (the number of excessive centroids, see above) of the greedy
+agglomerative heuristic procedure significantly affects the efficiency of the procedure.
+
+(b) Since it is hardly possible to determine the optimal value of this parameter based on such
+numerical parameters of the k-means problem as the number of data vectors and the number of
+clusters, reconnaissance (exploratory) search with various values of r can be useful.
+
+(c) Unlike the well-known VNS algorithms that use greedy agglomerative heuristic procedures with
+an increasing value of the parameter r, a gradual decrease in the value of this parameter may be
+more effective.
+
+Based on these assumptions, we propose a new VNS algorithm involving greedy agglomerative
+procedures for the k-means problem, which, by adjusting the initial r parameter of such procedures,
+enables us to obtain better results in a fixed time which exceed the results of known VNS algorithms.
+Due to self-adjusting capabilities, such an algorithm should be more versatile, which should increase
+its applicability to a wider range of problems in comparison with known VNS algorithms based on
+greedy agglomerative procedures.
+
+1.5. Structure of this Article
+
+The rest of this article is organized as follows. In Section 2, we present an overview of the
+most common local search algorithms for k-means and similar problems, and introduce the notion
+Computation 2020, 8, 90 6 of 32
+
+of neighborhoods SWAP, and GREEDY,. It is shown experimentally that the search result in these
+neighborhoods strongly depends on the neighborhood parameter r (the number of simultaneously
+alternated or added centroids). In addition, we present a new VNS algorithm which performs the
+local search in alternating GREEDY, neighborhoods with the decreasing value of r and its initial
+value estimated by a special auxiliary procedure. In Section 3, we describe our computational
+experiments with the new and known algorithms. In Section 4, we consider the applicability of the
+results on the adjustment of the GREEDY, neighborhood parameter in algorithmic schemes other
+than VNS, in particular, in evolutionary algorithms with a greedy agglomerative crossover operator.
+The conclusions are given in Section 5.
+
+2. Materials and Methods
+
+For constructing a more efficient algorithm (solver), we used a combination of such algorithms as
+Lloyd’s procedure, greedy agglomerative clustering procedures, and the variable neighborhood search.
+The most computationally expensive part of this new algorithmic construction, Lloyd’s procedure,
+was implemented on graphic processing units (GPU).
+
+2.1. The Simplest Approach
+
+Lloyd’s procedure, the simplest and most popular algorithm for solving the k-means problem,
+is described as follows (see Algorithm 1).
+
+Algorithm 1. Lloyd(S)
+
+ 
+
+Require: Set of initial centroids S = {X1,... , Xx}. If S is not given, then the initial centroids are selected
+randomly from the set of data vectors {Ay,... , Ay}.
+
+repeat
+
+1. For each centroid Xj, j= Lk, define its cluster in accordance with (2); //I.e. assign each data vector to the
+nearest centroid
+
+2. For each cluster Cj, j= Lk, calculate its centroid as follows:
+
+X= LicTN):AjeC; Aj .
+J [C;|
+
+until all centroids stay unchanged.
+
+Formally, the k-means problem in its formulation (1) or (3) is a continuous optimization problem.
+With a fixed composition of clusters C;, the optimal solution is found in an elementary way, see Step 2
+in Algorithm 1, and this solution is the local optimum of the problem in terms of the continuous
+optimization theory, i.e., local optimum in the e-neighborhood. A large number of such optima forces
+the algorithm designers to systematize their search in some way. The first step of Lloyd’s algorithm
+solves a simple combinatorial optimization problem (3) on the redistribution of data vectors among
+clusters, that is, it searches in the other neighborhood.
+
+The simplicity of Lloyd’s procedure enables us to apply it to a wide range of problems, including face
+detection, image segmentation, signal processing and many others [92]. Frackiewicz et al. [93] presented
+a color quantization method based on downsampling of the original image and k-means clustering on
+a downsampled image. The k-means clustering algorithm used in [94] was proposed for identifying
+electrical equipment of a smart building. In many cases, researchers do not distinguish between the
+k-means model and the k-means algorithm, as Lloyd’s procedure is also called. Nevertheless, the result
+of Lloyd’s procedure may differ from the results of other more advanced algorithms many times
+in the objective function value (1). For finding a more accurate solution, a wide range of heuristic
+methods were proposed [55]: evolutionary and other bio-inspired algorithms, as well as local search in
+various neighborhoods.
+Computation 2020, 8, 90 7 of 32
+
+Modern scientific literature offers many algorithms to speed up the solution of the k-means problem.
+Algorithm named k-indicators [95] promoted by Chen et al. is a semi-convex-relaxation algorithm for
+approximate solution of big-data clustering problems. In the distributed implementation of the k-means
+algorithm proposed in [96], the algorithm considers a set of agents, each of which is equipped with
+a possibly high-dimensional piece of information or set of measurements. In [97,98], the researchers
+improved algorithms for the data streams. In [99], Hedar et al. present a hierarchical k-means method
+for better clustering performance in the case of big data problems. This approach enables us to mitigate
+the poor scaling behavior with regard to computing time and memory requirements. Fast adaptive
+k-means subspace clustering algorithm with an adaptive loss function for high-dimensional data was
+proposed by Wang et al. [100]. Nevertheless, the usage of the massively parallel systems is the most
+efficient way to achieve the most significant acceleration of computations, and the original Lloyd’s
+procedure (Algorithm 1) can be seamlessly parallelized on such systems [101,102].
+
+Metaheuristic approaches for the k-means and similar problems include genetic algorithms [46,103,104],
+the ant colony clustering hybrid algorithm proposed in [105], particle swarm optimization algorithms [106].
+Almost all of these algorithms in one way or another use the Lloyd’s procedure or other local search
+procedures. Our new algorithm (solver) is not an exception.
+
+2.2. Local Search in SWAP Neighborhoods
+
+Local search algorithms differ in forms of neighborhood function n(S). A local minimum in one
+neighborhood may not be a local minimum in another neighborhood [50]. The choice of a neighborhood
+of lower cardinality leads to a decrease in the complexity of the search step, however, a wider
+neighborhood can lead to a better local minimum. We have to find a balance between these conflicting
+requirements [50].
+
+A popular idea when solving k-means, k-medoids, k-median problems is to search for a better
+solution in SWAP neighborhoods. This idea was realized, for instance, in the J-means procedure [80]
+proposed by Hansen and Mladenovic, and similar I-means algorithm [107]. In SWAP neighborhoods,
+the set n(S) is the set of solutions obtained from S by replacing one or more centroids with some
+data vectors.
+
+Let us denote the neighborhood, where r centroids must be simultaneously replaced, by SWAP,(S).
+The SWAP, neighborhood search can be regular (all possible substitutions are sequentially enumerated),
+as in the J-means algorithm, or randomized (centroids and data vectors for replacement are
+selected randomly). In both cases, the search in the SWAP neighborhood always alternates with the
+Lloyd’s procedure: if an improved solution is found in the SWAP neighborhood, the Lloyd’s procedure
+is applied to this new solution, and then the algorithm returns to the SWAP neighborhood search.
+Except for very small problems, regular search in SWAP neighborhoods, with the exception of the SWAP}
+neighborhood and sometimes SWAP3, is almost never used due to the computational complexity:
+in each of iterations, all possible replacement options must be tested. A randomized search in SWAP,
+neighborhoods can be highly efficient for sufficiently large problems, which can be demonstrated by
+the experiment described below. Herewith, the correct choice of r is of great importance.
+
+As can be seen on Figure 1, for various problems from the clustering benchmark repository [108,109],
+the best results are achieved with different values of r, although in general, such a search provides
+better results in comparison with Lloyd’s procedure. Our computational experiments are described in
+detail in Sections 2.5-2.7.
+Computation 2020, 8, 90 8 of 32
+
+BIRCH-3 dataset, 100 clusters —*- Min
+
+Mopsi-Joensuu dataset, 100 clusters oli Kar
+= -Max
+
+40 wie Average
+
+1,200E+14
+
+1,100E+14
+
+=— = Median
+
+1,000E+14
+
+9,000E+13
+
+8,000E+13
+
+obj.function SSE
+
+obj.function SSE
+
+7,000E+13
+
+6,000E+13
+
+  
+
+5,000E+13
+
+4,000E+13 0
+
+(a) (b)
+
+Mopsi-Joensuu dataset, 30 clusters —*: Min Mopsi-Joensuu dataset, 300 clusters seas
+°° ~~ Max - 4 - Max
+55 \ —t—Average —#— Average
+
+’
+’ \ =>< Median if
+
+obj.function SSE
+
+obj.function SSE
+
+  
+
+0 5 10 15 20 25 30 0 20 40 60 80 100 120 140 160 180 200 220 240 260 280 300
+
+ 
+
+ 
+
+ 
+
+(c) (d)
+
+Figure 1. Search in SWAPr neighborhoods. Dependence of the result on r: (a) BIRCH3 data set,
+100 clusters, 10° data vectors, time limitation 10 s; (b—d) Mopsi-Joensuu data set, 30, 100 and 300 clusters,
+6014 data vectors, time limitation 5 s.
+
+2.3. Agglomerative Approach and GREEDY; Neyborhoods
+
+When solving the k-means and similar problems, the agglomerative approach is often successful.
+In [86], Sun et al. propose a parallel clustering method based on MapReduce model which implements
+the information bottleneck clustering (IBC) idea. In the IBC and other agglomerative clustering
+algorithms, clusters are sequentially removed one-by-one, and objects are redistributed among
+the remaining clusters. Alp et al. [88] presented a genetic algorithm for facility location problems,
+where evolution is facilitated by a greedy agglomerative heuristic procedure. A genetic algorithm
+with a faster greedy heuristic procedure for clustering and location problems was also proposed
+in [90]. In [46], two genetic algorithm approaches with different crossover procedures are used to solve
+k-median problem in continuous space.
+
+Greedy agglomerative procedures can be used as independent algorithms, as well as being
+embedded into genetic operators [110] or VNS algorithms [79]. The basic greedy agglomerative
+procedure for the k-means problem can be described as follows (see Algorithm 2).
+
+Algorithm 2. BasicGreedy(S)
+
+ 
+
+Require: Set of initial centroids S = {X1,..., Xx}, K > k, required final number of centroids k.
+S — Lloyd(S);
+while |S| > k do
+for i = 1,K do
+F; — SSE(S\{X;});
+end for
+Select a subset S’ C S of rioremove centroids with the minimum values of the corresponding
+variables F;; // By default, rioremove = 1.
+S — Lloyd(S \S’);
+end while.
+Computation 2020, 8, 90 9 of 32
+
+In its most commonly used version, with rtoremove = 1, this procedure is rather slow for large-scale
+problems. It tries to remove the centroids one-by-one. At each iteration, it eliminates such centroids
+that their elimination results in the least significant increase in the SSE value. Further, this procedure
+involves the Lloyd’s procedure which can be also slow in the case of rather large problems with many
+clusters. To improve the performance of such a procedure, the number of simultaneously eliminated
+centroids can be calculated as rigremove = max{1, ([S| —k) - reoe fl. In [90], Kazakovtsev and Antamoshkin
+used the elimination coefficient value roe = 0.2. This means that at each iteration, up to 20% of the
+excessive centroids are eliminated, and such values are proved to make the algorithm faster. In this
+research, we use the same value.
+
+In [79,90,110], the authors embed the BasicGreedy() procedure into three algorithms which differ in
+r value only. All of these algorithms can be described as follows (see Algorithm 3):
+
+Algorithm 3. Greedy (S,S2,r)
+
+ 
+
+Require: Two sets of centroids S, S9, |S| = |S| = k, the number of centroids r of the solution Sy which are used
+
+ 
+
+to obtain the resulting solution, r € {1, kt.
+
+ 
+
+For i = 1, N;epeats do
+1. Select a subset S’ C So: |S’| = 1.
+2. S’ — BasicGreedy(S US’);
+3. if SSE(S’) < SSE(S) then S < S’ end if;
+end for
+return S.
+
+Such procedures use various values of r from 1 up to k. If r= 1 then the algorithm selects a subset
+(actually, a single element) of Sz regularly: {Xj} in the first iteration, {X2} in the second one, etc. In this
+CaSe, Nrepeats = k. If r = k then obviously S’ = Sp, and Nyepeat =1. Otherwise, r is selected randomly,
+
+ 
+
+re {2, k- 1}, and nyepeats depends on 1’: Nyepeats = Max{1,[k/7]}.
+If the solution S> is fixed, then all possible results of applying the Greedy(S,S2,r) procedure form
+a neighborhood of the solution S, and Sz as well as r are parameters of such a neighborhood. If S» is
+a randomly chosen locally optimal solution obtained by Lloyd(S»’) procedure applied to a randomly
+chosen subset S5 Cc {Aj,...,An},
+Let us denote such a neighborhood by GREEDY,(S). Our experiments in Section 3 demonstrate
+
+ 
+
+So’ | = k, then we deal with a randomized neighborhood.
+
+that the obtained result of the local search in GREEDY, neighborhoods strongly depends on r.
+
+2.4. Variable Neighborhood Search
+
+The dependence of the local search result on the neighborhood selection reduces if we use
+a certain set of neighborhoods and alternate them. This approach is the basis for VNS algorithms.
+The idea of alternating neighborhoods is easy to adapt to various problems [76-78] and highly efficient,
+which makes it very useful for solving NP-hard problems including clustering, location, and vehicle
+routing problems. In [111,112], Brimberg and Mladenovic and Miskovic et al. used the VNS for solving
+various facility location problems. Cranic et al. [113] as well as Hansen and Mladenovic [114] proposed
+and developed a parallel VNS algorithm for the k-median problem. In [115], a VNS algorithm was
+used for a vehicle routing and driver scheduling problems by Wen et al.
+
+The ways of neighborhood alternation may differ significantly. Many VNS algorithms are not
+even classified by their authors as VNS algorithms. For example, the algorithm in [57] alternates
+between discrete and continuous problems: when solving a discrete problem, the set of local optima
+is replenished, and then such local optima are chosen as elements of the initial solution of the
+continuous problem. A similar idea of the recombinator k-means algorithm was proposed by C.
+Baldassi [116]. This algorithm restarts the k-means procedure, using the results of previous runs as
+a reservoir of candidates for the new initial solutions, exploiting the popular k-means++ seeding
+Computation 2020, 8, 90 10 of 32
+
+algorithm to piece them together into new, promising initial configurations. Thus, the k-means search
+alternates with the discrete problem of finding an optimal initial centroid combination.
+
+VNS class includes a very efficient abovementioned J-Means algorithm [80], which alternates
+search in a SWAP neighborhood and the use of Lloyd’s procedure. Even when searching only in
+the SWAP, neighborhood, the J-Means results can be many times better than the results of Lloyd’s
+procedure launched in the multi-start mode, as shown in [62,97].
+
+In [50], Kochetov et al. describe such basic schemes of VNS algorithms as variable neighborhood descent
+(VND, see Algorithm 4) [117] and randomized Variable Neighborhood Search (RVNS, see Algorithm 5) [50].
+
+Algorithm 4. VND(S)
+
+Require: Initial solution S, selected neighborhoods n), | = {1 Tmax}.
+repeat
+l<1;
+while! < linjg,do
+search for S’ € n;(S) : f(S’) = min{ f(Y)|Y En)(S)};
+if f(S’) < f(S) then S — S’;1<— 1 else] —1+1 end if;
+end while;
+until the stop conditions are satisfied.
+
+Algorithm 5. RVNS(S)
+
+ 
+
+Require: Initial solution S, selected neighborhoods n), | = {1, Tmax}.
+repeat
+l<1;
+While | < liq, do
+select randomly S’ € 1;(S);
+if f(S’) < f(S) then S — S’; 1<— 1 else] <—/1+1 end if;
+end while;
+until the stop conditions are satisfied.
+
+Algorithms of the RVNS scheme are more efficient when solving large-scale problems [50],
+when the use of deterministic VND requires too large computational costs per each iteration. In many
+efficient algorithms, Ingy = 2. For example, the J-Means algorithm combines a SWAP neighborhood
+search with Lloyd’s procedure.
+
+As arule, algorithm developers propose to move from neighborhoods of lower cardinality to wider
+neighborhoods. For instance, in [79], the authors propose a sequential search in the neighborhoods
+GREEDY, — GREEDY random ~ GREEDY; — GREEDY, — ... Here, GREEDY; andom is a neighborhood
+with randomly selected r € {2, k- i}. In this case, the initial neighborhood type has a strong influence on
+the result [79]. However, the best initial value of parameter r is hardly predictable.
+
+In this article, we propose a new RVNS algorithm which involves GREEDY; neighborhood search
+with a gradually decreasing r and automatic adjustment of the initial r value. Computational experiments
+show the advantages of this algorithm in comparison with the algorithms searching in SWAP
+neighborhoods as well as in comparison with known search algorithms with GREEDY, neighborhoods.
+
+2.5. New Algorithm
+
+A search in a GREEDY, neighborhood with a fixed r values, on various practical problems listed
+in the repositories [108,109,118], shows that the result (the value of the objective function) essentially
+depends on r, and this dependence differs for various problems, even if the problems have similar basic
+numerical characteristics, such as the number of data vectors N, their dimension d, and the number of
+clusters k. The results are shown on Figures 2 and 3. At the same time, our experiments show that at
+the first iterations, the use of Algorithm 3 almost always leads to an improvement in the SSE value,
+Computation 2020, 8, 90 11 of 32
+
+and then the probability of such a success decreases. Moreover, the search in neighborhoods with
+large r values stops giving improving results sooner, while the search in neighborhoods with small r,
+in particular, with r = 1, enables us to obtain the improved solutions during a longer time. The search
+in the GREEDY; neighborhood corresponds to the adjustment of individual centroid positions. Thus,
+the possible decrement of the objective function value is not the same for different values of r.
+
+ 
+
+ 
+
+ 
+
+ 
+
+ 
+
+ 
+
+ 
+
+  
+
+ 
+
+ 
+
+ 
+
+ 
+
+ 
+
+ 
+
+     
+  
+
+3,800E+13 .
+oe BIRCH3 dataset, 100 clusters = $4. min / Mopsi-Joensuu dataset, 100 clusters
+-2- / .
+3,790E+13 / — mM —@: Min
+os ’ —k— Average
+/ ™ aS - Max
+‘ — = Median , j ‘
+3,780E+13 , x —tk— Average
+rf % —>< Median
+3,770E+13
+uy 3,760E+13
+a a
+: :
+% 3,750E+13 6
+& ~
+3 Vv
+= c
+8 2
+© 3,7406+13 =
+°
+3,730E+13
+—-—
+3,720E+13
+3,710E+13
+3,700E+13 0
+0 10 20 30 40 50 60 70 80 90 100 0 10 20 30 40 50 60 70 80 90 100
+r
+(a) (b)
+Mopsi-Joensuu dataset, 30 clusters Mopsi-Joensuu dataset, 300 clusters
+22 : 10:38 —+: Min
+1 oo 1
+; 2 e---8--2----9 oF ot! a -Max
+\ : iat —w#— Average
+‘ —¢: Min : “it — + Median
+21 ‘ -  -Max
+; —t— Average 7
+1
+\ —>< Median
+lo 1 w 6
+a ‘ 2
+c ‘ ‘e
+2 ‘ 6
+% 20 ‘ 35
+red 1 &
+2 ‘ =
+s \ 3
+3° 1 o4
+\
+\
+i 3
+19
+2
+Ok EH . = :
+wee
+18 0
+0 5 10 15 20 25 30 0 20 40 60 80 100 120 140 160 180 200 220 240 260 280 300
+r r
+(c) (d)
+Mopsi-Finland dataset, 100 clusters Mopsi-Finland dataset, 300 clusters
+5,6&+09
+| 2,5E+09
+5,5E+09
+—*: Min
+—+- Min
+5,4E+09 ~@-Max
+! -#@-Max
+Bet —#— Average aa
++ 7 ’ —e— Average
+5,3E+09 le ‘ -- Median :
+4 - = Median
+a
+- 5,2E+09 Png “
+§ { 7% i, §
+5 © 16, ‘at a db ---------~ ~~... o
+¥ ,1£+09 K-eK—me I ox ~ @....-- a 2
+2 . =
+2 \ ‘ 3
+©5,0&+09 | 6
+
+ 
+
+4,9&+09
+aseoo ft a Ss
+a
+| |
+4,7&+09 | | |
++ \ Riis meee me ee weil cee k an a>
+4,6&+09
+
+0
+
+(e)
+
+ 
+
+5,0E+08
+0
+
+— eh oO
+
+20 40 60 80 100 120 140 160 180 200 220 240 260 280 300
+r
+
+(f)
+
+Figure 2. Search in GREEDYr neighborhoods. Dependence of the result on r: (a) BIRCH3 data set,
+100 clusters, 10° data vectors, time limitation 10 s; (b—d) Mopsi-Joensuu data set, 30, 100 and 300 clusters,
+6014 data vectors, time limitation 5 s; (e-f) Mopsi-Finland data set, 100 and 300 clusters, 13,467 data
+
+vectors, time limitation 5 s.
+
+ 
+Computation 2020, 8, 90
+
+12 of 32
+
+IHEPC dataset, 50 clusters
+5 350,00
+
+5 330,00
+
+—@e- Min
+5 310,00
+~ @ - Max
+
+5 290,00
+
+— >< Median
+5 270,00
+
+function SSE
+
+= 5.250,00
+
+obj
+
+'
+'
+'
+'
+'
+'
+'
+I
+1
+.
+'
+1 ~~ Average
+'
+'
+'
+'
+'
+1
+'
+'
+!
+5 230,00 :
+'
+'
+'
+1
+
+    
+
+5 210,00
+
+'
+'
+5 190,00 ;
+
+-
+
+~~~
+5 170,00 i
+
+ 
+
+° Pig 3 : , ee
+5 150,00 =
+
+0 10 20
+
+Figure 3. Search in GREEDYr neighborhoods. Dependence of the result on r: Individual Household
+Electric Power Consumption (IHEPC) data set, 50 clusters, 2,075,259 data vectors, time limitation 5 min.
+
+We propose the following sequence of neighborhoods: GREEDY;9 — GREEDY,; — GREEDY;2 >
+. > GREEDY; — GREEDY; — .... Here, r values gradually decrease: 10 >11>72.... After reaching
+r = 1, the search continues in the GREEDY; neighborhood, and after that the value of r starts decreasing
+again. Moreover, the r value fluctuates within certain limits at each stage of the search.
+This algorithm can be described as follows (Algortithm 6).
+
+Algorithm 6. DecreaseGreedySearch(S,rq)
+
+Require: Initial solution S, initial r = rp € {1k .
+select randomly Sp C {A},
+
+wee ,An}, |So|= k; S9 <— Lloyd(S>);
+repeat
+Nyepeats max{1,{k/r]};
+
+fori = 1, "repeats do
+
+1. select randomly r’ € max\1, ||}, ’0 \
+2. S’ — Greedy(S, S2,1’);
+3. if SSE(S’) < SSE(S) then S <— S’ end if;
+endfor;
+select randomly S2 ¢ {A1, ..., An}, |S2] =k; S2 — Lloyd(S2);
+if Steps 1-3 have not changed S
+then
+ifr = 1 then rp < k else rp <— max\1, [5] — 1} end if;
+end if;
+
+until the stop conditions are satisfied (time limitation).
+
+Genetic algorithms with greedy agglomerative heuristics are known to perform better than VNS
+algorithms with sufficient computation time [79,90] which results in better SSE values. Despite this,
+the limited time and computational complexity of the Greedy() procedure as a genetic crossover operator
+leads to a situation when genetic algorithms may have enough time to complete a very limited number
+of crossover operations and often only reach the second or third generation of solutions. Under these
+conditions, VNS algorithms are a reasonable compromise of the computation cost and accuracy.
+
+The choice of the initial value of parameter ro is highly important. Such a choice is quite simply
+carried out by a reconnaissance search with different rg values. The algorithm with such an automatic
+
+adjustment of the parameter rg by performing a reconnaissance search is described as follows
+(Algorithm 7).
+Computation 2020, 8, 90 13 of 32
+
+Algorithm 7. AdaptiveGreedy (S) solver
+
+ 
+
+Require: the number of reconnaissance search iterations Nyecon-
+select randomly S C {Ay, ..., An}, |S| =k; S — Lloyd(S);
+for 1 = 1,N;recon Ao
+
+select randomly 5; ¢ {A1, ..., An}, |S] =k; S$; <— Lloyd(S;);
+end for;
+
+ 
+
+rk;
+repeat
+Sy” — S; "repeats < max({1,[k/r]};
+
+ 
+
+fori = 1, Nyecon do
+
+ 
+
+for 1 = 1, repeats do
+S’ — Greedy(S,”,S;,r); if SSE(S’) < SSE(S;”) then S,” <— S’ end if;
+end for;
+end for;
+re max\1, a — 1};
+
+untilr=1;
+select the value r with minimum value of SSE(S,” );
+ro — min{1.5r,k};
+DecreaseGreedySearch(S; , 10).
+
+Results of computational experiments described in the next Section show that our new algorithm,
+which sequentially decreases the value of the parameter ro, has an advantage over the known
+VNS algorithms.
+
+2.6. CUDA Implementation
+
+The greedy agglomerative procedure (BasicGreedy) is computationally expensive. In Algorithm 2,
+the objective function calculation Fy <—SSE(S\{X;}) is performed more than (K — k) - k times in each
+iteration, and after that, Lloyd() procedure is executed. Therefore, such algorithms are traditionally
+considered as methods for solving comparatively small problems (hundreds of thousands of data
+points and hundreds of clusters). However, the rapid development of the massive parallel processing
+systems (GPUs) enables us to solve the large-scale problems with reasonable time expenses (seconds).
+Parallel (CUDA) implementation of the algorithms for the Lloyd() procedure is known [101,102], and we
+used this approach in our experiments.
+
+Graphic processing units (GPUs) accelerate computations with the use of multi-core computing
+architecture. The CUDA (compute unified device architecture) is the most popular programming
+platform which enables us to use general-purpose programming languages (e.g., C++) for compiling
+GPU programs. The programming model uses the single instruction multiple thread (SIMT) principle [119].
+We can declare a function in the CUDA program a “kernel” function and run this function on the steaming
+multiprocessors. The threads are divided into blocks. Several instances of a kernel function are executed
+in parallel on different nodes (blocks) of a computation grid. Each thread can be identified by special
+threadIdx variable. Each thread block is identified by blockIdx variable. The number of threads in a block
+is identified by blockDim variable. All these variables are 3-dimensional vectors (dimensions x, y, Z).
+Depending on the problem solved, the interpretation of these dimensions may differ. For processing 2D
+graphical data, x and y are used for identifying pixel coordinates.
+
+The most computationally expensive part of Lloyd’s procedure is distance computation and
+comparison (Step 1 of Algorithm 1). This step can be seamlessly parallelized if we calculate
+distances from each individual data vector in a separate thread. Thus, threadIdx.x and blockIdx.x
+must indicate a data vector. The same kernel function prepares data needed for centroid calculation
+(Step 2 of Algorithm 1). Such data are the sum of data vector coordinates in a specific cluster
+sum; = die (TN):AieC, A; and the cardinality of the cluster counter; = IC il: Here, j is the cluster number.
+Variable sum; is a vector (1-dimensional array in program realization).
+Computation 2020, 8, 90 14 of 32
+
+To perform Step 1 of Algorithm 1 on a GPU, after initialization sum; <0 and counter; —0,
+the following procedure (Algorithm 8) runs on (N + blockDim.x) / blockDim.x nodes of computation grid,
+with blockDim.x threads in each block (in our experiments, blockDim.x = 512):
+
+Algorithm 8. CUDA kernel implementation of Step 1 in Lloyd’s procedure (Algorithm 1)
+
+ 
+
+i — blockIdx.x -blockDim.x + threadIdx.x;
+if i > N then return end if;
+Dyearest <— +00; // distance from Aj; to the nearest centroid
+for j] = 1,k do
+if Aj — Xil| < Dnearest then
+Dyearest Aj — Xj;
+nf;
+end if
+end for;
+
+ 
+
+SUM) <— SUM, + An;
+counter, <— counter, + 1;
+SSE <— SSE+ D2 carest -// Objective function adder
+If sum; and counter; are pre-calculated for each cluster then Step 2 of Algorithm 1 is reduced to
+a single arithmetic operation for each cluster: X; = sum,/counter;. If the number of clusters is not huge,
+this operation does not take significant computation resources. Nevertheless, its parallel implementation
+is even simpler: we organize k treads, and each thread calculates X; for an individual cluster.
+Outside Lloyd’s procedure, we use Algorithm 8 for SSE value estimation (variable SSE must be
+initialized by 0 in advance).
+The second computationally expensive part of the BasicGreegy() algorithm is estimation of the
+objective function value after eliminating a centroid [120]: Fy = SSE(S\{X;}). Having calculated SSE(S),
+we may calculate as SSE(S\{X;}) as
+
+ 
+
+F., = SSE(S\{Xi}) = SSE(S) + LAD, (5)
+where
+0, A, € Gi,
+AD, = 2 5
+(mics, jt IX) Alll) -IX- AIP, Ar € Ci
+
+For calculating (5) on a GPU, after initializing F; < SSE(S), the following kernel function
+(Algorithm 9) runs for each data vector.
+
+Algorithm 9. CUDA kernel implementation of calculating F; — SSE(S\{X;}) in BasicGreedy procedure (Algorithm 2)
+
+ 
+
+Require: index 7 of centroid being eliminated.
+1 — blockIdx.x -blockDim.x + threadIdx.x;
+if / > N then return end if;
+Dyearest <— +00; // distance from A, to the nearest centroid except X;
+for j] = 1,k do
+
+if] #i and Aj — X; < Dyearest then
+
+Dearest. Aj — Xij|l;
+
+end if
+end for;
+Fj — F; + D* — |X; — Ail;
+
+nearest
+
+ 
+Computation 2020, 8, 90 15 of 32
+
+All distance calculations for GREEDY, neighborhood search are performed by Algorithms 8 and 9.
+A similar kernel function was used for accelerating the local search in SWAP neighborhoods. In this
+function, after eliminating a centroid, a data point is included in solution S as a new centroid.
+
+All other parts of new and known algorithms were implemented on the CPU.
+
+2.7. Benchmarking Data
+
+In all our experiments, we used the classic data sets from the UCI Machine Learning and Clustering
+basic benchmark repositories [108,109,118]:
+
+(a) Individual household electric power consumption (IHEPC)—energy consumption data of
+households during several years (more than 2 million data vectors, 7 dimensions), 0-1 normalized
+data, “date” and “time” columns removed;
+
+(b) BIRCH3 [121]: one hundred of groups of points of random size on a plane (10° data vectors,
+2 dimensions);
+
+(c) S1 data set: Gaussian clusters with cluster overlap (5000 data vectors, 2 dimensions);
+
+(d) Mopsi-Joensuu: geographic locations of users (6014 data vectors, 2 dimensions) in Joensuu city;
+
+(e) Mopsi-Finland: geographic locations of users (13,467 data vectors, 2 dimensions) in Finland.
+
+Mopsi-Joensuu and Mopsi-Finland are “geographic” data sets with a complex cluster structure,
+formed under the influence of natural factors such as the geometry of the city, transport communications,
+and urban infrastructure (Figure 4).
+
+9? -
+
+ 
+
+Figure 4. Mopsi-Joensuu data set visualization.
+
+In our study, we do not take into account the true labeling provided by the data set (if it is known),
+i.e., the given predictions for known classes, and focus on the minimization of SSE only.
+
+2.8. Computational Environment
+
+For our computational experiments, we used the following test system: Intel Core 2 Duo
+E8400 CPU, 16GB RAM, NVIDIA GeForce GTX1050ti GPU with 4096 MB RAM, floating-point
+performance 2138 GFLOPS. This choice of the GPU hardware was made due to its prevalence, and also
+one of the best values of the price/performance ratio. The program code was written in C++. We used
+Visual C++ 2017 compiler embedded into Visual Studio v.15.9.5, NVIDIA CUDA 10.0 Wizards,
+and NVIDIA Nsight Visual Studio Edition CUDA Support v.6.0.0.
+Computation 2020, 8, 90 16 of 32
+
+3. Results
+
+For all data sets, 30 attempts were made to run each of the algorithms (see Tables 1 and A1,
+Tables A2—A11 in Appendix A).
+
+Table 1. Comparative results for all data sets (best of known algorithms vs. new algorithm).
+
+ 
+
+ 
+
+ 
+
+ 
+
+ 
+
+ 
+
+Algorithm or Achieved SSE Summarized After 30 Runs p-Values and Statistical
+. Significance of
+Neighborhood Diff in Result
+Min (Record) Max (Worst) Average Median Std.dev Hrerence 1 Xesuits
+BIRCH3 data set. 10° data vectors in R2, k = 300 clusters, time limitation 10 s
+1.31172 x 1.30916 x 1.30912 x 1.08001 x
+GREEDY 299 1.30773 x 1018 103 103 108 1010 pt = 0.4098
+AdaptiveGreedy 1.30807 x 10'3 TO * mers * gS * at ot * py = 0.23376
+BIRCH3 data set. 10° data vectors in R2, k = 100 clusters, time limitation 10 s
+3.72087 X 3.71644 x 3.71518 x 2.22600 x
+GREEDY; 3.71485 x 1018 103 1023 103 1010 pt = 0.0701
+AdaptiveGreedy 3.71484 x 1013 oN * 5 * 5 * aertiy * py = 0.13576
+Mopsi-Joensuu data set. 6014 data vectors in R2, k = 300 clusters, time limitation 5 s
+GH-VNS3 0.4321 0.6838 0.6024 0.6139 0.0836 Pu = 0.00005Tt
+GREEDY 299 0.4555 1.0154 0.6746 0.5882 0.2163 pt < 0.00001T
+AdaptiveGreedy 0.3128 0.6352 0.4672 0.4604 0.1026
+Mopsi-Joensuu data set. 6014 data vectors in R2, k = 100 clusters, time limitation 5 s
+GREEDY 109 1.8021 2.2942 2.0158 1.9849 0.1860 pt = 0.09102
+GH-VNS3 1.7643 2.7357 2.0513 1.9822 0.2699 Pu = 0.00427}
+AdaptiveGreedy 1.7759 2.3265 1.9578 1.9229 0.1523
+Mopsi-Joensuu data set. 6014 data vectors in R2, k = 30 clusters, time limitation 5 s
+GH-VNS1 18.3147 18.3255 18.3238 18.3253 0.0039 pt = 0.4118
+AdaptiveGreedy 18.3146 18.3258 18.3240 18.3253 0.0037 Pu = 0.2843
+Mopsi- Finland data set.13,467 data vectors in R2, k = 300 clusters, time limitation 5 s
+GH-VNS3 5.33373 x 108 7.29800 x 108 5.74914 10® 5.48427 x 10® 5.05346 x 107 pt = 0.13920
+AdaptiveGreedy 5.27254 x 108 7.09410 x 108 5.60867 10® 5.38952 x 108 4.89257 x 107 py = 0.0049}
+Mopsi-Finland data set. 13,467 data vectors in R2, k = 30 clusters, time limitation 5 s
+GH-VNS3 3.42528 x 1010 a aio * oe * aoe * 1.02356 x 108 pp = 0.05206
+AdaptiveGreedy 3.42528 x 1010 ans * aid * 5 * 1.03984 x 108 py = 0.00017
+S1 data set. 5000 data vectors in R2, k = 15 clusters, time limitation 1 second
+GH-VNS2 8.91703 x 10! oD * oD * oD * 0.0000 p= 0.50
+AdaptiveGreedy 8.91703 x 1012 ante * ant * ea * 0.0000 py = 0.58
+S1 data set. 5000 data vectors in R2, k = 50 clusters, time limitation 1 second
+GH-VNS1 3.74310 x 10! 5 * anes * ee * 6.99859 x 109 pp = 0.35710
+AdaptiveGreedy 3.74340 x 10! 5 * 0 * abd * 5.56298 x 109 py = 0.284346
+THEPC data set. 2,075,259 data vectors in R’, k = 50 clusters, time limitation 5 min
+GREEDY}j9 5154.2017 5176.4502 5162.0460 5160.4014 7.2029 pt = 0.008T
+AdaptiveGreedy 5153.5640 5163.9316 5157.0822 5155.5198 3.6034 Pu = 0.001ff
+
+Note: “7”, “f}”: the advantage of the new algorithms over known algorithms is statistically significant (“7” for t-test
+and “ff” for Mann-Whitney U test), “1”, “J”: the disadvantage of the new algorithm over known algorithms is
+
+statistically significant; “<0”, “>”: the advantage or disadvantage is statistically insignificant. Significance level is 0.01.
+
+For comparison, we ran local search in various GREEDYr neighborhoods at fixed r value.
+In addition, we ran various known Variable Neighborhood Search (VNS) algorithms with GREEDYr
+neighborhoods [79], see algorithms GH-VNS1-3. These algorithms use the same sequence of
+neighborhood types (GREEDY; GREEDY jgnqoy, >GREEDY;) and differ in the initial neighborhood type:
+GREEDY, for GH-VNS1, GREEDY jajgoi, for GH-VNS2, and GREEDY; GH-VNS3. Unlike our new
+AdaptiveGreedy() algorithm, GH-VNS1-3 algorithms increase r values, and this increase is not gradual.
+In addition, we included the genetic algorithm (denoted “GA-1” in Tables Al—A11) with the
+single-point crossover [103], real-valued genes encoded by centroid positions, and the uniform random
+mutation (probability 0.01). For algorithms launched in the multi-start mode (j-Means algorithm and
+Computation 2020, 8, 90 17 of 32
+
+Lloyd’s procedure), only the best results achieved in each attempt were recorded. In Tables A1—A11,
+such algorithms are denoted Lloyd-MS and j-Means-MS, respectively.
+
+The minimum, maximum, average, and median objective function values and its standard
+deviation were summarized after 30 runs. For all algorithms, we used the same realization of the
+Lloyd() procedure which consume the absolute majority of the computation time.
+
+The best average and median values of the objective function (1) are underlined. We compared
+the new AdaptiveGreedy() algorithm with the known algorithm which demonstrated the best median
+and average results (Table 1). For comparison, we used the t-test [122,123] and non-parametric
+Wilcoxon-Mann-Whitney U test (Wilcoxon rank sum test) [124,125] with z approximation.
+
+To compare the results obtained by our new algorithm, we tested the single-tailed null
+hypothesis Ho: SSE AdaptiveGreedy = SSEknown (the difference in the results is statistically insignificant)
+and the research hypothesis Hy: SSE AdaptiveGreedy < SSEknown (Statistically different results, the new
+algorithm has an advantage). Here, SSE AdaptiveGreedy are results ontained by AdaptiveGreedy() algorithm,
+SSEknown are results of the best-known algorithm. For t-test comparison, we selected the algorithm
+lowest in average SSE value, and for Wilcoxon—Mann—Whitney U test comparison, we selected the
+algorithm with the lowest SSE median value. For both tests, we calculated the p-values (probability of
+the null-hypothesis acceptance), see p; for the t-test and p,, for the Wilcoxon—Mann—Whitney U test in
+Table 1, respectively. At the selected significance level psig = 0.01, the null hypothesis is accepted if
+pt > 0.01 or py > 0.01. Otherwise, the difference in algorithm results should be considered statistically
+significant. If the null hypothesis was accepted, we also tested a pair of single-tailed hypotheses
+SSE AdaptiveGreedy = SSEknown and SSE adaptiveGreedy > SSEknown-
+
+In some cases, the Wilcoxon—Mann-Whitney test shows the statistical significance of the differences
+in results, while the t-test does not confirm the benefits of the new algorithm. Figure 5 illustrates such
+a situation. Both algorithms demonstrate approximately the same results. Both algorithms periodically
+produce results that are far from the best SSE values, which is expressed in a sufficiently large value of
+the standard deviation. However, the results of the new algorithm are often slightly better, which is
+confirmed by the rank test.
+
+@ GH-VNS3
+18 0 AdaptiveGreedy
+
+frequency
+co
+
+: bie
+
+42
+10
+
+5.26-5.40
+5.74-6.08
+6.42-6.76
+
+8
+SSE, -10
+
+5.40-5.74
+6.08-6
+6.76-7
+
+Figure 5. Frequency diagram of the results (our new algorithm vs. the best of other tested algorithms,
+GH-VNS3), Mopsi-Finland data set, 300 clusters, 13,467 data vectors, time limitation 5 s, 30 runs of
+each algorithm.
+
+In the comparative analysis of algorithm efficiency, the choice of the unit of time plays
+an important role. The astronomical time spent by an algorithm strongly depends on its implementation,
+the ability of the compiler to optimize the program code, and the fitness of the hardware to execute the
+code of a specific algorithm. Algorithms are often estimated by comparing the number of iterations
+performed (for example, the number of population generations for a GA) or the number of evaluations
+of the objective function.
+Computation 2020, 8, 90 18 of 32
+
+However, the time consumption for a single iteration of a local search algorithm depends on
+the neighborhood type and number of elements in the neighborhood, and this dependence can be
+exponential. Therefore, comparing the number of iterations is unacceptable. Comparison of the objective
+function calculations is also not quite correct. Firstly, the Lloyd() procedure which consumes almost all of
+the processor time, does not calculate the objective function (1) directly. Secondly, during the operation
+of the greedy agglomerative procedure, the number of centroids changes (decreases from k + r down
+to k), and the time spent on computing the objective function also varies. Therefore, we nevertheless
+chose astronomical time as a scale for comparing algorithms. Moreover, all the algorithms use the
+same implementation of the Lloyd() algorithm launched under the same conditions.
+
+In our computational experiments, the time limitation was used as the stop condition for all
+algorithms. For all data sets except the largest one, we have chosen a reasonable time limit to use the
+new algorithm in interactive modes. For IHEPC data and 50 clusters, a single run of the BasicGreedy()
+algorithm on the specified hardware took approximately 0.05 to 0.5 s. It is impossible to evaluate the
+comparative efficiency of the new algorithm in several iterations, since in this case, it does not have
+enough time to change the neighborhood parameter r at least once. We have increased the time to a few
+minutes. This time limit does not correspond to modern concepts of interactive modes of operation.
+Nevertheless, the rapid development of parallel computing requires the early creation of efficient
+algorithmic schemes. Our experiments were performed on a mass-market system. Advanced systems
+may cope with such large problems much faster.
+
+As can be seen from Figure 6, the result of each algorithm depends on the elapsed time.
+Nevertheless, an advantage of the new algorithm is evident regardless of the chosen time limit.
+
+IHEPC dataset, 50 clusters
+5400
+
+   
+  
+   
+    
+
+—=— j-means
+
+— - ~GREEDY30
+* - GH-VNS3
+—te— AdaptiveGreedy
+
+wn
+Oo
+uw
+oO
+
+5300
+
+5250 4
+
+obj.function SSE, median value of 30 runs
+
+5200 +
+
+ 
+
+5150
+
+time, minutes
+(a)
+
+Mopsi-Joensuu dataset, 300 clusters |
+—f— |-means
+
+—— GH-VNS1
+
+16 5 -4- GREEDYS
+= » =GREEDY200
+14 *--GH-VNS3
+\ —*— AdaptiveGreedy
+\
+12 ac 5
+~~. g \
+we.
+10 ~ \~s.
+
+~
+\ ~~ 2 --- 4-1
+
+obj.function, median value of 30 attempts
+co
+
+ 
+
+ 
+
+time, seconds
+
+(b)
+Figure 6. Cont.
+Computation 2020, 8, 90 19 of 32
+
+Mopsi-Finland dataset, 300 clusters
+
+oo
+f
+
+ 
+ 
+     
+  
+   
+
+Jal
+a
+se
+
+—=— j-means
+
+—— GH-VNS1
+
+-=- GREEDY7
+
+=- + GREEDY250
+¢- GH-VNS3
+
+ns
+> >
+
+obj.function, median value of 30 attempts
+de
+i
+
+© —t— AdaptiveGreedy
+34 *
+2,4
+Bg ees
+0,4
+0 1 2 time, seconds? 4 5
+
+(c)
+
+Figure 6. Comparative analysis of the convergence speed. Dependence of the median result on
+
+computation time for: (a) Individual Household Electric Power Consumption (IHEPC) data set, 50 clusters,
+2,075,259 data vectors, time limitation 5 min; (b) Mopsi-Joensuu data set, 300 clusters, 6014 data vectors,
+time limitation 5 s; (c) Mopsi-Finland data set, 300clusters, 13,467 data vectors, time limitation 5 s.
+
+To test the scalability of the proposed approach and the efficiency of the new algorithm on other
+hardware, we carried out additional experiments with NVIDIA GeForce 9600GT GPU, 2048 MB
+RAM, 336 GFLOPS. The declared performance of this simpler equipment is approximately 6 times
+lower. The results of experiments with proportional increase of time limitation are shown in Table 2.
+The difference with the results in Table 1 is obviously insignificant.
+
+Table 2. Additional benchmarking on NVIDIA GeForce 9600GT GPU. Comparative results for Mopsi-
+Finland data set.13,467 data vectors in R2, time limitation 30 s.
+
+ 
+
+ 
+
+Algorithm or Achieved SSE Summarized After 30 Runs
+Neighborhood — fin (Record) Max (Worst) Average Median Std.dev
+k = 300
+GH-VNS3 5.33373 x 108 7.29800 x 108 5.85377 x 108 5.52320x 108 5.59987 x 10”
+AdaptiveGreedy 5.27254 x 108 7.09410 x 108 5.59033 x 10° 5.38888 x 10° 4.60585 x 107
+k = 30
+GH-VNS2 3.42528 x 1010 3.48723 x 101° 3.43916 x 101° 3.43474 x 1019 = 1.46818 x 108
+GH-VNS3 3.42528 x 1010 3.46408 x 101° 3.43731 x 101° 3.43474 x 1019 ~—-_ 7.81989 x 107
+AdaptiveGreedy 3.42528x10!° 3.46274 x 10! = 3.43337 x 1019 ~=—s- 3.43473. x 109 8.13882 x 107
+
+The ranges of SSE values in the majority of Tables A1—A11 are narrow, nevertheless, the differences
+are Statistically significant in several cases, see Table 1. In all cases, our new algorithm outperforms
+known ones or demonstrates approximately the same efficiency (difference in the results is statistically
+insignificant). Moreover, the new algorithm demonstrates the stability of its results (narrow range of
+objective function values).
+
+Search results in both SWAP, and GREEDY, neighborhoods depend on a correct choice of
+parameter r (the number of replaced or added centroids). However, in general, local search algorithms
+with GREEDY, neighborhoods outperform the SWAP, neighborhood search. A simple reconnaissance
+search procedure enables the further improvement of the efficiency.
+
+4. Discussion
+
+The advantages of our algorithm are statistically significant for a large problem (IHEPC data),
+as well as for problems with a complex data structure (Mopsi-Joensuu and Mopsi-Finland data).
+The Mopsi data sets contain geographic coordinates of Mopsi users, which are extremely unevenly
+distributed in accordance with the natural organization of the urban environment, depending on street
+directions and urban infrastructure (Figure 6). In this case, the aim of clustering is to find some natural
+Computation 2020, 8, 90 20 of 32
+
+groups of users according to a geometric/geographic principle for assigning them to k service centers
+(hubs) such as shopping centers, bus stops, wireless network base stations, etc.
+
+Often, geographical data sets show such a disadvantage of Lloyd’s procedure as its inability to
+find a solution close to the exact one. Often, on such data, the value of the objective function found
+by the Lloyd’s procedure in the multi-start mode turns out to be many times greater than the values
+obtained by other algorithms, such as J-Means or RVNS algorithms with SWAP neighborhoods. As can
+be seen from Tables A2, A3 and A5 in Appendix A, for such data, GREEDY;neighborhoods search
+provides significant advantages within a limited time, and our new self-adjusting AdaptiveGreedy()
+solver enhances these advantages.
+
+The VNS algorithmic framework is useful for creating effective computational tools intended
+to solve complex practical problems. Embedding the most efficient types of neighborhoods in this
+framework depends on the problem type being solved. In problems such as k-means, the search
+in neighborhoods with specific parameters strongly depends not only on the generalized numerical
+parameters of the problems, such as the number of clusters, number of data vectors, and the search
+space dimensionality, but also on the internal data structure. In general, the comparative efficiency of
+the search in GREEDY, neighborhoods for certain types of practical problems and for specific data sets
+remains an open question. Nevertheless, the algorithm presented in this work, which automatically
+performs the adjustment of the most important parameter of such neighborhoods, enables its user
+to obtain the best result which the variable neighborhood search in GREEDY, is able to provide,
+without preliminary experiments in all possible GREEDY, neighborhoods. Thus, the new algorithm is
+a more versatile computational tool in comparison with the known VNS algorithms.
+
+Greedy agglomerative procedures are widely used as crossover operators in genetic algorithms
+[46,88,90,110]. In this case, most often, the “parent” solutions are merged completely to obtain
+an intermediate solution with an excessive number of centers or centroids [46,88], which corresponds to
+the search in the GREEDY; neighborhood (one of the crossed “parent” solutions acts as the parameter S>),
+although, other versions of the greedy agglomerative crossover operator are also possible [90,110].
+Such algorithms successfully compete with the advanced local search algorithms discussed in this article.
+
+Self-configuring evolutionary algorithms [126-128] have been widely used for solving various
+optimization problems. An important direction of the further research is to study the possibility
+of adjusting the parameter r in greedy agglomerative crossover operators of genetic algorithms.
+Such procedures with self-adjusting parameter r could lead to a further increase in the accuracy of solving
+the k-means problem with respect to the achieved value of the objective function. Such evolutionary
+algorithms could also involve a reconnaissance search, which would then continue by applying the
+greedy agglomerative crossover operator with r values chosen from the most favorable range.
+
+In addition, the similarity in problem statements of the k-means, k-medoids and k-median
+problems promises us a reasonable hope for the applicability of the same approaches to improving the
+accuracy of algorithms, including VNS algorithms, by adjusting the parameter r of the neighborhoods
+similar with GREEDY,.
+
+5. Conclusions
+
+The process of introducing machine learning methods into all spheres of life determines the
+need to develop not only fast, but also the most accurate algorithms for solving related optimization
+problems. As practice shows, including this study, when solving some problems, the most popular
+clustering algorithm gives a result extremely far from the optimal k-means problem solution.
+
+In this research, we introduced GREEDY, search neighborhoods and found that searching in both
+SWAP and GREEDY, neighborhoods has advantages over the simplest Lloyd’s procedure. However,
+the results strongly depend on the parameters of such neighborhoods, and the optimal values of these
+parameters differ significantly for test problems. Nevertheless, searching in GREEDY, neighborhoods
+outperforms searching in SWAP neighborhoods in terms of accuracy.
+Computation 2020, 8, 90 21 of 32
+
+We hope that our new variable neighborhood search algorithm (solver) for GPUs, which is more
+versatile due to its self-adjusting capability and has an advantage with respect to the accuracy of
+solving the k-means problem over known algorithms, will encourage researchers and practitioners
+in the field of machine learning to build competitive systems with the lowest possible error within
+a limited time. Such systems should be in demand when clustering geographic data, as well as when
+solving a wide range of problems with the highest cost of error.
+
+Author Contributions: Conceptualization, L.K. and I.R.; methodology, L.K.; software, L.K.; validation, IR. and E.T.;
+formal analysis, I.R. and A.P.; investigation, LR.; resources, L.K. and E.T.; data curation, I.R.; writing—original draft
+preparation, L.K. and I.R.; writing—review and editing, L.K., E.T., and A.P.; visualization, I.R.; supervision, L.K.;
+project administration, L.K.; funding acquisition, L.K. and A.P. All authors have read and agreed to the published
+version of the manuscript.
+
+Funding: This research was funded by The Ministry of Science and Higher Education of the Russian Federation,
+project No. FEFE-2020-0013.
+
+Conflicts of Interest: The authors declare no conflict of interest. The funder had no role in the design of the study;
+in the collection, analyses, or interpretation of data; in the writing of the manuscript, or in the decision to publish
+
+the results.
+
+Abbreviations
+
+The following abbreviations are used in this manuscript:
+
+NP Non-deterministic polynomial-time
+MSSC Minimum Sum-of-Squares Clustering
+SSE Sum of Squared Errors
+ALA algorithm Alternate Location-Allocation algorithm
+VNS Variable Neighborhood Search
+GA Genetic Algorithm
+IBC Information Bottleneck Clustering
+VND Variable Neighborhood Descent
+RVNS Randomized Variable Neighborhood Search
+GPU Graphics Processing Unit
+CPU Central Processing Unit
+RAM Random Access Memory
+CUDA Compute Unified Device Architecture
+THEPC Individual Household Electric Power Consumption
+Lloyd-MS Lloyd’s procedure in a multi-start mode
+J-means-MS J-Means algorithm in a multi-start mode (SWAP, +Lloyd VND)
+A neighborhood formed by applying greedy agglomerative
+GREEDY, procedures with r excessive clusters, and the RVNS algorithm which
+combines search in such neighborhood with Lloyd’s procedure
+A neighborhood formed by replacing r centroids by data vectors,
+SWAP, and the RVNS algorithm which combines search in such
+neighborhood with Lloyd’s procedure
+VNS algorithm with GREEDYr neighborhoods and GREEDY; for
+GH-VNS1 wage ;
+the initial neighborhood type
+VNS algorithm with GREEDYr neighborhoods and GREEDY pando
+GH-VNS2 Sage ;
+for the initial neighborhood type
+VNS algorithm with GREEDYr neighborhoods and GREEDY; for
+GH-VNS3 wage ;
+the initial neighborhood type
+CM Genetic algorithm with the single-point crossover, real-valued genes
+
+AdaptiveGreedy
+
+encoded by centroid positions, and the uniform random mutation
+New algorithm proposed in this article
+Computation 2020, 8, 90 22 of 32
+
+Appendix A. Results of Computational Experiments
+
+Table A1. Comparative results for Mopsi-Joensuu data set. 6014 data vectors in R*, k = 30 clusters,
+time limitation 5 s.
+
+ 
+
+ 
+
+Table A2. Comparative results
+time limitation 5 s.
+
+Algorithm or Neighborhood
+
+ 
+
+ 
+
+ 
+
+ 
+
+Algorithm or Achieved SSE Summarized After 30 Runs
+Neighborhood Min (Record) = Max (Worst) Average Median Std.dev
+Lloyd-MS 35.5712 43.3993 39.1185 38.7718 2.9733
+j-Means-MS 18.4076 23.7032 20.3399 19.8533 1.8603
+GREEDY, 18.3253 27.6990 21.4555 21.6629 3.1291
+GREEDY> 18.3253 21.7008 19.3776 18.3254 1.6119
+GREEDY3 18.3145 21.7007 18.5817 18.3254 0.9372
+GREEDYs5 18.3253 21.7007 18.5129 18.3254 0.7956
+GREEDY7 18.3253 21.7008 18.5665 18.3255 0.9021
+GREEDY 9 18.3253 21.7010 18.5666 18.3255 0.9021
+GREEDY} 18.3254 21.7009 18.5852 18.3256 0.9362
+GREEDYj5 18.3254 18.3257 18.3255 18.3255 0.0001
+GREEDY 79 18.3254 18.3263 18.3257 18.3257 0.0002
+GREEDY 5 18.3254 18.3257 18.3255 18.3255 0.0001
+GREEDY 39 18.3254 18.3261 18.3258 18.3258 0.0002
+GH-VNS1 18.3147 18.3255 18.3238 18.3253 0.0039
+GH-VNS2 18.3253 21.7008 19.3776 18.3254 1.6119
+GH-VNS3 18.3146 21.6801 18.5634 18.3254 0.8971
+SWAP, (the best of SWAP,) 18.9082 20.3330 19.4087 18.9967 0.6019
+GA-1 18.6478 21.1531 19.9555 19.9877 0.6632
+AdaptiveGreedy 18.3146 18.3258 18.3240 18.3253 0.0037
+
+for Mopsi-Joensuu data set. 6014 data vectors in R*, k = 100 clusters,
+
+Achieved SSE Summarized After 30 Runs
+
+ 
+
+ 
+
+ 
+
+ 
+
+ 
+
+Min (Record) Max (Worst) Average Median Std.dev
+
+Lloyd-MS 23.1641 34.7834 27.5520 27.1383 3.6436
+j-Means-MS 1.7628 31.8962 11.1832 2.4216 11.7961
+GREEDY, 20.6701 35.5447 28.9970 29.2429 5.0432
+GREEDY> 2.8264 29.0682 9.9708 5.3363 9.6186
+GREEDY3 2.6690 10.5998 4.1444 3.0588 2.2108
+GREEDYs5 1.9611 4.3128 2.7385 2.7299 0.6135
+GREEDY7 2.0837 4.6443 2.8730 2.6358 0.7431
+GREEDY 9 1.9778 3.8635 2.5613 2.3304 0.6126
+GREEDY}? 1.7817 4.3023 2.5639 2.2009 0.8730
+GREEDY}j5 1.9564 3.1567 2.3884 2.2441 0.3620
+GREEDY 9 1.7937 3.2809 2.4542 2.3500 0.4746
+GREEDY 95 1.9532 3.3874 2.4195 2.2575 0.5470
+GREEDY 39 1.9274 2.4580 2.1723 2.1458 0.2171
+GREEDY59 1.8903 9.3675 2.8047 2.1614 2.0838
+GREEDY 75 1.7878 2.8855 2.1775 2.0272 0.4023
+GREEDY 49 1.8021 2.2942 2.0158 1.9849 0.1860
+GH-VNS1 2.8763 17.1139 7.3196 4.3341 5.7333
+GH-VNS2 2.8264 29.0682 9.9708 5.3363 9.6186
+GH-VNS3 1.7643 2.7357 2.0513 1.9822 0.2699
+SWAP; (the best of rand. SWAP,) 4.9739 23.6572 9.0159 8.3907 4.1351
+GA-1 4.8922 19.1543 8.5914 7.1764 4.1096
+AdaptiveGreedy 1.7759 2.3265 1.9578 1.9229 0.1523
+
+ 
+Computation 2020, 8, 90 23 of 32
+
+Table A3. Comparative results for Mopsi-Joensuu data set. 6014 data vectors in R?, k = 300 clusters,
+
+time limitation 5 s.
+
+ 
+
+ 
+
+Algorithm or Achieved SSE Summarized After 30 Runs
+Neighborhood Min (Record) = Max (Worst) Average Median Std.dev
+Lloyd-MS 4.1789 14.7570 9.1143 9.3119 3.0822
+j-Means-MS 7.0119 22.3126 14.2774 12.6199 5.5095
+GREEDY, 7.1654 15.3500 9.6113 9.2176 2.5266
+GREEDY> 4.9896 14.4839 8.9197 8.2013 3.3072
+GREEDY3 5.8967 14.1110 8.3260 8.0441 2.2140
+GREEDYs5 2.9115 10.2536 5.8012 5.7305 2.2740
+GREEDY7 2.6045 7.9868 4.4201 4.0548 1.4841
+GREEDY jo 2.5497 8.6758 4.1796 2.9639 1.8494
+GREEDY} 2.0753 4.7134 3.0383 2.8777 0.8348
+GREEDYj5 1.8975 8.7890 3.8615 3.2661 1.8064
+GREEDY 79 1.1878 3.7944 2.4577 2.4882 0.9554
+GREEDY 5 1.1691 3.5299 1.8489 1.6407 0.7460
+GREEDY 39 1.1151 4.9425 2.3711 2.0582 1.1501
+GREEDY59 1.3526 3.5471 1.8635 1.7114 0.6046
+GREEDY75 1.0533 5.5915 1.9129 1.4261 1.2082
+GREEDY 09 0.8047 2.0349 1.2602 1.1994 0.3811
+GREEDYj59 0.6243 1.4755 0.8743 0.8301 0.2447
+GREEDY 299 0.4555 1.0154 0.6746 0.5882 0.2103
+GREEDY 59 0.4789 1.3368 0.7233 0.6695 0.2164
+GREEDY 2399 0.5474 1.0472 0.7228 0.6657 0.1419
+GH-VNS1 1.6219 5.2528 3.0423 3.1332 1.0222
+GH-VNS2 1.2073 8.6144 3.2228 2.3501 2.4014
+GH-VNS3 0.4321 0.6838 0.6024 0.6139 0.0836
+SWAP 12 (the best of SWAP 2.6016 5.5038 3.6219 3.3612 1.0115
+by median)
+SWAP29 (the best of SWAP 2.1630 5.1235 3.4958 3.4076 0.8652
+by avg.)
+GA-1 5.4911 12.6950 8.8799 7.7181 2.5384
+AdaptiveGreedy 0.3128 0.6352 0.4672 0.4604 0.1026
+
+ 
+
+ 
+
+ 
+
+Table A4. Comparative results for Mopsi-Finland data set. 13,467 data vectors in R*, k = 30 clusters,
+
+time limitation 5 s.
+
+ 
+
+ 
+
+Algorithm or Achieved SSE Summarized After 30 Runs
+Neighborhood Min (Record) Max (Worst) Average Median Std.dev
+Lloyd-MS 4.79217x10'° = 6.36078 x 10! = 5.74896 x 1019 ~—s- 5.79836 x 10! =: 3.69760 x 10?
+j-Means-MS 3.43535 x 10!9 = 4.26830 x 1019 3.66069 x 10! 3.60666 x 10! 1.75725 x 10?
+GREEDY, 3.43195 x 10!9 =. 3.70609 x 10! =—s- 3.51052 x 1019 ~=—s_- 3.48431 x 1029 =—s—« 7.42. 636 x 108
+GREEDY, 3.43194 x10!9 3.49405x 109 3.44496x10! 3.44140x10!9 1.64360 x 108
+GREEDY; 3.43195 x 10!° = 3.49411 x 10! 3.44474 10! = 3.44140 x 1029 1.71131 x 108
+GREEDY; 3.43195 x 10!° = 3.48411 x 101° 3.44663 x 10! = 3.44141 x 1019 1.65153 x 108
+GREEDY7 3.42531 x10!9 = 3.47610x10!9 3.44091 10! 3.43504 x 1019 1.76023 x 108
+GREEDY} 3.42560 x 1019 = 3.48824x 10! = - 3.45106 x 10! =: 3.43573 x 1018 2.36526 x 10°
+GREEDY} 3.42606 x 101° = 3.48822 x 1019 = 3.44507 x 10! ~—s_- 3.43901 x 1018 1.68986 x 10°
+GREEDY}5 3.42931 x 101° = 3.47817 x 10! ss 3.43874 x 1028 ~=—s-- 3.43901 x 1018 8.31510 x 107
+GREEDY 99 3.42954x10!° =. 3.48826 x 10! =: 3.44186 x 10! = 3.43905 x 1019 1.28972 x 108
+GREEDY>5 3.43877 x 1019s - 3.44951 x 109 =: 3.43982 x 10! =: 3.43907 x 1018 2.57320 x 107
+GREEDY 39 3.43900 x 1019s: 3.48967 x 109 =—s- 3.45169 x 1019 =: 3.43979 x 1018 1.93565 x 108
+GH-VNS1 3.42626 x 1019 =3.48724x 109 = 3.45244 x 1019 =: 3.44144 x 1018 2.00510 x 10°
+GH-VNS2 3.42528 x 109 = 3.48723 x 109 ~—s_- 3.44086 x 10! ~—s- 3.43474 x 101° 1.54771 x 108
+GH-VNS3 3.42528 x10! 3.47955x10!9  3.43826x10!9 3.43474 x 101° 1.02356 x 108
+SWAP) (the best 3 43499 x 1010 3.55777x 109 3.46821 x 10! 3.46056 x 109 3.22711 x 108
+of SWAP,)
+GA-1 3.48343 x 1019 = 3.81846 x 109 =: 3.65004 10! =—s_- 3.64415 x 1018 1.00523 x 10?
+
+AdaptiveGreedy
+
+3.42528 x 101°
+
+3.47353 x 1010
+
+3.43385 x 101°
+
+3.43473 x 101°
+
+1.03984 x 108
+Computation 2020, 8, 90 24 of 32
+
+Table A5. Comparative results for Mopsi- Finland data set. 13,467 data vectors in R?, k = 300 clusters,
+
+time limitation 5 s.
+
+ 
+
+ 
+
+Algorithm or Achieved SSE Summarized After 30 Runs
+Neighborhood Min (Record) Max (Worst) Average Median Std.dev
+Lloyd-MS 5.41643 x 10° 6.89261 x 10? 6.25619 x 10° 6.24387 x 10? 3.23827 x 108
+j-Means-MS 6.75216 x 10° 1.38889 x 10° 8.92782 x 10° 8.35397 x 10° 1.86995 x 108
+GREEDY}, 4.08445 x 10? 9.07208 x 10? 5.89974 x 10? 5.59903 x 10? 1.47601 x 108
+GREEDY, 1.11352 x 10? 2.10247 x 10° 1.59229 x 10? 1.69165 x 10? 2.89625 x 108
+GREEDY; 9.63842 x 108 2.15674 x 10° 1.61490 x 10° 1.60123 x 10° 3.06567 x 10°
+GREEDY; 9.11944 x 108 2.36799 x 10° 1.66021 x 10? 1.70448 x 10? 3.68575 x 108
+GREEDY, 1.17328 x 10? 2.44476 x 10? 1.77589 x 10° 1.80948 x 10? 2.68354 x 108
+GREEDY} 1.14221 x 10? 2.00426 x 10? 1.67586 x 10° 1.69601 x 10? 2.14822 x 108
+GREEDY} 9.41133 x 108 2.28940 x 10° 1.59715 x 10° 1.62288 x 10? 3.01841 x 108
+GREEDY}5 8.86983 x 108 2.29776 x 10° 1.53989 x 10? 1.43319 x 10? 3.70138 x 108
+GREEDY 1.02224 x 10° 2.11636 x 10° 1.62601 x 10? 1.64029 x 10? 2.45576 x 108
+GREEDY)s5 9.07984 x 108 1.87134 x 10? 1.42878 x 10? 1.42864 x 10? 2.74744 x 108
+GREEDY 39 8.44247 x 10° 2.22882 x 10? 1.50817 x 10° 1.56015 x 10° 3.52497 x 108
+GREEDYs59 7.98191 x 108 1.68198 x 10° 1.26851 x 10° 1.17794 x 10° 2.67082 x 10°
+GREEDY75 6.97650 x 108 1.74139 x 10? 1.16422 x 10? 1.16616 x 10? 2.82454 x 108
+GREEDY 199 6.55465 x 108 1.44162 x 10? 1.03643 x 10° 1.09001 x 10? 1.95246 x 108
+GREEDY}159 5.94256 x 108 1.45317 x 10? 8.88898 x 108 7.96787 x 108 2.33137 x 108
+GREEDY 299 5.60885 x 108 1.41411 x 10? 7.96908 x 108 7.20282 x 108 2.26191 x 10°
+GREEDY 59 5.58602 x 10° 1.13946 x 10° 7.58434 x 108 6.81196 x 10° 1.65511 x 108
+GREEDY 399 5.68646 x 10° 1.41338 x 10° 7.35067 x 10° 6.83004 x 10° 1.76126 x 108
+GH-VNS1 1.40141 x 10? 2.86919 x 10° 2.16238 x 10° 2.10817 x 10° 3.42105 x 108
+GH-VNS2 8.22679 x 108 2.12228 x 10° 1.40322 x 10° 1.39457 x 10? 2.96599 x 108
+GH-VNS3 5.33373 x 108 7.29800 x 108 5.74914 x 108 5.48427 x 108 5.05346 x 107
+SWAP) (the best ¢ 9501x108 «9.06507 x 108 ~—s7.48032 x 108 ~—S7.35532x108 ~—«-«6.74846 x 107
+of. SWAP,)
+GA-1 4.54419 x 10° 7.11460 x 10° 5.67688 x 10? 5.61135 x 10? 5.99687 x 10°
+AdaptiveGreedy 5.27254 x 108 7.09410 x 108 5.60867 x 10° 5.38952 x 10° 4.89257 x 10’
+
+Table A6. Comparative results for BIRCHS data set. 10° data vectors in R2, k = 100 clusters, time
+limitation 10 s.
+
+ 
+
+ 
+
+Algorithm or Achieved SSE Summarized After 30 Runs
+Neighborhood Min (Record) Max (Worst) Average Median Std.dev
+Lloyd-MS 8.13022 x10!% = 9.51129 x 108) ~— 8.96327 x 108 ~—s- 9.06147 x 10% ~=—_ 4.84194 x 1014
+j-Means-MS 4.14627 x10! — 6.25398 x 108 = 4.78063 x 108 4.55711 x 10% ~— 6.89734 x 104
+GREEDY, 3.73299 x 108 —s- 5.64559 x 108 = 4.13352 x 108) ~=—s 3.90845 x 108 ~=— 5.19021 x 10!
+GREEDY, 3.71499 x 108 = 3.72063 x 108 = 3.71689 x 108 )~=—s3.71565x 10% = 2.44802 x 101°
+GREEDY; 3.71518 x 10's 3.72643 x 10% ~=— 3.71840 x 10% = 3.71545x 1048 ~=— 4.12818 x 1019
+GREEDY; 3.71485 x 108 =. 3.72087 x 1088 ~—s_ 3.71644. x 10 ~=— 3.71518 x 1088 3=—— 2.22600 x 101°
+GREEDY, 3.71518 x 108 =. 3.72267 x 108 )3~=—3.71755x 108 )~=— 3.71658 x 108 ~— 2.24845 x 101°
+GREEDY 3.71555 x 108 = 3.72119x 108 )~=— 3.71771 x 10% ~=— 3.71794 x 1088 ~—- 1.90289 x 10!
+GREEDY} 3.71556 x 108 =. 3.72954x 108 ~=— 3.71892 x 108 )~—s 3.71693 x 10% 3.91673 x 1019
+GREEDY}5 3.71626 x 103 3.72169 x 108 — 3.71931 x 10!) ~— 3.71963 x 108 ~—- 1.86102 x 101°
+GREEDY 99 3.71600 x 10's 3.72638 x 10! )~— 3.72118 x 108 )~=— 3.72153 x 108 ~— 2.69206 x 10!
+GREEDY)s5 3.72042 x 103s 3.72690 x 10!) ~— 3.72284 x 10! ~=— 3.72228 x 10/8 ~— 2.14437 x 10!
+GREEDY 39 3.72180 x 108) 3.73554 x 108 ~=— 3.72586 x 108 )~— 3.72471 x 1085 ~—_ 4.33818 x 101°
+GREEDY5 3.72166 x10! ~—s-3.76422x 10 =. 3.73883 x 10! )~=—s 3.73681 x 10% ~— 16.1061 x 10!
+GREEDY75 3.72399 x 10!5 3.84870 x 108) ~=—s-- 3.76286 x 108 ~—s 3.74750 x 1048 ~=— 41.6632 x 10!
+GREEDY 19 3.72530 x 108 = 3.91589 x 10! = 3.80730 x 10! ~=—s_ «3.84482 x 108 ~— 61.9706 x 1019
+GH-VNS1 3.71914 x10!) = 3.77527x 10% ~=— 3.73186 x 108 )~— 3.72562 x 1048 ~— 18.3590 x 10!
+GH-VNS2 3.71568 x 108) 3.73791 x 10% = 3.72116 x 10% }~— 3.72051 x 108 ~— 6.08081 x 10!
+GH-VNS3 3.71619 x 10!) 3.73487 x 10! ~=—- 3.72387 x 108 ~— 3.72282 x 10/8 ~—s_ 5.96618 x 10!
+SWAP (the best 4 58705 x 1013 5.48014 103 4.82383 10'S «4.75120 x 1013 «3.90128 x 102
+of SWAP,)
+
+GA-1 3.84317 x 103s 4.08357 x 108 ~— 3.97821 x 10% ~— 3.97088 x 10!8 ~—s_ 7.43642 x 10!!
+
+AdaptiveGreedy
+
+3.71484 x 101°
+
+3.72011 x 1018
+
+3.71726 x 1018
+
+3.71749 x 1018
+
+2.02784 x 1019
+Computation 2020, 8, 90
+
+25 of 32
+
+Table A7. Comparative results for BIRCHS data set. 10° data vectors in R?, k = 300 clusters, time
+
+limitation 10 s.
+
+ 
+
+ 
+
+Algorithm or Achieved SSE Summarized After 30 Runs
+Neighborhood Min (Record) Max (Worst) Average Median Std.dev
+Lloyd-MS 3.49605 x 10% = 4.10899 x 108 ~— 3.74773 x 1088 ~— 3.77191 x 108 =~. 2.32012 x 102
+j-Means-MS 1.58234 x10! = 2.02926 x 108 —1.75530 x 10% ~—1.70507x 10!8 ~—_ 1.43885 x 10!
+GREEDY}, 1.48735 x10 2.63695x10!5 1.71372 10!% = 1.60354x10!% = 2.98555 x 10!2
+GREEDY, 1.31247x10!8 = 1.45481 x 10/3 — 1.37228 x 108 = 1.36745 x 108 = 4.01697 x 10!!
+GREEDY; 1.34995 x10!8 = 1.49226 x 1048 ~—s- 1.39925 x 108 ~—- 1.39752 x 108 ~=— 4.85917 x 10"!
+GREEDY; 1.33072 x10!8 = 1.45757 x 108 — ss: 1.39069 x 10!) — «1.38264 x 10!8 ~— 4.46890 x 10"!
+GREEDY, 1.34959x 108 = 1.49669 x 108 —s: 1.41606 x 10!8)~—s-:1.41764x 108 = 4.92200 x 10"
+GREEDY jo 1.31295 x10! = 1.42722x10!8 ~—: 1.35970 x 108 ~— 1.35318 x 10/8) ~— 3.70511 x 10!!
+GREEDY} 1.32677 x10!8 ~=—- 1.49028 x 10! —s- 1.35561 x 10%) ~=— 1.33940 x10 = 4.44283 x 10"!
+GREEDY}5 1.32077 x 108 ~=— 1.41079 x 10/3 —s- 1.34102 x 10/8) ~— 1.33832 x 10/3 = 2.16247 x 10!!
+GREEDY 1.31994x10!3 = 1.43160 x 10/8 —s-1.35420x 10!) ~=— 1.34096 x 10/3) ~— 3.43684 x 10!!
+GREEDY)s5 1.31078 x10!8 = 1.37699 x 1048 —s- 1.33571 x 10% ~=—. 1.33040 x 10% ~=—. 2.16378 x 10"!
+GREEDY 39 1.32947 x10!8 = 1.45967 x 10! —s« 1.37618 x 108 ~—s- 1.36729 x 108 ~=—— 3.92767 x 10"!
+GREEDYs59 1.32284 x10!8 =. 1.38691 x 104° —s- 1.34840x 10% =. 1.33345x 108 ~—2.70770 x 10"!
+GREEDY7s 1.30808 x 108 — ss: 1.33266 x 10/8): 1.31857 x 10/3) — ss: 1.31833 x 10/8 ~—_ 7.22941 x 1019
+GREEDY 199 1.30852 x 108 = 1.32697 x 108 ~—s-11.31250« 10!3 =: 1.31067x 10% = 4.94315 x 101
+GREEDY}159 1.30754x 10% =1.31446x 10% ~— 1.30971 x 10!8 ~—1.30952x 10/8 ~——- 1.82873 x 1019
+GREEDY 299 1.30773 x10! =. 1.31172 x 1013 ~=—s- 1.30916 x 1048 ~=— 1.30912 x 1073. ~— 1.08001 x 101°
+GREEDY>59 1.30699 x 10% ~=— 1.31073 x 108 ~—_ 1.30944 x 10/8 ~— 1.30990 x 10/8 ~——- 1.18367 x 1019
+GREEDY 399 1.30684 x 10% §=1.31068x 10! ~—— 1.30917 x 108 ~— 1.30933 x 1048 ~—-1.21748 x 1019
+GH-VNS1 1.40452x 10% = 1.56256 x 108) —s 1.45212 «x 10!8 ~— 1.42545 10/8 = 55.7231 x 1019
+GH-VNS2 1.32287 x 10!8 = 1.38727 x 10! — ss: 1,34654x 10%) ~=—s-1,34568 x 108 ~=—.2,01065 x 10"!
+GH-VNS3 1.30996 x 108 —s- 1.31378 x 10%) ~— 1.31158 10!8 = 1.31138 10! ~—- 1.44998 x 1019
+SWAP? (the bestof 5 19539 x 103 3.25705 x 1013 «2.54268 x 1013. «2.37312 x 1013 «3.78491 x 10!2
+SWAP, by median)
+SWAP? (the best of 5 54957 x 103 —-2.86883.x 1013 -—-2.46775x 1013 2.47301 x 1013 1.51198 x 10!2
+SWAP, by avg.)
+GA-1 1.38160 x 10% = 1.71472x 10%) ~—1.55644« 10!) ~— 1.54336 x 108 ~=— 9.21217 x 10
+AdaptiveGreedy 1.30807 x10! ~=—-1.31113 x 1048 —-1.30922x 108 ~—-1.30925x 10! ~——:0.87731 x 101°
+
+Table A8. Comparative results for S1 data set. 5000 data vectors in R2, k = 15 clusters, time limitation 1 s.
+
+ 
+
+ 
+
+AdaptiveGreedy 8.91703 x 10
+
+8.91703 x 10/2
+
+8.91703 x 1012
+
+8.91703 x 1012
+
+ 
+
+ 
+
+ 
+
+Algorithm or Achieved SSE Summarized After 30 Runs
+Neighborhood — iin (Record) Max (Worst) Average Median Std.dev
+Lloyd-MS 8.91703 x10 8.91707x10!2 = 8.91704 x 10!2, —- 8.91703 x 1012, 1.31098 x 107
+j-Means-MS 8.91703 x 102 = 14.2907 x 1012, 12.1154 10!2 = 13.3667 x 10!2 2.38947 x 10!
+GREEDY, 8.91703 x10 = =13.2502x10!2 s-9.27814x 1012 = 8.91703 x 10% ~ ~— 1.25086 x 10!2
+GREEDY, 8.91703 x 10! = 8.91703 x 1012 —s- 8.91703 x 10! —s 8.91703 x 10? 0.00000
+GREEDY3 8.91703 x 10 =8.91703 x 10!2 8.91703 x 10's 8.91703 x 10” 0.00000
+GREEDY; 8.91703 x 102 = 8.91703 x 1012, 8.91703 x 1012, 8.91703 x 1012, 4.03023 x 10°
+GREEDY, 8.91703 x 1012 = 8.91703 x 1012s: 8.91703 x 10! —s- 8.91703 x 1012, 4.87232 x 10°
+GREEDY} 8.91703 x 10% =8.91703x10!2. 8.91703 x 10! 8.91703 x 10% = 5.12234 x 10°
+GREEDY} 8.91703 x 1012 = 8.91703 x 1012s: 8.91703 x 10! —s- 8.91703 x 102 3.16158 x 10°
+GREEDY}; 8.91703 x 10% 8.91703x10!2 = 8.91703 x 10's 8.91703 x 10 3 = 5.01968 x 10°
+GH-VNS1 8.91703 x 102 8.91703 x 1012. 8.91703 x 102 8.91703 x 10/2 0.00000
+GH-VNS2 8.91703 x 10" = 8.91703 x 1012 8,91703 x 10's 8.91703 x 10” 0.00000
+GH-VNS3 8.91703 x 102 = 8.91703 x 10!2, 8.91703 x 10's 8.91703 x 1012 —s_ 4.03023 x 10°
+ect of SWAP) 8.91703 x 102 8.91709 x 102 8.91704 x 102 8.91703 x10" 8.67594 x 108
+GA-1 8.91703 x 10! 8.91707 x 1012 —- 8.91703 x 10's 8.91703 x 102 9.04519 x 10°
+
+0.00000
+Computation 2020, 8, 90
+
+26 of 32
+
+Table A9. Comparative results for S1 data set. 5000 data vectors in R2, k = 50 clusters, time limitation 1 s.
+
+Algorithm or
+Neighborhood
+
+Min (Record)
+
+Achieved SSE Summarized After 30 Runs
+
+Max (Worst)
+
+Average
+
+Median
+
+Std.dev
+
+ 
+
+Lloyd-MS
+j-Means-MS
+GREEDY,
+GREEDY»
+GREEDY3
+GREEDY5
+GREEDY7
+GREEDY}
+GREEDYj5
+GREEDY 9
+GREEDY 5
+GREEDY 39
+GREEDY59
+GH-VNS1
+GH-VNS2
+GH-VNS3
+
+SWAP3 (the best
+
+of SWAP)
+GA-1
+
+AdaptiveGreedy
+
+3.94212 x 10!2
+3.96626 x 10!2
+3.82369 x 10 2
+3.74350 x 10 2
+3.74776 x 10 2
+3.74390 x 10
+3.74446 x 10
+3.74493 x 10
+3.74472 x 10
+3.75028 x 10 12
+3.74770 x 10 2
+3.75014 x 107
+3.74676 x 10!
+3.74310 x 10!
+3,75106 x 10!2
+3.75923 x 10!2
+
+3.75128 x 1012
+
+3.84979 x 10!2
+3.74340 x 1012
+
+4.06133 x 10!2
+4.40078 x 10!2
+4.19102 x 10!
+3.76202 x 10!”
+3.76237 x 10!”
+3.77031 x 10!”
+3.77208 x 10!”
+3.76031 x 10!
+3.77922 x 10!4
+3.76448 x 10!2
+3.76224 x 10!”
+3.76010 x 10/2
+3.77396 x 10/2
+3.76674 x 10!
+3,77369 x 10!2
+3.77964 x 10!2
+
+3.79170 x 10!
+
+3.99291 x 10!
+3.76313 x 10!2
+
+3.99806 x 10!
+4.12311 x 10”
+3.91601 x 1012
+3.75014 x 10!2
+3.75455 x 10!
+3.75345 x 10!
+3.75277 x 10!2
+3.75159 x 10!2
+3.75426 x 1012
+3.75586 x 10/2
+3.75500 x 10!
+3.75583 x 10!
+3.76021 x 10!
+3.74911 x 10!”
+3,75792 x 1014
+3.76722 x 1014
+
+3.77853 x 1012
+3.92266 x 10!2
+
+3.74851 x 10/2
+
+3.99730 x 10/2
+4.07123 x 10!
+3.88108 x 10/2
+3.74936 x 10/2
+3.75456 x 10/2
+3.75298 x 10!2
+3.75190 x 10/2
+3.75185 x 10!
+3.75519 x 10!
+3.75573 x 10!
+3.75572 x 10!
+3.75661 x 10!
+3.75933 x 10/2
+
+3.74580 x 10/2
+
+3,75782 x 10/2
+3.76812 x 10/2
+
+3.77214 x 10/2
+
+3.92818 x 10/2
+3.75037 x 10/2
+
+4.52976 x 1010
+
+14.81090 x 1019
+9.82433 x 1010
+6.10139 x 10?
+
+5.24513 x 10?
+
+7.17733 x 10°
+
+7.40052 x 10?
+
+5.26553 x 10?
+
+9.79855 x 10?
+
+3.97310 x 10°
+
+4.95370 x 10?
+
+3.45280 x 10?
+
+9.09159 x 10?
+
+6.99859 x 10?
+
+6,67960 x 10?
+
+6.00125 x 10?
+
+4.53608 x 10?
+
+4.56845 x 10/2
+5.56298 x 10?
+
+Table A10. Comparative results for Individual Household Electric Power Consumption (IHEPC)
+
+data set. 2,075,259 data vectors in R’, k = 15 clusters, time limitation 5 min.
+
+ 
+
+ 
+
+Algorithm or Achieved SSE Summarized After 30 Runs
+Neighborhood —_ fin (Record) Max (Worst) AVERAGE Median Std.dev
+Lloyd-MS 12,874.8652 12,880.0703 12,876.0219 12,874.8652 2.2952
+j-Means-MS 12,874.8652 13,118.6455 12,984.7081 12,962.1323 75.6539
+allGREEDY115 49. g74.8633 12.874.8633 12,874.8633 12,874.8633 0.0000
+(equal results) ————. ’ —————_ —_ —_—
+GH-VNS1 12,874.8633 12,874.8633 12,874.8633 12,874.8633 0.0000
+GH-VNS2 12,874.8633 12,874.8633 12,874.8633 12,874.8633 0.0000
+GH-VNS3 12,874.8633 12,874.8633 12,874.8633 12,874.8633 0.0000
+GA-1 12,874.8643 12,874.8652 12,874.8644 12,874.8643 0.0004
+AdaptiveGreedy — 12,874.8633 12,874.8633 12,874.8633 12,874.8633 0.0000
+
+Table A11. Comparative results for Individual Household Electric Power Consumption (IHEPC) data
+
+set. 2,075,259 data vectors in R’, k = 50 clusters, time limitation 5 min.
+
+ 
+
+ 
+
+Algorithm or Achieved SSE Summarized After 30 Runs
+Neighborhood — fin (Record) Max (Worst) Average Median Std.dev
+Lloyd-MS 5605.0625 5751.1982 5671.0820 5660.4429 54.2467
+j-Means-MS 5160.2700 6280.6440 5496.6539 5203.5679 493.7311
+GREEDY, 5200.9268 5431.3647 5287.4101 5281.7300 77.0460
+GREEDY» 5167.1482 5283.3894 5171.6509 5192.1274 7.7203
+GREEDY3 5155.5166 5178.4063 5166.5360 5164.6045 8.1580
+GREEDY5 5164.6040 5178.4336 5170.8829 5174.0938 6.0904
+GREEDY7 5162.5381 5178.1269 5168.7218 5171.8292 6.4518
+GREEDY} 5154.2017 5176.4502 5162.0460 5160.4014 7.2029
+GREEDY}? 5162.8715 5181.0281 5166.8952 5165.3295 6.0172
+GREEDYj5 5163.2500 5181.1333 5167.3385 5165.8037 5.7910
+GREEDY 9 5156.2852 5176.6855 5166.2013 5164.6323 7.8749
+Computation 2020, 8, 90
+
+Algorithm or
+Neighborhood
+
+Table A11. Cont.
+
+Achieved SSE Summarized After 30 Runs
+
+27 of 32
+
+ 
+
+Min (Record)
+
+Max (Worst)
+
+Average
+
+Median
+
+Std.dev
+
+ 
+
+GREEDY>;
+GREEDY.
+GREEDY 59
+GH-VNS1
+GH-VNS2
+GH-VNS3
+GA-1
+
+5166.9820
+5168.6309
+5168.3887
+5155.5166
+5159.8818
+5171.2969
+5215.9521
+
+5181.8529
+5182.4351
+5182.4321
+5164.6313
+5176.6855
+5182.4321
+5248.4521
+
+5175.0317
+5175.2414
+5177.5249
+5158.6549
+5167.3365
+5175.0468
+5230.2839
+
+5176.2136
+5176.4512
+5177.6855
+5157.6812
+5166.9512
+5174.0752
+5226.0386
+
+6.1471
+6.4635
+5.4437
+3.7467
+5.6808
+3.6942
+13.2694
+
+AdaptiveGreedy
+
+5153.5640 5163.9316 5157.0822 5155.5198 3.6034
+
+ 
+
+References
+
+10.
+
+11.
+
+12.
+
+13.
+14.
+
+15.
+
+16.
+
+17.
+
+18.
+
+19.
+
+Berkhin, P. Survey of Clustering Data Mining Techniques; Accrue Software: New York, NY, USA, 2002.
+Cormack, R.M. A Review of Classification. J. R. Stat. Soc. Ser. A 1971, 134, 321-367. [CrossRef]
+
+Tsai, C.Y.; Chiu, C.C. A VNS-based hierarchical clustering method. In Proceedings of the 5th WSEAS International
+Conference on Computational Intelligence, Man-Machine Systems and Cybernetics (CIMMACS’06), Venice,
+Italy, 20-22 November 2006; World Scientific and Engineering Academy and Society (WSEAS): Stevens Point,
+WL, USA, 2006; pp. 268-275.
+
+Lloyd, S.P. Least Squares Quantization in PCM. IEEE Trans. Inf. Theory 1982, 28, 129-137. [CrossRef]
+MacQueen, J.B. Some Methods of Classification and Analysis of Multivariate Observations. In Proceedings of
+the 5th Berkley Symposium on Mathematical Statistics and Probability, Berkeley, CA, USA, 21 June—18 July 1965
+and 27 December 1965-7 January 1966; Volume 1, pp. 281-297.
+
+Drineas, P.; Frieze, A.; Kannan, R.; Vempala, S.; Vinay, V. Clustering large graphs via the singular value
+decomposition. Mach. Learn. 2004, 56, 9-33. [CrossRef]
+
+Gu, Y.; Li, K.; Guo, Z.; Wang, Y. Semi-supervised k-means ddos detection method using hybrid feature
+selection algorithm. IEEE Access 2019, 7, 351-365. [CrossRef]
+
+Guo, X.; Zhang, X.; He, Y.; Jin, Y.; Qin, H.; Azhar, M.; Huang, J.Z. A Robust k-Means Clustering Algorithm
+Based on Observation Point Mechanism. Complexity 2020, 2020, 3650926. [CrossRef]
+
+Milligan, G.W. Clustering validation: Results and implications for applied analyses. In Clustering and
+Classification; Arabie, P., Hubert, L.J., Soete, G., Eds.; World Scientific: River Edge, NJ, USA, 1996; pp. 341-375.
+Steinley, D.; Brusco, M. Choosing the Number of Clusters in K-Means Clustering. Psychol. Methods 2011,
+16, 285-297. [CrossRef] [PubMed]
+
+Garey, M.; Johnson, D.; Witsenhausen, H. The complexity of the generalized Lloyd—Max problem (Corresp.)
+IEEE Trans. Inf. Theory 1982, 28, 255-256. [CrossRef]
+
+Aloise, D.; Deshpande, A.; Hansen, P.; Popat, P. NP-hardness of Euclidean sum-of-squares clustering.
+Mach. Learn. 2009, 75, 245-248. [CrossRef]
+
+Cooper, L. Heuristic methods for location-allocation problems. SIAM Rev. 1964, 6, 37-53. [CrossRef]
+
+Jiang, J.L.; Yuan, X.M. A heuristic algorithm for constrained multi-source Weber problem. The variational
+inequality approach. Eur. J. Oper. Res. 2007, 187, 357-370. [CrossRef]
+
+Arthur, D.; Manthey, B.; Roglin, H. k-Means Has Polynomial Smoothed Complexity. In Proceedings of the
+2009 50th Annual IEEE Symposium on Foundations of Computer Science (FOCS’09), Atlanta, GA, USA,
+25-27 October 2009; IEEE Computer Society: Washington, DC, USA, 2009; pp. 405-414. [CrossRef]
+
+Sabin, M.]J.; Gray, R.M. Global convergence and empirical consistency of the generalized Lloyd algorithm.
+IEEE Trans. Inf. Theory 1986, 32, 148-155. [CrossRef]
+
+Emelianenko, M.; Ju, L.; Rand, A. Nondegeneracy and Weak Global Convergence of the Lloyd Algorithm
+in Rd. SIAM J. Numer. Anal. 2009, 46, 1423-1441. [CrossRef]
+
+Pham, D.T.; Afify, A.A. Clustering techniques and their applications in engineering. Proceedings of the
+Institution of Mechanical Engineers, Part C. J. Mech. Eng. Sci. 2007, 221, 1445-1459. [CrossRef]
+
+Fisher, D.; Xu, L.; Carnes, J.R.; Reich, Y.; Fenves, J.; Chen, J.; Shiavi, R.; Biswas, G.; Weinberg, J. Applying AI
+clustering to engineering tasks. [EEE Expert 1993, 8, 51-60. [CrossRef]
+Computation 2020, 8, 90 28 of 32
+
+20.
+
+21.
+
+22.
+
+23.
+
+24.
+
+25.
+
+26.
+
+27.
+
+28.
+
+29.
+
+30.
+
+31.
+
+32.
+
+33.
+
+34.
+
+35.
+
+36.
+
+37.
+
+38.
+
+39.
+
+40.
+
+41.
+
+42.
+
+43.
+
+Gheorghe, G.; Cartina, G.; Rotaru, F. Using K-Means Clustering Method in Determination of the Energy Losses
+Levels from Electric Distribution Systems. In Proceedings of the International Conference on Mathematical
+Methods and Computational Techniques in Electrical Engineering, Timisoara, Romania, 21-23 October 2010;
+pp- 52-56.
+
+Kersten, P.R.; Lee, J.S.; Ainsworth, T.L. Unsupervised classification of polarimetric synthetic aperture radar
+images using fuzzy clustering and EM clustering. IEEE Trans. Geosci. Remote Sens. 2005, 43, 519-527. [CrossRef]
+Cesarotti, V.; Rossi, L.; Santoro, R. A neural network clustering model for miscellaneous components
+production planning. Prod. Plan. Control 1999, 10, 305-316. [CrossRef]
+
+Kundu, B.; White, K.P., Jr.; Mastrangelo, C. Defect clustering and classification for semiconductor devices.
+In Proceedings of the 45th Midwest Symposium on Circuits and Systems, Tulsa, Oklahoma, 4-7 August 2002;
+Volume 2, pp. II-561-I]-564. [CrossRef]
+
+Vernet, A.; Kopp, G.A. Classification of turbulent flow patterns with fuzzy clustering. Eng. Appl. Artif. Intell.
+2002, 15, 315-326. [CrossRef]
+
+Afify, A.A.; Dimov, S.; Naim, M.M.; Valeva, V. Detecting cyclical disturbances in supply networks using
+data mining techniques. In Proceedings of the 2nd European Conference on Management of Technology,
+Birmingham, UK, 10-12 September 2006; pp. 1-8. [CrossRef]
+
+Jain, A.K.; Murty, M.N.; Flynn, PJ. Data clustering: A review. ACM Comput. Surv. 1999, 31, 264-323. [CrossRef]
+Naranjo, J.E.; Saha, R.; Tarig, M.T.; Hadi, M.; Xiao, Y. Pattern Recognition Using Clustering Analysis to
+Support Transportation System Management, Operations, and Modeling. J. Adv. Transp. 2019. [CrossRef]
+Kadir, R.A.; Shima, Y.; Sulaiman, R.; Ali, F. Clustering of public transport operation using K-means.
+In Proceedings of the 2018 IEEE 3rd International Conference on Big Data Analysis (ICBDA), Shanghai,
+China, 9-12 March 2018; pp. 427-532.
+
+Sesham, A.; Padmanabham, P.; Govardhan, A. Application of Factor Analysis to k-means Clustering
+Algorithm on Transportation Data. IJCA 2014, 95, 40-46. [CrossRef]
+
+Deb Nath, R.P.; Lee, H.J.; Chowdhury, N.K.; Chang, J.W. Modified K-Means Clustering for Travel Time
+Prediction Based on Historical Traffic Data. LNCS 2010, 6276, 511-521. [CrossRef]
+
+Montazeri-Gh, M.; Fotouhi, A. Traffic condition recognition using the k-means clustering method. Sci. Iran.
+2011, 18, 930-937. [CrossRef]
+
+Farahani, R.Z.; Hekmatfar, M. Facility Location Concepts, Models, Algorithms and Case Studies; Springer:
+Berlin/Heidelberg, Germany, 2009. [CrossRef]
+
+Drezner, Z.; Hamacher, H. Facility Location: Applications and Theory; Springer: Berlin, Germany, 2004;
+pp. 119-143.
+
+Klastorin, T.D. The p-Median Problem for Cluster Analysis: A Comparative Test Using the Mixture Model
+Approach. Manag. Sci. 1985, 31, 84-95. [CrossRef]
+
+Brusco, M.]J.; Kohn, H.F. Optimal Partitioning of a Data Set Based on the p-Median Model. Psychometrica
+2008, 73, 89-105. [CrossRef]
+
+Kaufman, L.; Rousseeuw, P.J. Clustering by means of Medoids. In Statistical Data Analysis Based on the
+L1—Norm and Related Methods; Dodge, Y., Ed.; Birkhauser Basel: Basel, Switzerland, 1987; pp. 405-416.
+Schubert, E.; Rousseeuw, P. Faster k-Medoids Clustering: Improving the PAM, CLARA, and CLARANS
+Algorithms. arXiv 2019, arXiv:1810.05691.
+
+Park, H.S.; Jun, C.H. A simple and fast algorithm for K-medoids clustering. Expert Syst. Appl. 2009,
+36, 3336-3341. [CrossRef]
+
+Hakimi, S.L. Optimum Locations of Switching Centers and the Absolute Centers and Medians of a Graph.
+Oper. Res. 1964, 12, 450-459. [CrossRef]
+
+Masuyama, S.; Ibaraki, T.; Hasegawa, T. The Computational Complexity of the m-Center Problems on the
+Plane. Trans. Inst. Electron. Commun. Eng. Japan 1981, 64E, 57-64.
+
+Kariv, O.; Hakimi, $.L. An Algorithmic Approach to Network Location Problems. II: The P medians. SIAM J.
+Appl. Math. 1979, 37, 539-560. [CrossRef]
+
+Kuenne, R.E.; Soland, R.M. Exact and approximate solutions to the multisource Weber problem. Math. Program.
+1972, 3, 193-209. [CrossRef]
+
+Ostresh, L.M., Jr. The Stepwise LocationAllocation Problem: Exact Solutions in Continuous and Discrete Spaces.
+Geogr. Anal. 1978, 10, 174-185. [CrossRef]
+Computation 2020, 8, 90 29 of 32
+
+44.
+
+45.
+
+46.
+
+47.
+
+48.
+
+49.
+
+50.
+
+51.
+
+52.
+
+53.
+
+54.
+
+55.
+
+56.
+
+57.
+
+58.
+
+59.
+
+60.
+
+61.
+
+62.
+
+63.
+
+64.
+
+65.
+
+66.
+
+67.
+
+Rosing, K.E. An optimal method for solving the (generalized) multi-Weber problem. Eur. J. Oper. Res. 1992,
+58, 414-426. [CrossRef]
+
+Blum, C.; Roli, A. Metaheuristics in combinatorial optimization: Overview and conceptual comparison.
+ACM Comput. Surv. 2001, 35, 268-308. [CrossRef]
+
+Neema, M.N.; Maniruzzaman, K.M.; Ohgai, A. New Genetic Algorithms Based Approaches to Continuous
+p-Median Problem. Netw. Spat. Econ. 2011, 11, 83-99. [CrossRef]
+
+Hoos, H.H.; Stutzle, T. Stochastic Local Search Foundations and Applications; Springer: Berlin, Germany, 2005.
+
+Bang-Jensen, J.; Chiarandini, M.; Goegebeur, Y.; Jorgensen, B. Mixed Models for the Analysis of Local Search
+Components. In Proceedings of the Engineering Stochastic Local Search Algorithms International Workshop,
+Brussels, Belgium, 6-8 September 2007; pp. 91-105.
+
+Cohen-Addad, V.; Mathieu, C. Effectiveness of local search for geometric optimization. In Proceedings of
+the 31st International Symposium on Computational Geometry, SoCG-2015, Eindhoven, The Netherlands,
+22-25 June 2015; pp. 329-343.
+
+Kochetov, Y.; Mladenovi¢, N.; Hansen, P. Local search with alternating neighborhoods. Discret. Anal.
+Oper. Res. 2003, 2, 11-43. (In Russian)
+
+Kanungo, T.; Mount, D.M.; Netanyahu, N.S.; Piatko, C.D.; Silverman, R.; Wu, A.Y. A local search
+approximation algorithm for k-means clustering. Comput. Geom. Theory Appl. 2004, 28, 89-112. [CrossRef]
+
+Page, E.S. On Monte Carlo methods in congestion problems. I: Searching for an optimum in discrete
+situations. Oper. Res. 1965, 13, 291-299. [CrossRef]
+
+Hromkovic, J. Algorithmics for Hard Problems: Introduction to Combinatorial Optimization, Randomization, Approximation,
+and Heuristics; Springer: Berlin/Heidelberg, Germany, 2011.
+
+Ng, T. Expanding Neighborhood Tabu Search for facility location problems in water infrastructure planning.
+In Proceedings of the 2014 IEEE International Conference on Systems, Man, and Cybernetics (SMC), San Diego,
+CA, USA, 5-8 October 2014; pp. 3851-3854. [CrossRef]
+
+Mladenovic, N.; Brimberg, J.; Hansen, P.; Moreno-Perez,J.A. The p-median problem: A survey of metaheuristic
+approaches. Eur. J. Oper. Res. 2007, 179, 927-939. [CrossRef]
+
+Reese, J. Solution methods for the p-median problem: An annotated bibliography. Networks 2006,
+48, 125-142. [CrossRef]
+
+Brimberg, J.; Drezner, Z.; Mladenovic, N.; Salhi, S. A New Local Search for Continuous Location Problems.
+Eur. J. Oper. Res. 2014, 232, 256-265. [CrossRef]
+
+Drezner, Z.; Brimberg, J.; Mladenovic, N.; Salhi, S. New heuristic algorithms for solving the planar p-median
+problem. Comput. Oper. Res. 2015, 62, 296-304. [CrossRef]
+
+Drezner, Z.; Brimberg, J.; Mladenovic, N.; Salhi, S. Solving the planar p-median problem by variable
+neighborhood and concentric searches. J. Glob. Optim. 2015, 63, 501-514. [CrossRef]
+
+Arthur, D.; Vassilvitskii, S. k-Means++: The Advantages of Careful Seeding. In Proceedings of the SODA’07,
+SIAM, New Orleans, LA, USA, 7-9 January 2007; pp. 1027-1035.
+
+Bradley, P.S.; Fayyad, U.M. Refining Initial Points for K-Means Clustering. In Proceedings of the
+Fifteenth International Conference on Machine Learning (ICML “98), Madison, WI, USA, 24-27 July 1998;
+Morgan Kaufmann Publishers Inc.: San Francisco, CA, USA, 1998; pp. 91-99.
+
+Bhusare, B.B.; Bansode, 5.M. Centroids Initialization for K-Means Clustering using Improved Pillar Algorithm.
+Int. J. Adv. Res. Comput. Eng. Technol. 2014, 3, 1317-1322.
+
+Yang, J.; Wang, J. Tag clustering algorithm Immsk: Improved k-means algorithm based on latent semantic
+analysis. J. Syst. Electron. 2017, 28, 374-384.
+
+Mishra, N.; Oblinger, D.; Pitt, L. Sublinear time approximate clustering. In Proceedings of the 12th SODA,
+Washington, DC, USA, 7-9 January 2001; pp. 439-447.
+
+Eisenbrand, F.; Grandoni, F.; Rothvosz, T.; Schafer, G. Approximating connected facility location problems
+via random facility sampling and core detouring. In Proceedings of the SODA’2008, San Francisco, CA, USA,
+20-22 January 2008; ACM: New York, NY, USA, 2008; pp. 1174-1183. [CrossRef]
+
+Jaiswal, R.A.; Kumar, A.; Sen, S. Simple D2-Sampling Based PTAS for k-Means and Other Clustering
+Problems. Algorithmica 2014, 70, 22-46. [CrossRef]
+
+Avella, P.; Boccia, M.; Salerno, S.; Vasilyev, I. An Aggregation Heuristic for Large Scale p-median Problem.
+Comput. Oper. Res. 2012, 39, 1625-1632. [CrossRef]
+Computation 2020, 8, 90 30 of 32
+
+68.
+
+69.
+
+70.
+
+71.
+72.
+
+73.
+7A.
+
+79.
+
+76.
+
+77.
+
+78.
+
+79.
+
+80.
+
+81.
+
+82.
+
+83.
+
+84.
+
+85.
+
+86.
+
+87.
+88.
+
+89.
+
+90.
+
+91.
+
+92.
+
+93.
+
+94.
+
+Kaufman, L.; Rousseeuw, P.J. Finding Groups in Data: An Introduction to Cluster Analysis; Wiley: New York,
+NY, USA, 1990.
+
+Francis, R.L.; Lowe, T.J.; Rayco, M.B.; Tamir, A. Aggregation error for location models: Survey and analysis.
+Ann. Oper. Res. 2009, 167, 171-208. [CrossRef]
+
+Pelleg, D.; Moore, A. Accelerating Exact k-Means with Geometric Reasoning [Technical Report CMU-CS-00-105];
+Carnegie Melon University: Pittsburgh, PA, USA, 2000.
+
+Borgelt, C. Even Faster Exact k-Means Clustering. LNCS 2020, 12080, 93-105. [CrossRef]
+
+Lai, J.Z.C.; Huang, T.J.; Liaw, Y.C. A Fast k-Means Clustering Algorithm Using Cluster Center Displacement.
+Pattern Recognit. 2009, 42, 2551-2556. [CrossRef]
+
+Mladenovic, N.; Hansen, P. Variable Neighborhood Search. Comput. Oper. Res. 1997, 24, 1097-1100. [CrossRef]
+Hansen, P. Variable Neighborhood Search. Search Methodology. In Search Metodologies; Bruke, E.K.,
+Kendall, G., Eds.; Springer: New York, NY, USA, 2005; pp. 211-238. [CrossRef]
+
+Hansen, P.; Mladenovic, N. Variable Neighborhood Search. In Handbook of Heuristics; Marti, R., Pardalos, P.,
+Resende, M., Eds.; Springer: Cham, Switzerland, 2018. [CrossRef]
+
+Brimberg, J.; Hansen, P.; Mladenovic, N. Attraction Probabilities in Variable Neighborhood Search. 4OR-Q. J.
+Oper. Res 2010, 8, 181-194. [CrossRef]
+
+Hansen, P.; Mladenovic, N.; Perez, J.A.M. Variable Neighborhood Search: Methods and Applications.
+40OR-Q. J. Oper. Res. 2008, 6, 319-360. [CrossRef]
+
+Hansen, P.; Brimberg, J.; Urosevic, D.; Mladenovic, N. Solving Large p-Median Clustering Problems by
+Primal Dual Variable Neighborhood Search. Data Min. Knowl. Discov. 2009, 19, 351-375. [CrossRef]
+Rozhnov, I.P.; Orlov, V.I.; Kazakovtsev, L.A. VNS-Based Algorithms for the Centroid-Based Clustering
+Problem. Facta Univ. Ser. Math. Inform. 2019, 34, 957-972.
+
+Hansen, P.; Mladenovic, N. J-Means: A new local search heuristic for minimum sum-of-squares clustering.
+Pattern Recognit. 2001, 34, 405-413. [CrossRef]
+
+Martins, P. Goal Clustering: VNS Based Heuristics. Available online: https://arxiv.org/abs/1705.07666v4
+(accessed on 24 October 2020).
+
+Carrizosa, E.; Mladenovic, N.; Todosijevic, R. Variable neighborhood search for minimum sum-of-squares
+clustering on networks. Eur. J. Oper. Res. 2013, 230, 356-363. [CrossRef]
+
+Roux, M. A Comparative Study of Divisive and Agglomerative Hierarchical Clustering Algorithms. J. Classif.
+2018, 35, 345-366. [CrossRef]
+
+Sharma, A.; Lopez, Y.; Tsunoda, T. Divisive hierarchical maximum likelihood clustering. BMC Bioinform.
+2017, 18, 546. [CrossRef]
+
+Venkat Reddy, M.; Vivekananda, M.; Satish, R.U.V.N. Divisive Hierarchical Clustering with K-means and
+Agglomerative Hierarchical Clustering. IJCST 2017, 5, 6-11.
+
+Sun, Z.; Fox, G.; Gu, W.; Li, Z. A parallel clustering method combined information bottleneck theory and
+centroid-based clustering. J. Supercomput. 2014, 69, 452-467. [CrossRef]
+
+Kuehn, A.A.; Hamburger, M_J. A heuristic program for locating warehouses. Manag. Sct. 1963, 9, 643-666. [CrossRef]
+Alp, O.; Erkut, E.; Drezner, Z. An Efficient Genetic Algorithm for the p-Median Problem. Ann. Oper. Res.
+2003, 122, 21-42. [CrossRef]
+
+Cheng, J.; Chen, X.; Yang, H.; Leng, M. An enhanced k-means algorithm using agglomerative hierarchical
+clustering strategy. In Proceedings of the International Conference on Automatic Control and Artificial
+Intelligence (ACAI 2012), Xiamen, China, 3-5 March 2012; pp. 407-410. [CrossRef]
+
+Kazakovtsev, L.A.; Antamoshkin, A.N. Genetic Algorithm with Fast Greedy Heuristic for Clustering and
+Location Problems. Informatica 2014, 3, 229-240.
+
+Pelleg, D.; Moore, A. X-means: Extending K-means with Efficient Estimation of the Number of Clusters.
+In Proceedings of the International Conference on Machine Learning ICML, Sydney, Australia, 8-12 July 2002.
+Ahmed, M.; Seraj, R.; Islam, S.M.S. The k-means Algorithm: A Comprehensive Survey and Performance
+Evaluation. Electronics 2020, 9, 1295. [CrossRef]
+
+Frackiewicz, M.; Mandrella, A.; Palus, H. Fast Color Quantization by K-Means Clustering Combined with
+Image Sampling. Symmetry 2019, 11, 963. [CrossRef]
+
+Zhang, G.; Li, Y.; Deng, X. K-Means Clustering-Based Electrical Equipment Identification for Smart Building
+Application. Information 2020, 11, 27. [CrossRef]
+Computation 2020, 8, 90 31 of 32
+
+95.
+
+96.
+
+97.
+
+98.
+
+99.
+
+100.
+
+101.
+
+102.
+
+103.
+
+104.
+
+105.
+
+106.
+
+107.
+
+108.
+
+109.
+110.
+
+111.
+
+112.
+
+113.
+
+114.
+
+115.
+
+116.
+
+117.
+
+118.
+
+119.
+
+Chen, F.; Yang, Y.; Xu, L.; Zhang, T.; Zhang, Y. Big-Data Clustering: K-Means or K-Indicators? 2019.
+Available online: https://arxiv.org/pdf/1906.00938.pdf (accessed on 18 October 2020).
+
+Qin, J.; Fu, W.; Gao, H.; Zheng, W.X. Distributed k-means algorithm and fuzzy c -means algorithm for sensor
+networks based on multiagent consensus theory. IEEE Trans. Cybern. 2016, 47, 772-783. [CrossRef]
+Shindler, M.; Wong, A.; Meyerson, A. Fast and accurate k-means for large datasets. In Proceedings of the
+24th International Conference on Neural Information Processing Systems (NIPS’11), Sydney, Australia,
+13-16 December 2011; Curran Associates Inc.: Red Hook, NY, USA, 2011; pp. 2375-2383.
+
+Hedar, A.R.; Ibrahim, A.M.M.; Abdel-Hakim, A.E.; Sewisy, A.A. K-Means Cloning: Adaptive Spherical
+K-Means Clustering. Algorithms 2018, 11, 151. [CrossRef]
+
+Xu, T.S.; Chiang, H.D.; Liu, G.Y.; Tan, C.W. Hierarchical k-means method for clustering large-scale advanced
+metering infrastructure data. IEEE Trans. Power Deliv. 2015, 32, 609-616. [CrossRef]
+
+Wang, X.D.; Chen, R.C.; Yan, F.; Zeng, Z.Q.; Hong, C.Q. Fast adaptive k-means subspace clustering for
+high-dimensional data. IEEE Access 2019, 7, 639-651. [CrossRef]
+
+Zechner, M.; Granitzer, M. Accelerating K-Means on the Graphics Processor via CUDA. In Proceedings of
+the International Conference on Intensive Applications and Services, Valencia, Spain, 20-25 April 2009;
+pp. 7-15. [CrossRef]
+
+Luebke, D.; Humphreys, G. How GPUs work. Computer 2007, 40, 96-110. [CrossRef]
+
+Maulik, U.; Bandyopadhyay, S. Genetic Algorithm-Based Clustering Technique. Pattern Recognit. 2000,
+33, 1455-1465. [CrossRef]
+
+Krishna, K.; Murty, M. Genetic K-Means algorithm. IEEE Trans. Syst. Man Cybern. Part B 1999, 29, 433-439.
+[CrossRef] [PubMed]
+
+Singh, N.; Singh, D.P.; Pant, B. ACOCA: Ant Colony Optimization Based Clustering Algorithm for Big Data
+Preprocessing. Int. J. Math. Eng. Manag. Sci. 2019, 4, 1239-1250. [CrossRef]
+
+Merwe, D.W.; Engelbrecht, A.P. Data Clustering Using Particle Swarm Optimization. In Proceedings of the
+2003 Congress on Evolutionary Computation, Canberra, Australia, 8-12 December 2003; pp. 215-220.
+Nikolaev, A.; Mladenovic, N.; Todosijevic, R. J-means and I-means for minimum sum-of-squares clustering
+on networks. Optim. Lett. 2017, 11, 359-376. [CrossRef]
+
+Franti, P.; Sieranoja, S. K-means properties on six clustering benchmark datasets. Appl. Intell. 2018,
+48, 4743-4759. [CrossRef]
+
+Clustering Basic Benchmark. Available online: http://cs.joensuu.fi/sipu/datasets/ (accessed on 15 September 2020).
+Kazakovtsev, L.; Shkaberina, G.; Rozhnov, I; Li, R.; Kazakovtsev, V. Genetic Algorithms with the Crossover-Like
+Mutation Operator for the k-Means Problem. CCIS 2020, 1275, 350-362. [CrossRef]
+
+Brimberg, J.; Mladenovic, N. A variable neighborhood algorithm for solving the continuous location-allocation
+problem. Stud. Locat. Anal. 1996, 10, 1-12.
+
+Miskovic, S.; Stanimirovich, Z.; Grujicic, I. An efficient variable neighborhood search for solving a robust
+dynamic facility location problem in emergency service network. Electron. Notes Discret. Math. 2015,
+47, 261-268. [CrossRef]
+
+Crainic, T.G.; Gendreau, M.; Hansen, P.; Hoeb, N.; Mladenovic, N. Parallel variable neighbourhood search for
+the p-median. In Proceedings of the 4th Metaheuristics International conference MIC’2001, Porto, Portugal,
+16-21 July 2001; pp. 595-599.
+
+Hansen, P.; Mladenovic, N. Variable neighborhood search for the p-median. Locat. Sci. 1997, 5, 207-226. [CrossRef]
+Wen, M.; Krapper, E.; Larsen, J.; Stidsen, T.K. A multilevel variable neighborhood search heuristic for
+a practical vehicle routing and driver scheduling problem. Networks 2011, 58, 311-323. [CrossRef]
+Baldassi, C. Recombinator-k-Means: Enhancing k-Means++ by Seeding from Pools of Previous Runs.
+Available online: https://arxiv.org/abs/1905.00531v 1 (accessed on 18 September 2020).
+
+Duarte, A.; Mladenovié¢, N.; Sanchez-Oro, J.; Todosijevi¢, R. Variable Neighborhood Descent. In Handbook of
+Heuristics; Marti, R., Panos, P., Resende, M., Eds.; Springer: Cham, Switzerland, 2016. [CrossRef]
+
+Dua, D.; Graff, C. UCI Machine Learning Repository 2019. Available online: http://archive.ics.uci.edu/ml
+(accessed on 30 September 2020).
+
+Molla, M.M.; Nag, P.; Thohura, S.; Khan, A. A Graphics Process Unit-Based Multiple-Relaxation-Time
+Lattice Boltzmann Simulation of Non-Newtonian Fluid Flows in a Backward Facing Step. Computation
+2020, 8, 83. [CrossRef]
+Computation 2020, 8, 90 32 of 32
+
+120.
+
+121.
+
+122.
+
+123.
+
+124.
+
+125.
+
+126.
+
+127.
+
+128.
+
+Kazakovtsev, L.A.; Rozhnov, L-P.; Popov, E.A.; Karaseva, M.V.; Stupina, A.A. Parallel implementation of the
+greedy heuristic clustering algorithms. IOP Conf. Ser. Mater. Sci. Eng. 2019, 537, 022052. [CrossRef]
+Zhang, T.; Ramakrishnan, R.; Livny, M. BIRCH: An Efficient Data Clustering Method for Very Large Databases.
+In Proceedings of the 1996 ACM SIGMOD International Conference on Management of data (SIGMOD’96),
+Montreal, OC, Canada, 4-6 June 1996; ACM: New York, NY, USA, 1996; pp. 103-114. [CrossRef]
+
+Smucker, M.D.; Allan, J.; Carterette, B.A. Comparison of Statistical Significance Tests for Information Retrieval.
+In Proceedings of the Sixteenth ACM Conference on Information and Knowledge Management (CIKM ‘07),
+Lisbon, Portugal, 6-10 November 2007; ACM: New York, NY, USA, 2007; pp. 623-632.
+
+Park, H.M. Comparing Group Means: The t-Test and One-way ANOVA Using STATA, SAS, and SPSS; Indiana University:
+Bloomington, Indiana, 2009.
+
+Mann, H.B.; Whitney, D.R. On a Test of Whether one of Two Random Variables is Stochastically Larger than
+the other. Ann. Math. Stat. 1947, 18, 50-60. [CrossRef]
+
+Fay, M.P.; Proschan, M.A. Wilcoxon-Mann-Whitney or t-Test? On Assumptions for Hypothesis Tests and
+Multiple Interpretations of Decision Rules. Stat. Surv. 2010, 4, 1-39. [CrossRef]
+
+Burke, E.; Gendreau, M.; Hyde, M.; Kendall, G.; Ochoa, G.; Ozkan, E.; Qu, R. Hyper-heuristics: A survey of
+the state of the art. J. Oper. Res. Soc. 2013, 64, 1695-1724. [CrossRef]
+
+Stanovov, V.; Semenkin, E.; Semenkina, O. Self-configuring hybrid evolutionary algorithm for fuzzy imbalanced
+classification with adaptive instance selection. J. Artif. Intell. Soft Comput. Res. 2016, 6, 173-188. [CrossRef]
+Semenkina, M.; Semenkin, E. Hybrid Self-configuring Evolutionary Algorithm for Automated Design of
+Fuzzy Classifier. LNCS 2014, 8794, 310-317. [CrossRef]
+
+Publisher’s Note: MDPI stays neutral with regard to jurisdictional claims in published maps and institutional
+affiliations.
+
+@) © 2020 by the authors. Licensee MDPI, Basel, Switzerland. This article is an open access
+article distributed under the terms and conditions of the Creative Commons Attribution
+Ey
+
+(CC BY) license (http://creativecommons.org/licenses/by/4.0/).

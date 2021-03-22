@@ -29,14 +29,21 @@ writer = ix.writer()
 # with open(myFile1) as f:
 #     content = f.readlines()
 #     writer.add_document(title=u"Second document", path=myFile1, content=content)
-for index,file in enumerate(files):
-  srcFile = str(index) + 'tokens.txt'
-  myFile = srcFolder + srcFile
-  fileobj = open(myFile, encoding='utf-8', errors='ignore')
-  content = fileobj.read()
-  fileobj.close()
-  writer.add_document(title=myFile, content=content)
 
+# print(enumerate(files))
+# for index,file in enumerate(files):
+
+for i in range (752):
+  srcFile = str(i) + 'tokens.txt'
+  myFile = srcFolder + srcFile
+  try:
+    fileobj = open(myFile, encoding='utf-8', errors='ignore')
+    content = fileobj.read()
+    fileobj.close()
+    writer.add_document(title=myFile, content=content)
+    print("indexed file n.", i)
+  except:
+    print("error")
 writer.commit()
 
 # def add_doc(writer, path):

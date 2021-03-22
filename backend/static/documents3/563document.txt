@@ -1,0 +1,936 @@
+Pattern Recognition Letters 140 (2020) 165-171
+
+ 
+
+   
+
+8 Om p
+ase. | f a
+ge ell
+;
+
+ays a
+
+ELSEVIER
+
+Pattern Recognition
+Letters
+
+IAPR@,
+
+Contents lists available at ScienceDirect
+
+Pattern Recognition Letters
+
+ 
+
+journal homepage: www.elsevier.com/locate/patrec
+
+ 
+
+Multi-region saliency-aware learning for cross-domain placenta image
+
+segmentation
+
+Zhuomin Zhang*", Dolzodmaa Davaasuren’, Chenyan Wu, Jeffery A. Goldstein,
+Alison D. Gernand®*, James Z. Wang?
+
+4The Pennsylvania State University, University Park, PA, USA
+
+b Northwestern University, Chicago, IL, USA
+
+ARTICLE INFO
+
+Article history:
+
+Received 1 August 2020
+
+Revised 7 October 2020
+Accepted 10 October 2020
+Available online 10 October 2020
+
+ 
+
+Keywords:
+
+Transfer learning
+Placenta
+
+Photo image analysis
+Pathology
+
+ABSTRACT
+
+We propose a multi-region saliency-aware learning (MSL) method for cross-domain placenta image seg-
+mentation. Unlike most existing image-level transfer learning methods that fail to preserve the semantics
+of paired regions, our MSL incorporates the attention mechanism and a saliency constraint into the adver-
+sarial translation process, which can realize multi-region mappings in the semantic level. Specifically, the
+built-in attention module serves to detect the most discriminative semantic regions that the generator
+should focus on. Then we use the attention consistency as another guidance for retaining semantics after
+translation. Furthermore, we exploit the specially designed saliency-consistent constraint to enforce the
+semantic consistency by requiring the saliency regions unchanged. We conduct experiments using two
+real-world placenta datasets we have collected. We examine the efficacy of this approach in (1) segmen-
+tation and (2) prediction of the placental diagnoses of fetal and maternal inflammatory response (FIR,
+
+MIR). Experimental results show the superiority of the proposed approach over the state of the art.
+
+© 2020 The Authors. Published by Elsevier B.V.
+
+This is an open access article under the CC BY license (http://creativecommons.org/licenses/by/4.0/)
+
+1. Introduction
+
+The placenta is the essential connection between mother
+and fetus, sensing nutrient availability and needs, producing
+hormones to drive physiologic changes, and protecting the fetus
+from pathogens [18]. Because the main function of the placenta
+is to support important metabolic activities, pathological analysis
+of the placenta should be an integral part of the health exam-
+ination during pregnancy and after delivery. Yet, as a result of
+costly examination charges and limited expertise and facilities in
+developing countries, we estimate that only a small proportion of
+placentas ever examined by a pathologist worldwide. Automating
+pathological analysis by advanced image processing techniques is
+an inevitable trend because it can substantially augment the pro-
+ductivity of pathologists, shorten examination time and enhance
+examination accuracy. Particularly, accurate image segmentation
+is essential for integrated computerized placenta photo analy-
+sis [2,3]. As shown in Fig. 1, the placenta disc, umbilical cord,
+ruler (for measuring the scale), and background are four com-
+
+* Corresponding author.
+E-mail address: zxz78@psu.edu (Z. Zhang).
+
+https://doi.org/10.1016/j.patrec.2020.10.004
+
+mon categories that must be segmented in a photo for further
+analysis.
+
+Although convolutional neural networks (CNNs) have tri-
+umphed over conventional object segmentation in many clinical
+image segmentation and analysis applications |2,3,10,16], the gen-
+eralizability of a trained CNN is often inadequate when applied
+to a new dataset (e.g., photos from a different hospital) because
+the two datasets often have vastly different data distributions
+[24,25].
+
+This limits the applicability of Al models trained on data from
+high-resource settings, such as academic medical centers, to lower
+resource settings including community hospitals and low income
+countries. As illustrated in Fig. 1(a), although the appearances of
+the disc and cord are reasonably consistent across different data
+sources, the ruler and background can be vastly distinctive in
+terms of the color, texture, and amount of distraction. These largely
+different visual appearances can cause a well-trained CNN model,
+such as UNet [20], to be vulnerable when generating segmentation
+results in an unseen domain, as shown in Fig. 1(b). Because of the
+difficulties lying in data collection and annotation, it is practically
+infeasible to retrain a label-dependent CNN model to adapt to dif-
+ferent datasets every time.
+
+0167-8655/© 2020 The Authors. Published by Elsevier B.V. This is an open access article under the CC BY license (http://creativecommons.org/licenses/by/4.0/)
+166 Z. Zhang, D. Davaasuren, C. Wu et al./Pattern Recognition Letters 140 (2020) 165-171
+
+Therefore, it is highly desirable to close the gap across domains
+by an effective domain adaptation method. This paper focuses on
+the domain adaptation problem for placenta image segmentation
+when data in the target domain are insufficient and the corre-
+sponding labels are unavailable.
+
+Most existing unsupervised domain adaptation methods can
+be categorized into: (1) feature distribution alignment, (2) task-
+specific output space relation preservation, and (3) image-to-image
+translation. Feature-level adaptation methods aim at aligning the
+two domains in a latent feature space by minimizing the distri-
+bution distance, such as the maximum mean discrepancy | 13], or
+leveraging adversarial learning strategies [6]. However, the aligned
+feature space is not guaranteed to be semantically consistent and
+some low-level visual cues that are crucial for the end segmenta-
+tion task may be lost. The output space adaptation method aims to
+make the predicted maps close to each other [4,22]. It is not suit-
+able for placenta image segmentation because the spatial relations
+among objects are not consistent across domains. Image-to-image
+translation tries to alleviate the domain shift from headstream by
+forcing the cross-domain images to look like those from the orig-
+inal domain. Some regularization terms such as the cycle strat-
+egy |26]| are exploited to make the training process free of paired
+data. Attention mechanism is also introduced to pair the regions of
+interests across domains for more realistic image generation | 1,15].
+Nevertheless, these attention methods only focus on one specific
+type of object, so the translation can still be mismatched when
+multiple objects are attended to simultaneously. How to enforce
+semantic consistency for multi-region translation is the research
+problem our MSL model aims to solve.
+
+In this paper, we propose a multi-region saliency-aware learn-
+ing method to realize cross-domain placenta image translation by
+enforcing both the attention and saliency consistency. An atten-
+tion module serving as the semantic guidance is firstly coupled
+with the classic generator-discriminator game to find the most dis-
+criminative regions (i.e., ruler and background). Out of the motiva-
+tion for semantic-consistent transfer of multi regions, an attention-
+consistent loss is added as an extra constraint to enforce the
+translation to preserve the attention-related information. Notably,
+we devise a new Saliency-consistent constraint as another seman-
+tic guidance by restraining the saliency relation unchanged after
+translation. Finally, we feed the translated target domain images
+to a well-trained CNN model from the annotation-sufficient source
+domain for the ultimate segmentation task.
+
+2. Approach
+
+The overall framework of our MSL is presented in Fig. 2, where
+two attention networks, A; and A;, work together with correspond-
+ing generators Gs _, 7 and Gy_, 5, along with two discriminators
+Ds; and D;, to form our MSL model. Due to the high demand of
+multi-region semantic consistency before and after image transla-
+tion for our end segmentation task, we add an attention-consistent
+loss Late to alleviate the influence of unattended regions and a sim-
+ple but effective saliency-consistent constraint L,,, to guarantee the
+salient regions to stay unaltered during the generation. Meanwhile,
+the classic adversarial loss Lgan and cycle loss Lcyc are exploited to-
+gether to accomplish semantic mappings, which will be described
+in detail as follows.
+
+We formulate this task as an image-to-image translation for
+segmentation map prediction. We assume that the source image
+set Xs together with the source label set Ys; are accessed, while
+only the image set X; in the target domain is available. Our fi-
+nal goal is to adapt the pre-trained segmentation model F; to the
+translated source-like images in the target domain.
+
+uler
+gem background
+
+ 
+
+   
+
+ 
+
+th of. \s
+(a)
+Fig. 1. Challenges for cross-domain placenta image segmentation. (a) Cross-domain
+
+images: Placenta images from two different hospitals. (b) Their corresponding seg-
+mentation results using the trained model on the first dataset.
+
+ 
+
+2.1. Cycle generative adversarial network
+
+The goal of image translation is to learn a mapping between
+the source domain and the target domain. A generative model an-
+notated as Gs _, 7 is exploited to learn this kind of data mapping
+to generate target-like images xs_,¢ = Gs_,r(Xs), which can deceive
+the discriminator. On the contrary, the discriminator D; aims to
+distinguish the genuine image x; from the translated images x; -, 1,
+to constitute a dynamic min-max two-player game. We adopt the
+adversarial loss function in LSGAN [14] into our model, and Lgan is
+denoted as:
+
+Lgan(Gsr, Dr, Xs, Xr) = Ex,~p, (x, [log (Dr (Xr )) |
++ Ey,~B, (x, log — Dr (Xxs..r))] . (1)
+
+Similarly, the corresponding loss function for the target-to-source
+translation Lgan(Gr _, 5, Ds, X7, Xs) is defined in the same way. That
+is,
+
+Lgan(Grs, Ds, Xr, Xs) = Ex,~r, (x,) [log (Ds (xs) ) |
++ Ex,~p, x [log(1 — Ds(Xst))] - (2)
+
+The discriminators D; and Dy; attempt to maximize the loss,
+while the generators Gs _, ; and Gy _, 5 strive to minimize the loss.
+To make the translated image preserve the structure and local con-
+tent of the original image, a cycle consistency loss [8] is also de-
+signed as follows by measuring the pixel-wise difference between
+the reconstructed image and the original image.
+
+Leyc(Gr..s, Gs_,r) = Ex, ~ Py (x) L||Grs(Xsst) ~~ Xs| li]
+
++ Ex,~Pe (x )LGs7 Xs) — Xel hi]. (3)
+2.2. Multi-region saliency-aware constraints
+
+To realize multi-region translation simultaneously by a sin-
+gle generator, we made the assumption that fixing the fore-
+ground regions (placenta disc and cord) would improve the trans-
+lation quality and subsequent cross-domain pathological diagnosis
+adaptation. The rationales are: (1) The characteristics of placenta
+datasets: Although the background material and the ruler of pla-
+centa photos vary a lot across different clinical datasets, visual dif-
+ferences of the foreground disc and cord are relatively negligible
+because placentas share the same basic structure and appearance.
+Z. Zhang, D. Davaasuren, C. Wu et al./Pattern Recognition Letters 140 (2020) 165-171 167
+
+ 
+
+ 
+
+ 
+
+ 
+
+ 
+
+ 
+
+  
+
+aA. —
+
+     
+
+\
+I
+I
+I
+I
+I
+I
+1
+I
+I
+I
+I
+I
+I
+I
+I
+I
+I
+I
+I
+<
+I ——
+*
+I
+I
+I
+I
+I
+I
+I
+I
+I
+I
+I
+I
+I
+I
+I
+I
+I
+I
+!
+
+ 
+
+Target
+domain
+
+o - Gm |G
+
+ 
+
+ 
+
+  
+
+att
+
+sot
+tt
+
+ 
+
+       
+ 
+
+        
+
+. 1
+% PO a
+Way }
+
+SZ AN
+
+att Ven Gi
+Go op Ts G S3T
+
+a
+
+  
+
+  
+  
+ 
+ 
+ 
+ 
+
+ 
+
+L g
+
+Source
+domain
+
+Fig. 2. The pipeline of the proposed approach. As shown in the left part, the introduced attention network A; can divide the placenta image x; into attended regions such as
+ruler and background, and unattended regions that include disc and cord. The translated image x@"t. is a combination of translated attended parts and original unattended
+parts. The attention-consistent loss La and a saliency-consistent L,,; loss are added to preserve the semantics in together with the image-level adaptation as composed of
+
+the pixel GAN loss Lgan and the cycle loss Leyc.
+
+We have collected over 1000 placentas in the source dataset cover-
+ing most variations in placenta morphology in the target domain,
+so the feature extracted from the placenta is insignificant for fake
+image discrimination. That also explains why the foreground is
+learned as unattended regions. Hence, transferring the foreground
+placenta itself helps little to the quality of the final generated im-
+ages. (2) The requirement of real clinical application: The patho-
+logical indicator prediction relies on the extracted visual features
+from the placenta, so keeping the original foreground features un-
+changed is essential for adapting the pretrained source-domain di-
+agnosis models to the translated images. Otherwise, the diagno-
+sis results could be unreliable if the foreground is also translated.
+(3) The functionality of the generator: Incorporating the separation
+and conversion of foreground objects with the existing background
+translation in a single network would confuse the aims of the gen-
+erator, leading to unmatched contents in generated images. This
+viewpoint has been justified in [1,13], where fixing the unattended
+regions can help generate more realistic images than transferring
+the entire image.
+
+Inspired by AGGAN [15], we decompose the generative module
+into two separated parts: (1) the attention networks As and Ar, at-
+tempting to attend to the regions that the discriminator considers
+to be the most descriptive within its domain (i.e., the ruler and
+background in our application), and (2) the classic generative net-
+works focusing on transforming the whole image from one domain
+to another. The ultimate generated image is therefore a combina-
+tion of the attended regions from the transformed image and unat-
+tended areas in the original image by using the attention map as
+mask. With the attention mechanism, the discriminator can force
+
+the attention networks to find the most domain-descriptive regions
+of interest and, therefore, make the generators pay more attention
+to the attended objects.
+
+We denote the attention maps induced from Xs and Xy as xt —
+As(xs) and x#t = Ar(x;), respectively. Attention-guided generated
+map can then be computed as:
+
+xatl = xs. Go (Xs) + (1 — x8") - Xs, (4)
+
+where denotes the element-wise product. This attention net-
+work is jointly adversarially trained with the generators and dis-
+criminators. We replace x;_, + and x;_, ; in the (1) and (3) with
+xatt and xt. respectively.
+
+Attention-consistent loss One regulation of generators is that the
+transformed image should have the same semantics as the orig-
+inal image. If the semantics are aligned, in other words, the at-
+tended regions should maintain the same before and after trans-
+lation: As(x;) ~ Ar(xXs -. r). Instead of using the segmentation label
+to supervisedly preserve the semantics [12], we treat the learned
+attention map as an important form of semantics. Besides, because
+we have the segmentation maps in the source domain, we can add
+extra supervision to attention map generation in the source do-
+main. To that end, the attention-consistent losses are formulated
+as:
+
+Latt(As) = Ex,~p, (x, []]As (Xs) — Ysll1]
++ Exp wy Ar Xsse) —¥slliI,
+Latt (Ar) = Ex, (x [ Ar Xe) — As (Xs) IT. (S)
+
+Saliency-consistent loss In most attention-guided image transla-
+tion cases, the most salient object in the foreground is likely to be
+168 Z. Zhang, D. Davaasuren, C. Wu et al./Pattern Recognition Letters 140 (2020) 165-171
+
+learned as the region of interest. To add the additional saliency-
+consistent loss is hence meaningless. However, this attention map
+is learned by the discriminator, which is not always consistent with
+the visual attention (i.e., saliency). For instance, what if both the
+background and foreground objects are included into the attended
+region? In our case, it is observed that the cord and disc in the
+foreground stay changeless across domains, while the ruler and
+background suffer a lot of variations, leading them to be classified
+as attended areas by the discriminator. Even if we force the gen-
+erator to focus on this region, the generated ruler and background
+can still be mismatched. Therefore, adding the saliency-consistent
+loss as a constraint is indispensable to help maintain the semantic
+consistency before and after translation to prevent label flipping.
+
+Because the attended areas can be obtained at the early train-
+ing stage, we only compute the saliency value for pixels in the at-
+tended regions. We employ the simple but effective FT [17] method
+for saliency detection:
+
+SG, J) = |G) — Tulle . (6)
+where I(i, j) represents the pixel color vector value after Gaussian
+blurring [7], and J,, is the mean image color vector. |] - ||z is the
+
+Euclidean distance between color vectors. We denote the saliency
+maps for both the images in the original domain and the trans-
+lated images as Ss, Sy and Ss _, 7, Sp_, 5, respectively. We binarize
+these saliency maps Ss, S; as the saliency ground truth to formu-
+late the loss function. To overcome the problem that the number
+of pixels in different categories are highly unbalanced, the saliency
+consistency loss is defined using the dice coefficient [21 |:
+
+The L,,)(Gr _, s) is defined in a similar way.
+
+We obtain the final loss function by combining the adversarial,
+cycle consistency, attention consistency, and saliency consistency
+losses for both the source and target domains, defined as:
+
+Ltotal = Lean (Gs_.r, Dr, Xs, Xr) + Lean (Grss, Ds, Xr, Xs)
++ Acyclcyc (Gr-.s ’ Gs_.r) + AattsLatt (As ) + Aatt tLatt (Ar)
++ AsatsLsal (Gs_,r) + Asai tLsal (Gr-+s) . (8)
+
+This ultimate model parameters can be obtained by solving the
+mini-max optimization problem:
+
+Lyai(Gs_.r) =1- (7)
+
+* * * * * * 1
+Ge 7, Gr_,5, Dg, Dp, Aj, A; = arg MING, Gg, 5 Asap AY MAXp, p, Leota -
+
+(9)
+
+Segmentation loss We adopt the same structure of the segmen-
+tation module from PlacentaNet [2] to train a segmentation model
+in the source domain. We use p(i, j, k) to denote the prediction
+probability of the pixel (i, j) belonging to class k and g(i, j, k) to
+represent the corresponding ground truth. Sharing the same spirit
+of saliency consistency loss to balance labels, the dice loss for 4-
+class segmentation is defined as:
+
+Lig Veco PG I-k) 8G j,k)
+ij Veo. + eG ik)
+
+We apply this pretrained model to the translated target-domain
+images to obtain the final segmentation results.
+
+Lseg = 1 (10)
+
+3. Experiments
+3.1. Datasets and experimental settings
+We curated real-world post-delivery datasets, including a rel-
+
+atively clean image set together with comprehensive pathology
+reports (de-identified) from a large urban academic hospital,the
+
+Northwestern Memorial Hospital, as the source domain, and im-
+ages of non-professional quality taken from a hospital in Mongo-
+lia (only images, no accompanying pathology reports) as the target
+domains. A web-based annotation tool was developed to: (1) dis-
+card images that don’t meet our image quality standard (disc and
+cord should be fresh and not occluded by irrelevant objects); and
+(2) get pixel-wise segmentation maps for the disc, cord, ruler and
+background annotated by trained labelers. The dataset collected as
+the source domain contained 1003 placenta images together with
+segmentation maps and extracted diagnoses from the pathology
+reports, while the target dataset has 76 images and corresponding
+annotated segmentation maps for evaluation purpose.
+
+We divided the dataset in the source domain into training and
+testing sets with the ratio of 0.8: 0.2 for training the segmentation
+model. For the image translation task, 200 images from the source
+domain and 60 images from the target domain were used for train-
+ing. We used cross-validation to demonstrate the translation per-
+formance and the segmentation result in the target domain.
+
+PlacentaNet We adopted the same encoder-decoder structure
+from PlacentaNet |2,3] to train a segmentation model in the source
+domain. We used the Adam optimizer [11] with a mini-batch size
+of 5 and a learning rate of 0.001 for training. The pixel-wise accu-
+racy and mean IoU are 0.9693 and 0.9131 respectively for testing
+in the same domain.
+
+Translation network Our training process can be separated into
+three steps: (1) We first trained the discriminators on full im-
+ages for 20 epochs to help the attention module well trained with
+the guidance of the attention consistency loss; (2) Then, we make
+the discriminator to focus on the salient region (i.e., the ruler)
+within the next 5 epochs by multiplying the saliency map (thresh-
+old = 0.7) to the image, which can alleviate the unbalanced label
+distribution problem. (3) Finally, we multiply the binarized atten-
+tion map (threshold = 0.2) to the generated images to make the
+discriminator only consider attended regions. The saliency loss is
+then added to guide the overall translation performance.
+
+For all steps, the training images were rescaled to 512 x 512
+pixels, following by random flipping for data augmentation. We
+used Adam with a batch size of 1 and a linearly decaying learn-
+ing rate from 0.0002 for the training of all the three networks.
+As for the network structure, we used the residual attention mod-
+ule introduced in Wang et al. [23] as attention network, Resnet-
+Qblocks [9] as the generator and PatchGAN [8] as the discriminator.
+We set hyper-parameters Acye =5, Aatts = 2, Aatttr =4, Asars = 1.
+and A,,,7 = 1, respectively.
+
+3.2. Results
+
+To show the improvement on segmentation brought by the
+cross-domain adaptation, we first compare our model with the
+baseline scenario (i.e., segmentation without adaptation). Then two
+state-of-the-art image translation models, CycleGAN [26] and AG-
+GAN [15], are compared to demonstrate the superiority of our MSL
+model. These two methods are pioneering in the GAN-based trans-
+lation methods and most relevant to our placenta segmentation
+problem. The segmentation performance is evaluated using stan-
+dard segmentation metrics, including pixel accuracy, mean accu-
+racy, and mean JoU. The definition of those metrics are as follows:
+we use P;;denote the number of pixels that are annotated as class
+i but predicted as class j. The total number of pixels that belong to
+class i in the ground truth are denoted as G;. Because there are 4
+classes (ruler, disc, cord and background) in our case, i, j € {0, 1, 2,
+3}. The pixel accuracy, mean class accuracy, and mean JoU are then
+defined as follows:
+
+e Pixel accuracy:
+3
+DV i-0 Pi
+3 .
+DVi-0 Gj
+Z. Zhang, D. Davaasuren, C. Wu et al./Pattern Recognition Letters 140 (2020) 165-171 169
+
+a) (b) (c) (d)
+
+ 
+
+(e) (f) “Q) fh)
+
+Fig. 3. Segmentation result comparisons. (a) Original images. (b) Ground truth. (c) Segmentation results without adaptation. (d)(f)(h) Translation results using CycleGAN,
+AGGAN, and our model, respectively. (e)(g)(i) Segmentation results using the translated images to the left of it.
+
+Confusion matrix of baseline Confusion matrix of CycleGAN
+
+ 
+
+background | 0.4789 0.3867 0.1303 0.0042 background 0.1874 0.0779 0.0484
+
+disc4 9.0005 Ea 0.0038 0.0028 disc 0.0712 Ree 0.0346 0.0228
+
+cord 9.1106 0.1725 0.0162 cord] 9.0509 0.0616
+
+ruler 9.0179 0.8508 0.1099 0.0214 ruler 0.0092
+
+ 
+
+ 
+
+ 
+
+\__  d
+background disc cord ruler background disc cord ruler
+
+Confusion matrix of AGGAN
+
+Confusion matrix of MSL
+
+    
+   
+
+     
+
+background Deer o.cbee Oa background ’ 0.1301 0.0148 0.0003
+
+ 
+
+0.0053 0.8669 0.1278 0.0000 disc] 9.0009 0.9247 0.0744 0.0000
+0.0232 0.1063 0.8705 0.0001 cord | 0.0127 0.0754 =|
+
+0.0717 0.0958
+
+ 
+
+disc
+
+cord
+
+  
+ 
+
+ruler
+
+0.1105 0,0602 0.0443
+
+ 
+
+ruler
+
+ 
+
+ 
+
+ 
+
+background disc cord ruler
+
+T T t
+background disc cord ruler
+
+Fig. 4. Confusion matrices of baseline, CycleGAN, AGGAN and MSL.
+
+e Mean class accuracy:
+13 Pi
+4 i=0 G; .
+e Mean IJoU:
+133 ii
+4 »-i-0 GIS By
+The quantitative results are shown in . We observe that
+the segmentation performance has been greatly improved from
+
+0.2049 to 0.7380 in mean IoU by adding proper adaptation. The
+success of the background translation leads to a big leap on the
+
+Table 1
+
+Segmentation evaluation accuracy.
+Method Pixel Accu. Mean Accu. Mean IoU
+No adaptation 0.5256 0.4164 0.2049
+CycleGAN 0.7022 0.5850 0.3508
+AGGAN 0.7807 0.6497 0.4672
+MSL(w/oLatt ) 0.8291 0.6502 0.4812
+MSL(w/oL,a1 ) 0.7852 0.6591 0.4722
+MSL(w/0Lcyc ) 0.7593 0.6203 0.3874
+MSL 0.8743 0.8691 0.7380
+
+pixel accuracy. The improvement of Mean IJoU should be credited
+to our accurate ruler translation with the saliency-aware guidance.
+We also show a few segmentation examples in for qualita-
+tive comparison. Some special cases, including non-uniform back-
+ground, poor-quality cloth, different color, and messy surrounding,
+are shown to demonstrate the robustness of our proposed trans-
+lation method. Besides, to illustrate detailed segmentation perfor-
+mance in different categories,we also compare our approach with
+the baseline, AGGAN and CycleGAN respectively using pixel-wise
+prediction confusion matrices as shown in . According to the
+confusion matrices, it is noticeable that our method greatly im-
+prove the segmentation accuracy of cord and ruler with the added
+losses.
+
+3.3. Ablation study
+
+To show the indispensability of each loss term, we conducted
+an ablation study as follows.
+170 Z. Zhang, D. Davaasuren, C. Wu et al./Pattern Recognition Letters 140 (2020) 165-171
+
+ 
+
+|
+1 -
+
+(a)Attended regions learned by our
+
+ 
+
+Fig. 5. Ablation Study. Left: original images. Middle: results of MSL. Right: results
+without the corresponding loss.
+
+ROC curve for FIR Stages 2-3
+
+True positive rate
+
+—— Segmented images (AUC = 0.958)
+—— Original images (AUC = 0.779)
+
+ 
+
+00 0.2 o4 0.6 08 10
+False positive rate
+
+ROC curve for MIR Stages 2-3
+
+True positive rate
+
+—— Segmented images (area = 0.833)
+—— Original images (area = 0.762)
+
+ 
+
+0.0 0.2 04 0.6 08 10
+False positive rate
+
+Fig. 6. Prediction results comparison using original or segmented images for FIR
+(top) and MIR (bottom).
+
+Effectiveness of attention consistency As shown in the Fig. 5(a),
+the attention-consistent loss enforces the cord region to be unat-
+tended by keeping the consistency of attention regions. Without
+the attention-consistent loss, the cord can sometimes be learned as
+the attended background due to the similar light colors and bloody
+background in the target domain.
+
+Effectiveness of saliency consistency Fig. 5(b) shows the saliency
+loss constrains the saliency relation between ruler and background
+
+to be consistent. Without the saliency constraint, the translation
+often suffers from random label flipping because the generator fails
+to produce matched semantics.
+
+Effectiveness of cycle consistency From Fig. 5(c), we observe that
+the translation back to the original domain sometimes fails be-
+cause there is no reconstruction guarantee without the cycle loss,
+which may cause the structure of the generated image altered. The
+quantitative results of removing each loss term can be found in the
+Table. 1.
+
+3.4, Enhancing diagnosis of chorioamnionitis
+
+Fetal and Maternal Inflammatory Responses (FIR, MIR) are com-
+ponents of ascending infection and chorioamnionitis in pregnancy
+and predictive of infant sepsis [19]. To show the application poten-
+tial of the MSL, we applied a pre-trained source-domain classifi-
+cation model to the target domain to predict if FIR and/or MIR of
+Stage 2 or 3 are observed within an image. The labels for train-
+ing are from the collected pathological records (prepared via tradi-
+tional histological exams), while the images in the target domain
+were annotated by a perinatal pathologist (from the images alone).
+Instead of using full translated images as the input, we fed the net-
+work with segmented images only occupied by cord and disk to re-
+move distractions. We compare the ROC curves [5] of the FIR and
+MIR prediction either employing full images or segmented images
+in Fig. 6, where the AUC has been substantially enhanced when the
+segmented images are utilized for both cases. Specifically, the Area
+Under Curve(AUC) for FIR and MIR prediction changed from 0.78
+and 0,76 to 0.96 and 0.83 correspondingly.
+
+4. Conclusions
+
+To enable the use of machine learning based pathology image
+analysis models in very different hospital environments, we have
+proposed a new unified pipeline adopting multi-region saliency-
+aware learning for cross-domain placenta image segmentation. Our
+approach guides the translation between domains by enforcing
+both the image-level and semantic-level consistency. By introduc-
+ing the attention and saliency consistency constraints, the transla-
+tion performance is substantially improved and the segmentation
+accuracy is enhanced. To our knowledge, this is the first approach
+for cross-domain placenta image segmentation, with real clinical
+datasets involving hundreds of patients, to demonstrate clinical rel-
+evance/viability in clinical practice. We showed successful use of
+our proposed model in instantly detecting significant pathologi-
+cal/abnormal indicators, MIR and FIR, which traditionally need his-
+tology to diagnose. This application lays the foundation for further
+pathological indicator analysis in real clinical situations.
+
+Declaration of Competing Interest
+
+The authors declare that they have no known competing finan-
+cial interests or personal relationships that could have appeared to
+influence the work reported in this paper.
+
+Acknowledgments
+
+This work was supported primarily by the Bill & Melinda Gates
+Foundation, Seattle, WA (Grant no. OPP1195074 ).
+
+References
+
+[1] X. Chen, C. Xu, X. Yang, D. Tao, Attention-GAN for object transfiguration in wild
+images, in: Proceedings of the European Conference on Computer Vision, 2018,
+pp. 164-180.
+Z. Zhang, D. Davaasuren, C. Wu et al./Pattern Recognition Letters 140 (2020) 165-171 171
+
+[2] Y. Chen, C. Wu, Z. Zhang, J.A. Goldstein, A.D. Gernand, J.Z. Wang, Placentanet:
+automatic morphological characterization of placenta photos with deep learn-
+ing, in: International Conference on Medical Image Computing and Comput-
+er-Assisted Intervention, Springer, 2019, pp. 487-495.
+
+[3] Y. Chen, Z. Zhang, C. Wu, D. Davaasuren, J.A. Goldstein, A.D. Gernand, J.Z. Wang,
+Ai-plax: Ai-based placental assessment and examination using photos, Com-
+put. Med. Imaging Graph. 84 (2020) 101744.
+
+[4] Y.-C. Chen, Y.-Y. Lin, M.-H. Yang, J.-B. Huang, Crdoco: pixel-level domain trans-
+fer with cross-domain consistency, in: Proceedings of the IEEE Conference on
+Computer Vision and Pattern Recognition, 2019, pp. 1791-1800.
+
+[5] T. Fawcett, An introduction to ROC analysis, Pattern Recognit. Lett. 27 (8)
+(2006) 861-874.
+
+[6] Y. Ganin, V. Lempitsky, Unsupervised domain adaptation by backpropagation,
+arXiv preprint arXiv:1409.7495(2014).
+
+[7] E.S. Gedraite, M. Hadad, Investigation on the effect of a Gaussian Blur in
+image filtering and segmentation, in: Proceedings of the ELMAR, IEEE, 2011,
+pp. 393-396.
+
+[8] P. Isola, J.-Y. Zhu, T. Zhou, A.A. Efros, Image-to-image translation with condi-
+tional adversarial networks, in: Proceedings of the IEEE Conference on Com-
+puter Vision and Pattern Recognition, 2017, pp. 1125-1134.
+
+[9] J. Johnson, A. Alahi, L. Fei-Fei, Perceptual losses for real-time style transfer and
+super-resolution, in: Proceedings of the European Conference on Computer Vi-
+sion, Springer, 2016, pp. 694-711.
+
+[10] K. Kamnitsas, C. Ledig, V.F.J. Newcombe, J.P. Simpson, A.D. Kane, D.K. Menon,
+D. Rueckert, B. Glocker, Efficient multi-scale 3D CNN with fully connected CRF
+for accurate brain lesion segmentation, Med. Image Anal. 36 (2017) 61-78.
+
+[11] D.P. Kingma, J. Ba, Adam: a method for stochastic optimization,
+arXiv preprint arXiv:1412.6980(2014).
+
+[12] P. Li, X. Liang, D. Jia, E.P. Xing, Semantic-aware grad-GAN for virtual-to-real
+urban scene adaption, arXiv preprint arXiv:1801.01726(2018).
+
+[13] M. Long, Y. Cao, J. Wang, M.I. Jordan, Learning transferable features with deep
+adaptation networks, arXiv preprint arXiv: 1502.02791(2015).
+
+[14] X. Mao, Q. Li, H. Xie, R.Y.K. Lau, Z. Wang, S. Paul Smolley, Least squares genera-
+tive adversarial networks, in: Proceedings of the IEEE International Conference
+on Computer Vision, 2017, pp. 2794-2802.
+
+[15] Y.A. Mejjati, C. Richardt, J. Tompkin, D. Cosker, K.I. Kim, Unsupervised atten-
+tion-guided image-to-image translation, in: Advances in Neural Information
+Processing Systems, 2018, pp. 3693-3703.
+
+[16] F. Milletari, N. Navab, S.-A. Ahmadi, V-Net: fully convolutional neural networks
+for volumetric medical image segmentation, in: Proceedings of the IEEE Inter-
+national Conference on 3D Vision, 2016, pp. 565-571.
+
+[17] X. Qin, Z. Zhang, C. Huang, C. Gao, M. Dehghan, M. Jagersand, Basnet: bound-
+ary-aware salient object detection, in: Proceedings of the IEEE Conference on
+Computer Vision and Pattern Recognition, 2019, pp. 7479-7489.
+
+[18] DJ. Roberts, Placental pathology, a survival guide, Arch. Pathol. Lab. Med. 132
+(4) (2008) 641-651.
+
+[19] R. Romero, F. Gotsch, B. Pineles, J.P. Kusanovic, Inflammation in pregnancy:
+its roles in reproductive physiology, obstetrical complications, and fetal injury,
+Nutr. Rev. 65 (suppl_3) (2007) S194-S202.
+
+[20] O. Ronneberger, P. Fischer, T. Brox, U-Net: convolutional networks for biomed-
+ical image segmentation, in: Proceedings of the International Conference
+on Medical Image Computing and Computer-Assisted Intervention, 2015,
+pp. 234-241.
+
+[21] C.H. Sudre, W. Li, T. Vercauteren, S. Ourselin, M.J. Cardoso, Generalised dice
+overlap as a deep learning loss function for highly unbalanced segmentations,
+in: Deep Learning in Medical Image Analysis and Multimodal Learning for Clin-
+ical Decision Support, Springer, 2017, pp. 240-248.
+
+[22] Y.-H. Tsai, W.-C. Hung, S. Schulter, K. Sohn, M.-H. Yang, M. Chandraker, Learn-
+ing to adapt structured output space for semantic segmentation, in: Proceed-
+ings of the IEEE Conference on Computer Vision and Pattern Recognition, 2018,
+pp. 7472-7481.
+
+[23] F Wang, M. Jiang, C. Qian, S. Yang, C. Li, H. Zhang, X. Wang, X. Tang, Residual
+attention network for image classification, in: Proceedings of the IEEE Confer-
+ence on Computer Vision and Pattern Recognition, 2017, pp. 3156-3164.
+
+[24] W. Yan, Y. Wang, S. Gu, L. Huang, F. Yan, L. Xia, Q. Tao, The domain shift prob-
+lem of medical image segmentation and vendor-adaptation by Unet-GAN, in:
+Proceedings of the International Conference on Medical Image Computing and
+Computer-Assisted Intervention, Springer, 2019, pp. 623-631.
+
+[25] F Yu, J. Zhao, Y. Gong, Z. Wang, Y. Li, F. Yang, B. Dong, Q. Li, L. Zhang, Annota-
+tion-free cardiac vessel segmentation via knowledge transfer from retinal im-
+ages, in: Proceedings of the International Conference on Medical Image Com-
+puting and Computer-Assisted Intervention, Springer, 2019, pp. 714-722.
+
+[26] J.-Y. Zhu, T. Park, P. Isola, A.A. Efros, Unpaired image-to-image translation using
+cycle-consistent adversarial networks, in: Proceedings of the IEEE International
+Conference on Computer Vision, 2017, pp. 2223-2232.

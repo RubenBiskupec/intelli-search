@@ -1,0 +1,1527 @@
+Al-Tous et al. EURASIP Journal on Wireless Communications and j
+Networking (2020) 2020:132 EURASIP Journal on Wireless
+
+https://doi.org/10.1007/13638.1687-1499 Communications and Networking
+
+RESEARCH Open Access
+
+Multipoint channel charting-based ®
+radio resource management for V2V ji
+communications
+
+Hanan Al-Tous!” ®, Tushara Ponnada', Christoph Studer? and Olav Tirkkonen|
+
+ 
+
+ 
+
+*Correspondence:
+
+hanan.al-tous@aalto fi Abstract oo, . . .
+
+' Department of Communications We consider a multipoint channel charting (MPCC) algorithm for radio resource
+and Networking, Aalto University, management (RRM) in vehicle-to-vehicle (V2V) and vehicle-to-infrastructure (V21)
+
+Espoo, Finl a
+spo, Finland a communication systems. A massive MIMO (mMIMO) infrastructure network performs
+Full list of author information is
+
+available at the end of the article logical localization of vehicles to a MPCC, based on V2! communication signals.
+Combining logical distances given by channel charting with V2V measurements, the
+network trains a function to predict the quality of a direct V2V communication link from
+observed V2I communication signals. In MPCC, the network uses machine learning
+techniques to learn a logical radio map from V2! channel state information (CSI) samples
+transmitted from unknown locations. The network extracts CS! features, constructs a
+dissimilarity matrix between CSI samples, and performs dimensional reduction of the
+CSI feature space. Here, we use Laplacian Eigenmaps (LE) for dimensional reduction.
+The resulting MPCC is a two-dimensional map where the spatial distance between a
+pair of vehicles is closely approximated by the distance in the MPCC. In addition to V2!
+CSI, the network acquires V2V channel quality information for vehicles in the training set
+and develops a link quality predictor. MPCC provides a mapping for any vehicle location
+in the training set. To use MPCC for cognitive RRM of V2! and V2V communications,
+network management has to find logical MPCC locations for vehicles not in the training
+set, based on newly acquired V2! CSI measurements. For this, we develop an extension
+of LE-based MPCC to out-of-sample CSI samples. We evaluate the performance of link
+quality prediction for V2V communications in a MMIMO millimeter-wave scenario, in
+terms of the relative error of the predicted outage probability.
+
+Keywords: Massive MIMO, Channel charting, Laplacian Eigenmaps, Out-of-sample
+extension, V2I, V2V
+
+ 
+
+1 Introduction
+
+Communication technologies are becoming integrated in vehicles for safety applications,
+such as blind spot warning and forward collision warning, as well as for non-safety-related
+applications such as toll collection and infotainment [1]. The dedicated short-range
+communication (DSRC) protocol can be used both for vehicle-to-vehicle (V2V) and
+vehicle-to-infrastructure (V2I) communications, and provides a coverage range of about
+1 km and achieves data rates in the range of 2-6 Mbps [2]. 4G-LTE connectivity below 6
+GHz can be used for V2I, achieving a data rate of up to 100 Mbps [3].
+
+. © The Author(s). 2020 Open Access This article is licensed under a Creative Commons Attribution 4.0 International License,
+GQ) Springer O pen which permits use, sharing, adaptation, distribution and reproduction in any medium or format, as long as you give appropriate
+— credit to the original author(s) and the source, provide a link to the Creative Commons licence, and indicate if changes were
+made. The images or other third party material in this article are included in the article’s Creative Commons licence, unless
+indicated otherwise in a credit line to the material. If material is not included in the article’s Creative Commons licence and your
+intended use is not permitted by statutory regulation or exceeds the permitted use, you will need to obtain permission directly
+from the copyright holder. To view a copy of this licence, visit http://creativecommons.org/licenses/by/4.0/.
+Al-Tous et al. EURASIP Journal on Wireless Communications and Networking (2020) 2020:132 Page 2 of 20
+
+Next generation vehicles are expected to become automated and to contain hundreds
+of sensor nodes. The increase in the number of sensors will generate a huge amount of
+data that can be utilized for different applications. It is expected that autonomous cars
+will comprise 75% of total traffic on the road by the year 2040. There are many benefits of
+sharing rich sensor data with other vehicles and infrastructure. However, this will require
+exchanging a large amount of data, from tens to thousands of megabits per second. The
+state-of-the-art vehicular communication standard DSRC is not sufficient to handle such
+high data rates in next generation vehicles [4].
+
+The large bandwidth channels at millimeter-wave (mm-Wave) are a promising candi-
+date to realizing high data rates and is of prime interest for 5G and Beyond 5G (B5G)
+communication [5]. Massive MIMO (mMIMO) is another promising technology for 5G
+and B5G, with the potential to provide high spectral and power efficiency. Ina mMIMO
+cell, each base station (BS) has a large number of antennas, which can provide a simulta-
+neous use of the resource (e.g., frequency and/or time slots) for multiple user equipments
+(UEs) in the cell [5—7]. Furthermore, the high spatial resolution exploited by the large-
+scale antenna arrays used at the mMIMO BSs can be used for many applications, such as
+UE positioning and environment mapping [8-10].
+
+In [11], test results of mm-Wave for V2V and V2I communications are reported. The
+results are promising, while it is indicated that much research is still needed to develop
+the physical (PHY) and medium access control (MAC) layers for mm-Wave systems to
+provide a reliable basis for V2V and V2I communication. A key challenge in developing
+mm-Wave systems is the potential for rapid channel dynamics; mm-Wave propagation
+suffers from high path loss, reduced diversity, and increased effect of blockage by obsta-
+cles [12]. mm-Wave BSs have to use beamforming for transmission in order to increase
+the signal-to-noise ratio, reaching a radius of up to 200 m. Hence, hundreds of BSs will
+be needed to cover large spaces. Modeling, measuring, and predicting the radio channel
+characteristics of mm-Wave systems for V2V communications are the currently active
+research areas [3, 13]. Successful deployment of mm-Wave systems requires new manage-
+ment procedures to handle resource-constrained devices, radio resource management,
+heterogeneous networking, and computing infrastructures [4, 5, 14, 15]. The level of
+channel variability in mm-Wave has widespread implications for virtually every aspect of
+V2V communications.
+
+Motivated by the burgeoning progress of artificial intelligence (AI) and its break-
+throughs in a variety of domains, the B5G research community is currently seeking
+solutions from machine learning (ML) for intelligent control of PHY and MAC layers of
+future networks. B5G networks are expected to be intelligent enough to adapt to very
+dynamic topologies, intensive computation and storage applications, and diverse Quality
+of Service (QoS) requirements [16-19].
+
+To efficiently manage B5G networks and to perform cognitive networking tasks, the
+network states which include the spatial distribution and trajectories of the UEs, neigh-
+borhood relationships among the UEs, and handover boundaries among neighboring
+cells need to be estimated. A novel ML framework called channel charting (CC) based
+on the massive amounts of channel state information (CSI) available at the base sta-
+tions is proposed for a single-cell MIMO system in [20]. CC applies unsupervised ML
+techniques to create a radio map of the cell served by the BS, which preserves the
+neighborhood relations of UEs, using features that characterize the large-scale fading
+Al-Tous et al. EURASIP Journal on Wireless Communications and Networking (2020) 2020:132 Page 3 of 20
+
+effects of the channel. The obtained CC can be used for local radio resource man-
+agement (RRM) in the cell. However, cell edge UEs may not be accurately located in
+the chart due to their low signal-to-noise ratio (SNR) at the cell edge. In [21], a mul-
+tipoint CC (MPCC) framework is proposed to support advanced multicell RRM and
+to accurately map cell edge UEs. First, each BS generates its own dissimilarity matrix
+between the users it can decode; then, the dissimilarity matrices are fused and used to
+construct the MPCC. The trustworthiness and continuity measures show that the pro-
+posed MPCC is capable to preserve the neighborhood structure between UEs in the
+network.
+
+MPCC-based approach entails more computational efforts compared to other approach
+at the BSs to compute the dissimilarity matrix between the UEs seen by the same BS.
+
+In this paper, we consider MPCC in V2I networks, where vehicular UEs communicate
+with infrastructure BSs. Using only uplink radio channel features, a logical MPCC map
+is constructed for the network. Furthermore, some of the UEs have the capability of V2V
+communications. To enable V2V connectivity prediction, radio link quality information
+of V2V pairs is collected and used to build a link quality prediction (LQP) model utilizing
+the MPCC distance between V2V pairs.
+
+To use MPCC for online RRM, it is important to generalize the chart, allowing the
+incorporation of new data to an existing MPCC and/or to estimate the features related
+to a location in the chart. As the radio channel features of a UE can change rapidly
+in a small distance, it is important to accurately estimate the MPCC location of data
+from a UE that was not included in the training data set (out-of-sample UE). In this
+paper!, an extension-of-MPCC (EMPCC) to out-of-sample data points is considered.
+This is a general framework that is needed to implement any online RRM function
+using CC.
+
+This paper investigates V2V link quality prediction based on an MPCC approach.
+MPCC-based LQP for V2I/V2V consists of two phases: an offline training and online
+usage phase. In the training phase, V2I and V2V radio channel features of a large number
+of UEs are used to construct the MPCC and LQP model, respectively. In the online phase,
+given the radio features of active vehicles (UEs), the EMPCC algorithm is used to map the
+UEs to CC locations. Based on the CC distance and LQP model, the possibility of V2V
+communication for a given pair of vehicles is evaluated. All simulation and modeling are
+performed in an mm-Wave context, lending credibility for the considered solutions for
+mm-Wave-based V2I/V2V. It is worth noting here that the proposed MPCC-based LQP
+for V2I/V2V is not restricted to mm-Wave communications and can be used for other
+radio frequencies.
+
+In LQP based on MPCC, neither physical location information, downlink channel mea-
+surement at the vehicular terminals, nor V2V measurements are needed for predicting
+V2V connectivity. Advanced power allocation and beam alignment algorithms for V2V
+communications can be then designed based on LQP and MPCC.
+
+The remainder of this paper is organized as follows. Section 2 presents the system
+model of V2I and V2V communications. In Section 4, the MPCC and LQP and EMPCC
+frameworks are presented. Numerical results are presented and discussed in Section 5.
+
+Finally, conclusions are drawn in Section 6.
+
+ 
+
+'Part of the results of this paper were presented in [22].
+Al-Tous et al. EURASIP Journal on Wireless Communications and Networking (2020) 2020:132 Page 4 of 20
+
+1.1 Notation
+We adopt the following notation: matrices and vectors are set in upper and lower boldface,
+respectively. OF, ©), 4, +4, LI p denote the transpose, the conjugate, the Hermitian,
+the absolute value, and the p-norm, respectively. Tr(A) denotes the trace of matrix A.
+Calligraphic letters denote sets, e.g., G, and |G| denotes the cardinality of G. R+ is the set
+of non-negative real numbers, C is the set of complex numbers, C’*™
+
+N x M matrices and E| -] denotes expectation, andi = /—1.
+
+is the space of
+
+2 System model
+The system under consideration is schematically shown in Fig. 1.
+
+Each infrastructure BS b = 1,...,B has M antenna elements. In the network, two types
+of UEs are assumed: V2I UEs and V2V UEs.
+
+Each UE of V2I type has a single antenna element, whereas UE of V2V type has N + 1
+antenna elements, one is used for V2I communications, and N antennas for V2V com-
+munication. In V2I communications, the base station antenna is at an elevated position,
+10-25 m above ground. This is not the case in V2V communications; both the transmit
+(Tx) and receive (Rx) antennas are at the same height relatively close to the ground level,
+at some 1-2 m above ground, by having antennas close to the ground level, shadowing
+effects from other vehicles and surrounding buildings are expected to be stronger. To han-
+dle this issue, multiple antennas are used at both the Tx and Rx terminals [3]. Note that
+UEs of type V2I can have more than one antenna; however, it is shown that one element
+at the UE can be used to construct an accurate MPCC [21].
+
+The V2I channel vector of UEK = 1,...,K using a uniform-linear-array (ULA) at BS b
+for a coherence bandwidth can be modeled as [23]:
+
+Lk
+hy = S By ra(by tr) (1)
+i=1
+
+ 
+
+BS 1
+
+((9)) . 4 )) ((9)) ((9))
+7. F
+
+; A Ses i
+
+BS B
+
+Fig. 1 V2I and V2V communication system with B BSs. A V2V/V2I example; a UE communicating with three
+mMIMO BSs and direct communication between a pair of UEs
+
+ 
+
+ 
+
+ 
+Al-Tous et al. EURASIP Journal on Wireless Communications and Networking (2020) 2020:132 Page 5 of 20
+
+where L, is the number of multipath components for the wireless channel between UE k
+and BS b, pe is the direction of arrival of the /th path, 6 » is the complex-valued gain of
+the /th path, and a(-) is the BS steering vector. For ULA, the steering vector is:
+
+Qn * Qn .
+a(?) =| 1, e! 7 Ssin(p) — e! q (M—I)s sin(p))T (2)
+
+where A is the carrier wavelength, and s is the antenna spacing. The covariance Rpx €
+C™~M of the CSI hy x used to extract the features at BS b becomes:
+
+Rye = El hoch) = AvrSor Ape (3)
+where E is the expectation operator, Ap, = E ( be) yee (one )| is a matrix of array
+
+steering vectors, and Sp, = diag (E [ Be P| »..5E [ pew P|) is a diagonal matrix of
+multipath power components.
+For V2V communication between UEs i and j, the channel matrix is denoted as Hj; €
+
+CN*N and the channel covariance matrix at receiver terminal ; is:
+
+H
+The received signal vector at UE is:
+Vij = VPH iwi x + Nj; (5)
+
+where x is the transmitted symbol with E[ |x|?] = 1, Pis the transmitted power, nj € CNx1
+is the received white Gaussian noise, and w;; is the beamformer weight. Assuming Tx i
+knows the statistics of the wireless channel, the beamformer weight w;,; is selected as the
+Eigenvector u corresponding to the largest Eigenvalue of the covariance matrix Q,;. The
+average V2V SNR at UE j can be computed as [24]:
+
+P HH P
+Vij =—kE [Tr Him, iH | | = —Amax: (6)
+On On
+where Tr is matrix trace operator and o,, is the received noise power. The latter equality
+
+holds for the adopted Eigenbeamformer, and Amax is the maximum Eigenvalue of Q;,.
+
+3 Channel charting
+
+3.1 Feature extraction and dissimilarity matrix
+
+Large-scale effects of wireless channel are caused by reflection, diffraction, and scattering
+of the physical environment, whereas small-scale effects are caused by multipath propa-
+gation and related destructive/constructive addition of signal components. CC is based
+on the assumption that statistical properties of MIMO channel vary relatively slowly
+across space, on a length-scale related to the macroscopic distances between scatterers in
+the channel, not on the small fading length-scale of wavelengths. In this regard, the CSI
+covariance matrix can be used to capture large-scale effects of the wireless channel based
+on the assumption that there is a continuous mapping from the spatial location p,; of UE
+k to the covariance CSI Rp x [20, 21]:
+
+Hy :R? > CY Hy (p,) = Rox. (7)
+
+Here, d is the spatial dimension which is either 2 or 3.
+
+CC starts by processing the CSI covariance matrix R,;% into suitable channel features
+Fy, that capture large-scale properties of the wireless channel. CC then proceeds by using
+the set of collected features Frdperr for the set of UEs Ky = {1,..., Kp} seen by BS b to
+Al-Tous et al. EURASIP Journal on Wireless Communications and Networking (2020) 2020:132 Page 6 of 20
+
+learn the dissimilarity matrix Dp € R MoXKb The pairwise dissimilarity | Dp]x,, between
+UEs k and m, for k,m € Ky measures the dissimilarity of the radio features between UEs k
+and m. Different approaches can used to select the channel features and then computing
+the dissimilarity matrix (see [20, 21]). In this paper, we select the feature vector f;, , based
+on multipath components [21]:
+
+1 L 1 L
+Sok = [ee Ape Oper eB rae (8)
+here AD —E Bo? 2 The multipath components (power and phase) a “ and
+w bk = bk! |" ulup P P P bk fy
+
+{on |" of UE k at BS b are estimated from the CSI covariance matrix Rp, using the
+multiple signal classification (MUSIC) algorithm [25]. The dissimilarity between two UEs
+(k, m) is based on identifying multipath components in their feature vectors that are sim-
+ilar. For this, the components of feature vectors are transformed to Cartesian coordinates
+as [21]:
+
+Ff p,} = lahbe ca 9)
+
+@ ()
+where x) = ote i ato ? . To cluster multipath components to clusters deemed
+, [6 ) [4 he
+
+ 
+
+ 
+
+to be similar, the density-based spatial clustering of applications with noise (DBSCAN)
+algorithm [26] is used to label the multipath components” {F{f palin . Lhis results in a
+label L(x) ') € {C,--- , Cy} for each multipath component, where C,, is the label of the
+nth cluster. The dissimilarity coefficient between a pair of UEs (k,m) then is computed
+taking into consideration multipath components of the UEs that are in the same cluster.
+The pairwise dissimilarity is computed as:
+
+[Dplim = | owe — “ill if £ (x\"? )= L (xi)>.), (10)
+
+1
+lew — Xp mn (1) l|2 otherwise,
+
+where [ 7’, j’] = arg max min (A oad ay) me
+
+3.2 Multipoint channel charting
+MPCC utilizes the different views of the spatially distributed BSs by fusing the BS-specific
+dissimilarity matrices Dp, b = 1,..., Binto a global dissimilarity matrix D [21]. The bene-
+fits of having multiple spatially distributed BSs can be utilized by merging the BS-specific
+dissimilarity matrices {Dp}P_, into a global dissimilarity matrix D, where the (k,m)th
+element [ D],,, can be computed as:
+1 B
+
+[Dm = SF api & 2 votk m)(Dplkm » (11)
+where w,(k, m) is a weighting factor computed as w,(k,m) = min(yp,4; Yom)” and yp, is
+the SNR of the wireless link between UE k and BS b.
+
+3.3 Dimesionality reduction and Laplacian Eigenmaps
+CC finds in an unsupervised manner a low dimensional channel chart providing logical
+
+locations Z = {zi} for the sample UEs such that neighboring UEs will be neighboring
+
+ 
+
+A non-linear transformation can be applied to make clusters of multipath components separable.
+Al-Tous et al. EURASIP Journal on Wireless Communications and Networking (2020) 2020:132 Page 7 of 20
+
+points in the channel chart, i.e., CC preserves the local geometry. The relation between
+the logical and physical locations is approximative:
+
+ 
+
+ 
+
+|Z. —Zm|| Ya Px — Pp, ||, fork,meK, (12)
+
+where a is a scaling factor. Note that the UE spatial location P is not known and BS loca-
+tion is not needed; CC is computed solely based on the dissimilarity matrix. A channel
+chart is constructed using an unsupervised ML framework that processes the dissimilar-
+ity matrix, and manifold learning is used to dimensionally reduce the CSI feature space
+[20]. For a given dissimilarity matrix, different dimension reduction techniques have been
+proposed in the literature. The performance of a given technique is problem dependent,
+as discussed in [27]. The single-cell CC problem has been solved using principle compo-
+nent analysis (PCA), Sammon’s mapping (SM), and autoencoder reduction techniques in
+[20], whereas the MPCC is solved using SM, Laplacian Eigenmaps (LE), and t-Distributed
+Stochastic Neighbor Embedding (t-SNE) in [21]. Recently, neural networks have been
+used successfully for dimensionality reduction as in [28, 29].
+
+LE is a computationally efficient non-linear dimensionality reduction technique based
+on the graph Laplacian. It preserves neighborhood properties and clustering connections
+[30]. LE constructs a graph from neighborhood information of the dissimilarity matrix.
+The LE problem is expressed as [30]:
+
+minimize Tr(Z' LZ), (13a)
+subject to Z'SZ= Tg41) (13b)
+where Z = [zi peas zh | " represents the optimization variables (CC locations) in a matrix
+
+form, Ig is the identity matrix of order d, L is the graph Laplacian matrix, and S is the
+degree matrix. The graph Laplacian matrix is computed as:
+
+L=S-W, (14)
+
+where W is the weight matrix. The degree matrix S can be constructed using the dis-
+similarity matrix either by an e-neighborhood, i.e., nodes k and m are connected by an
+edge if [D]km < €, or by N nearest neighbors, i.e., nodes k and m are connected by an
+edge if m is among the N nearest neighbors (N smallest dissimilarity values of the kth
+row of D) of k or k is among the N nearest neighbors (N smallest dissimilarity values of
+the mth row of D) of m. The weight matrix can be constructed using the dissimilarity
+matrix either by a simple approach, if nodes k and m are connected, [W]x,, = 1, other-
+
+wise [W]x = 0 or by using the heat kernel with temperature T, if nodes k and m are
+De mn
+connected, [W]k,,=e ~T , otherwise [|W]; = 0. The temperature T can be selected
+
+based on the statistics of the dissimilarity matrix.
+
+The Laplacian matrix is a symmetric positive-semidefinite matrix. Every row sum and
+column sum of L is zero, consequently 49 = 0 is the smallest Eigenvalue of LZ, and vp =
+[1,...,1]* satisfies Lvo = 0. In addition, the elements of an Eigenvector sum to zero, i.e.,
+ye_alvide= Ofori=1,...,K —1.
+
+The solution of (13) can be obtained in closed form as the solution of a generalized
+Eigenvector problem based on KKT conditions [30]. The CC locations are obtained by
+finding the d+1 Eigenvectors corresponding to d+ 1 smallest Eigenvalues. An example of
+a connected graph of five nodes is shown in Fig. 2. The dissimilarity matrix is computed
+Al-Tous et al. EURASIP Journal on Wireless Communications and Networking (2020) 2020:132 Page 8 of 20
+
+ 
+
+y-coordinate
+
+ 
+
+0.8 -0.6 -0.4 -0.2 0 0.2 0.4 0.6 0.8
+x-coordinate
+
+ 
+
+0.8 -0.6 -0.4 -0.2 0 0.2 0.4 0.6 0.8
+
+V3
+Fig. 2 A connected graph of five nodes. Top: two-dimensional true location of the nodes. Middle: LE logical
+location of the nodes using the first and second Eigenvectors. Bottom: logical location using the third and
+fourth Eigenvectors
+
+ 
+
+ 
+
+ 
+
+using the true Euclidean distance, three nearest neighbors are used to compute the degree
+matrix, and the heat kernel temperature is set T = 1. The true location of the nodes
+is shown in the top subfigure. LE is used to find the logical location of the nodes. The
+second and third Eigenvectors preserve the local neighborhood information as shown in
+the middle subfigure, whereas the forth and fifth Eigenvectors maximize the difference
+between the nodes as shown in the bottom subfigure. The neighborhood information is
+not preserved using Eigenvectors corresponding to the largest Eigenvalues.
+
+Algorithm 1 summarizes how the CC locations can be obtained using LE.
+
+3.4 Out-of-sample extension
+
+Since the MPCC is constructed by processing the data of all UEs from all BSs, it is compu-
+tationally expensive to repeat the MPCC process if an out-of-sample data item is available,
+and needs to be inserted into the chart. If the original MPCC is based on a sufficient
+number of samples, it is expected that the out-of-sample data will not change the MPCC
+positions of the original samples.
+
+Here, we address out-of-sample extension of MPCC in this sense, aiming to estimate
+the location of the new sample on the MPCC, to be used for RRM functions, such as
+V2V LQP. It is worth mentioning that the same feature extraction should be used for the
+out-of-sample data items as for the original samples, and the data-driven dissimilarity
+measure found for the original samples should be used to measure dissimilarity of the out-
+of-sample items to the original samples. For an out-of-sample UE j, the CSI covariance
+matrix Rp; at BS b is used to find the feature vector F{f;, ;} = Ey penny x? |, The cluster
+Al-Tous et al. EURASIP Journal on Wireless Communications and Networking (2020) 2020:132 Page 9 of 20
+
+Algorithm 1 The LE for MPCC
+1: Given: the dissimilarity matrix D, «/N, T.
+2: Construct: the adjacency matrix, two approaches can be considered:
+
+e The e-neighborhood, nodes k and m are connected by an edge if [D] km < €.
+e Nodes k and m are connected by an edge if m is among the N nearest neighbors
+of k or k is among the N nearest neighbors of m.
+
+3: Choosing: the weight matrix W; two approaches can be considered:
+
+e Using the heat kernel with temperature T, which needs to be chosen based on
+IDlkm
+
+the dissimilarity statistics; if nodes k and m are connected, [W]k,=e T ,
+otherwise |W], = 0.
+
+e Simple approach, if nodes k and m are connected, [W]x,, = 1, otherwise
+[Wim = 9.
+
+4. Compute: the Laplacian Matrix L = S — W, where S is the degree matrix (diagonal
+matrix) with [S]xn= a Wi-
+
+5: Compute: the eigenvalues A; fori = 0,..., K—1 and eigenvectors v; fori = 0,...,K—
+1 for the generalized eigenvector problem: Lv = ASv,
+
+6: Order: the eigenvectors vg,v1,...,V¥K—1 according to their eigenvalues, with O =
+Ag < Aq XS AQ <... <5 dK-1.
+
+7: Return: the CC position of the kth UE on the MPCC as: z(k) =[ v1 (k), v2(k)] for
+d = 2 and z(k) =| v1 (k), vo(k), v2(k)] for d = 3.
+
+label for an out-of-sample multipath component is determined based on the cluster label
+
+. . . (2)\ __ (I')
+of the nearest multipath component on the original data set, i-e., L(x,;) = Lp in) where
+
+[m,l/] = argmin| lar — x l2,k € Ky, andn = 1,...,L,. The out-of-sample dissimilar-
+NM
+
+ity element [Dp]; at BS b is computed using (10), and then, the global dissimilarity is
+computed using (11). The relation between MPCC and EMPCC is shown in Fig. 3.
+
+In [31], a generalized framework for out-of-sample extension is proposed for several
+algorithms, providing that these algorithms learn Eigenfunctions of a data-dependent
+kernel. The out-of-sample mapping can be formulated as an optimization problem, where
+the objective is to find a normalized kernel function that minimizes the mean squared
+error. The normalized kernel vector is used as a weight vector to find the out-of-sample
+mapping. For LE, the normalized kernel function (weight) is computed as [31]:
+
+» 1 Wik, i
+Wiki) = -—__O) k,i=1,...,K, (15)
+K JEx[ W(k, x)] Ey[ Wiy)]
+where W (Kk, i) =| W],; and the expectation is taking with respect to the original data set.
+The EMPCC position of an out-of-sample data z() for j ¢ {1,...,K},i = 1,...,K, and
+
+d = 2 can be computed as:
+K K
+k=1 k=1
+
+where the weight W(j, i) for j ¢ {1,...,K} is computed based on the dissimilarity of the
+radio features of UE j with respect to the radio features of all UEs in the original set, and
+Al-Tous et al. EURASIP Journal on Wireless Communications and Networking (2020) 2020:132
+
+ 
+
+CC-LE/MPCC-LE
+
+A set of data points
+EMPCC-LE of CSI of UEs
+
+New eat velntot Learn dissimilarit
+CSI of a UE y
+measure
+| Learned |
+Feature extraction measure G ;
+and preperation _ ec .
+| dissimilarity matrix
+Generate a |
+
+dissimilarity vector COLNE kernel
+| matrix and weights
+
+Solve a generalized
+eigenvalue problem
+
+ 
+
+Generate a weight
+vector
+
+| CC locations
+Locate the new point
+
+in the chart
+
+Fig. 3 Main steps of MPCC and EMPCC. EMPCC uses the CC locations of the offline training set and the
+dissimilarity measure learned by MPCC
+
+ 
+
+ 
+
+ 
+
+the Eigenvectors ?, and ? are computed based on the normalized weighting matrix W
+of the original data set.
+The resulting EMPCC method is summarized in Algorithm 2.
+
+4 MPCC-based V2V link quality prediction
+
+Radio maps can be utilized for RRM functionalities. To construct radio maps, either the
+physical or the logical location of the UEs in the radio environment and the correspond-
+ing CSIs are needed. The physical location can be obtained either by a global navigation
+satellite system (GNSS) such as GPS or by a triangulation approach. Triangulation can be
+used for only LOS communications with at least three BSs. The locations of the BSs need
+to be known, whereas CC has the advantage of being able to be used for both LOS and
+NLOS communications without the need to know the BS locations. CC can be used with
+a single BS; however, using more BSs improves the CC accuracy. CC has the advantage
+
+Algorithm 2 The EMPCC for UEj,7 ¢ {1,...,K}
+
+1: Given the feature vector {F{f,;}}, cluster label (Lap) )}, weighting matrix We
+
+R**X and the eigenvectors 7; and 7.
+
+Estimate the multipath components {f y) ane
+
+Compute the feature vector F {f;, ;}.
+
+Find the cluster label L(x;") for each multipath components.
+
+Compute the dissimilarity coefficient | Dp]j,m form = 1,..., Kp.
+
+Compute the dissimilarity fusion vector {| D]j,m eo for out-of-sample UE /.
+Compute the weight vector =[W(j,1),..., W(, K)].
+
+Map the position z(j) on the MPPC using (16).
+
+Page 10 of 20
+Al-Tous et al. EURASIP Journal on Wireless Communications and Networking (2020) 2020:132
+
+of replacing the timely and costly measurement campaign in GNSS fingerprinting-based
+algorithms by heavily processing ML algorithms (i.e., unsupervised learning plays a key
+role of mapping radio features to logical locations and preserving neighborhood relations)
+at the BSs, which has the advantage of being able to be applied for large-scale areas and
+in an automated manner when the radio environment changes. The back-haul cost of
+CC is less than the back-haul of GNSS fingerprinting, since the location information is
+not transmitted. Table 1 compares CC-based radio maps with GNSS-based fingerprinting
+and triangulation-based fingerprinting in terms of communication scenario, BS location,
+back-haul load, and computational cost at UEs and BSs.
+
+We consider V2I/V2V RRM based on large-scale radio features, i.e., the covariance
+matrices. A large data set of radio features of V2I is processed to obtain a channel chart
+of logical locations. In the training phase, the network control unit selects pairs of UEs
+that have the capability for V2V communications, and asks them to establish connection
+and measure the link quality. The vehicular terminals then feedback the average SNR of
+V2V communication to the network. The control unit constructs a LQP model based on
+the knowledge of CC locations of the vehicular terminals and the received average SNR
+of V2V pairs. The RRM framework consists of an offline training phase where MPCC
+and LQP are generated and an online phase where the MPCC and LQP are used to pre-
+dict connectivity of UEs in the network. In the online phase, out-of-sample extension of
+MPCC is used to place vehicles to the MPCC, and the LQP model is used to predict V2V
+connectivity. The block diagram of the considered method to predict V2V connectivity is
+shown in Fig. 4.
+
+4.1. Link quality prediction model
+
+In wireless communications, the optimal transmission scheme is adaptively selected
+based on the estimated CSI. Due to the high-mobility nature of V2V, directivity, and
+blockage of mm-Wave bands, link quality prediction of V2V is a challenging problem.
+Generally, analytical and theoretical models for LQP are based on simplified bounding
+assumptions, which cannot be used in practical scenarios. Here, we consider a data-driven
+probabilistic LQP model, utilizing the MPCC locations and average SNR of a large set
+of V2V pairs. The LQP of V2V communications is determined by the average SNR at
+the receiving terminal. The most important characteristic of a V2V channel is whether
+there is a connection or not. To proceed with predicting connectivity, we assume that
+there is an SNR threshold for successful reception. Knowing the SNR statistics for V2V
+
+Table 1 Benefits and costs of CC-based RRM
+
+ 
+
+ 
+
+Property MPCC/CC GNSS-based Triangulation-based
+fingerprinting fingerprinting
+
+Scenario NLOS/LOS Signals from three LOS from three BSs
+satellites
+
+BSs location Not needed Not needed Needed
+
+Back-haul load CSls CSls and location CSIs
+coordinates
+
+Comp. cost at BSs High (population-based Not applicable Low (point-based CSI
+
+CSI processing) processing)
+Comp. cost at UEs Not applicable GNSS position calcula- Not applicable
+
+tion
+
+ 
+
+Page 11 of 20
+Al-Tous et al. EURASIP Journal on Wireless Communications and Networking (2020) 2020:132
+
+ 
+
+ 
+
+ 
+
+Offline phases
+BS b GE
+dissimilarity measure locations
+UEs °
+V2 MPCC based on V2I
+communication
+BSB
+dissimilarity measure
+LQP P
+V2V SNR
+Network Control/BS b
+v2I ly ial el +
+Subset of UEs Subset of UEs
+UEs . 5
+V2V candidate for V2V ——» candidate for V2V
+transmiter receiver
+Online phase
+RRM
+V2I
+Out of sample MPCC distance V2V
+oe! MePPINg , & LOP , decision
+UE j EMPCC
+Fig. 4 RRM for V2I/V2V communication systems. Offline phase: the MPCC and LOP models are constructed.
+Online phase: network management uses EMPC and LOP to predict V2V connectivity
+
+ 
+
+communication with a given MPCC distance, one may then predict the probability of the
+V2V link being in outage with respect to this SNR threshold.
+
+The channel charting distance dy between UE i and UE/ is defined using the Euclidean
+distance of MPCC locations z; and 2; as:
+
+C
+dy = |Z — jlo. (17)
+
+The MPCC distance dy of the V2V pairs is quantized into a grid with G points, D =
+{do,..., dei} such that dj is assigned to grid point g if dy < d\ < do. The outage
+probability for CC grid distance do? can then be estimated as:
+
+O (ynld©) = Pr(P < yuld€), (18)
+
+where y,, is an SNR threshold determined for reliable communication at a rate required
+by the network, and I’ is the average SNR of a V2V communication pair belonging to
+the sample set with MPCC distance quantized to dy. The outage probability for distances
+dg € D is empirically computed using the measured SNR of V2V UEs.
+
+5 Simulation results and discussion
+A multicell mm-Wave scenario is considered as discussed in [21]. The simulation param-
+eters are shown in Table 2. The UE locations are generated on the streets of a Manhattan
+
+Page 12 of 20
+Al-Tous et al. EURASIP Journal on Wireless Communications and Networking (2020) 2020:132
+
+Table 2 Simulation parameters [21]
+
+ 
+
+ 
+
+Parameter Value Parameter Value
+Pathloss at 1 m 61.4 dB Reflection loss 0-15.5 dB
+UE tx power 23 dBm BS noise power —86 dBm
+BS antenna gain Oor2 UE antenna gain 1
+Bandwidth 200 MHz OFDM subcarriers 256
+
+BS antenna 64 ULA V2V antenna 8 ULA
+
+BS array gain 18 dB V2V array gain 8 dB
+Noise figure 6 dB Noise power —174 dBm
+No. of subrays/cluster 5 Max. no. of bounces 5
+
+Max. no. of multipaths 10 Intra-cluster mean delay 10 ns
+
+ 
+
+grid as shown in Fig. 5. In [21], a ray-tracing mm-Wave cellular channel model was created
+following the principles of [32, 33]. Here, we use this channel model for V2I and further
+generalize it to a V2V model. The channel simulator models the path loss experienced
+by the multipath components using the free-space path loss model with power inversely
+proportional to the square of the distance. The reflections from obstacles, i.e., the walls,
+are modeled such that the reflection coefficients are based on Fresnel’s equations. The
+typical value for the wall relative permittivity is between 4 and 6. The channel for each
+link is then calculated using the ray-traced paths with the path loss, reflection losses, and
+antenna gain accounted for in the channel. The multipath gain 6 ht is computed as:
+
+2
+(19)
+
+ 
+
+R
+Bre = eM | Go pd; ? gil) gato T] |r?
+i=1
+
+where Go = 10~©!* is the omnidirectional path gain at a reference distance of 1 m; p is
+
+the transmit power; y is the phase modeled as a uniform random variable w; ~ U(0, 277);
+
+ 
+
+450
+
+400
+
+Oo
+o1
+oO
+
+300
+
+y-coordinate in [m]
+
+250
+
+200
+
+150
+
+ 
+
+ 
+
+ 
+
+s 5
+150 200 250 300 350 400 450
+x-coordinate in [m]
+
+Fig. 5 Simulated scenario: streets in a Manhattan grid with 10 BSs labeled by numbers and sampled UE
+locations marked by colors
+
+ 
+
+ 
+
+ 
+Al-Tous et al. EURASIP Journal on Wireless Communications and Networking (2020) 2020:132 Page 14 of 20
+
+d; is the propagation distance in meters; g/(6;) and go(¢;) are the antenna gain for an angle
+of departure 6; at the VE and angle of arrival ¢; at the BS, respectively; R is the number
+of reflections that the /th multipath component undergoes; and r\? is the ith reflection
+coefficient. For an LOS path, R = 1 and 7) = 1.
+
+A scenario showing the propagation paths for multipath components using the ray-
+tracing model is shown in Fig. 6. A UE location has LOS communication with one BS
+(BS—LOS) anda NLOS communication with another BS (BS—NLOS). The SNR observed
+at BS — LOS which is at a distance of 43.01 m is obtained as 38 dB. The SNR at BS — NLOS
+which is at a distance of 235.7 m is calculated as —36.83 dB.
+
+5.1 Performance of out-of-sample extension algorithm
+
+First, we investigate the performance of EMPCC, which inserts out-of-sample UEs to the
+chart. There are K UEs, and the number of neighboring UEs used to construct the graph
+for LE is denoted by N. The number of UEs for which EMPCC is used is denoted by /.
+Two scenarios are considered to evaluate the performance of EMPCC. In scenario I, the
+MPCC is generated based on the channel features of K UE locations. Then, J UE locations
+are removed at random, and EMPCC is used for mapping the J locations to the chart. In
+scenario II, J UE locations are selected at random and the MPCC is generated based on the
+channel features of K — J UE locations. EMPCC is used for mapping the J locations to the
+chart. Both Laplacian Eigenmaps based on a conflict graph and LE based on a weighted
+graph are used for channel charting.
+
+i
+
+400
+
+ 
+
+     
+
+—>— MPC to LOS BS
+
+-»-MPC to NLOS BS |
+
+350
+
+300
+
+rot > FZ
+4° v7
+4 =
+¢ — .
+250 . Ne
+. MPC.- LOS _-7
+* | “77
+\ —S
+|
+
+\ _-77 MPC,,-NLOS
+
+=-
+
+   
+
+200
+
+150
+
+ 
+
+| | | | | |
+150 200 250 300 350 400 450
+
+Fig.6 A scenario showing the propagation paths and MPCS for a UE location with LOS and NLOS BSs
+
+ 
+
+ 
+
+ 
+Al-Tous et al. EURASIP Journal on Wireless Communications and Networking (2020) 2020:132 Page 15 of 20
+
+ 
+
+ 
+
+ 
+
+ 
+
+ 
+
+   
+
+ 
+
+ 
+
+ 
+
+ 
+
+ 
+
+ 
+
+ 
+
+ 
+
+ 
+
+ 
+
+ 
+
+ 
+
+ 
+
+ 
+
+ 
+
+ 
+
+1000 . 1000
+* KUEs MPCC 2 KJ UEs MPCC
+800 - eee, > JUEs E-MPCC | 800 f < JUEs EMPCC | 7
+5 Es R
+600 | - J UEs Removed 600
+oO oO
+% 400 - * 4007
+© 200 + * * i § 200+
+8 ey 5 8
+OF a > OF
+t ‘ Cc
+w & a 5
+6-200 a x oF § -200
+e e
+* *
+“600 | eee 6 oi -600
+-800 800
+-800 -600 -400 -200 0 200 400 600 800 1000 300-600. 400 200. 0 200 400. 600 800 1000
+Chart x-corrdinate Chart x-corrdinate
+
+Fig. 7 Two-dimensional channel chart for 4 BSs. The channel chart location of out-of-sample UEs is in black
+color. Left: re-inserting removed sample. Right: inserting new sample
+
+ 
+
+ 
+
+ 
+
+ 
+
+An example instance for LE-based MPCC/EMPCC for different parameters is shown
+in Figs. 7 and 8. For Fig. 7, the parameters are K = 500, J = 100, N = 25, and B = 4
+BSs labeled as {1, 3, 5, 7}. We select a reference point in the first quadrant for K and K —J
+MPCC to avoid the possibility of rotation or flipping of the EMPCC compared to MPCC.
+
+In Fig. 8, the parameters are K = 5000, N = 250, J = 500, and B = 10. The J out-of-
+sample locations are accurately mapped by EMPCC.
+
+The performance of MPCC/EMPCC is evaluated using continuity (CT) and trustwor-
+thiness (TW) measures as shown in Table 3. For a discussion on these measures, see [34].
+CT and TW are computed by considering 50 nearest neighbors. For MPCC, all K UEs
+are used to generate the chart, whereas for EMPCC, the chart is constructed by K — J
+UEs and the EMPCC is used to position the reaming J UEs. For weighted Gaussian ker-
+nel, T = 0.05. The CT and TW and measures of EMPCC are comparable to MPCC,
+indicating that the out-of-sample extension methodology in EMPCC works.
+
+5.2 Performance of link quality prediction
+
+For V2V link quality prediction, the MPCC is constructed based on V2I communications.
+For this, we consider a scenario with K = 5000 UEs and B = 10 BSs, in the Manhattan
+grid considered above. The LQP model is constructed based on the SNR of V2V pairs
+with the corresponding Euclidean charting distance computed using the MPCC loca-
+tions. To construct the V2V channels, 1, 000, 000 random pairs of UEs are selected among
+
+ 
+
+ 
+
+ 
+
+ 
+
+ 
+
+      
+   
+
+ 
+
+ 
+
+ 
+
+ 
+
+  
+
+ 
+
+ 
+
+ 
+
+ 
+
+ 
+
+ 
+
+ 
+
+300 1 1 300 1 1
+* KUEs MPCC a K-J UEs MPCC
+> J UEs Removed sail < JUEs EMPCC
+200 || 9 JUESEMPCC | ga” 200
+©
+5 100 £100
+o S
+° 3
+g 8
+> 7
+Or >
+3 2 of
+< w
+° 5
+100 400
+“200 | ! 1 ! ! | \ | 200 - ms Serta ate a ,
+-200 -100 0 100 200 *
+Chart x-coordinate -200 100 onart x-corrdiante 100 200
+
+Fig. 8 Two-dimensional channel chart for 10 BSs. The channel chart location of out-of-sample UEs is in black
+color. Left: re-inserting removed sample. Right: inserting new sample
+
+ 
+
+ 
+
+ 
+
+ 
+Al-Tous et al. EURASIP Journal on Wireless Communications and Networking
+
+(2020) 2020:132
+
+Table 3 Comparison of MPCC and EMPCC in terms of TW and CT measures considering 50
+neighbors, weighted LE (w-LE) with T = 0.05 is considered
+
+ 
+
+ 
+
+ 
+
+LE-MPCC LE-EMPCC WLE-MPCC WLE-EMPCC
+
+CT TW CT TW CT TW CT TW
+4 BSs 0.9880 0.9883 0.9868 0.9802 0.9777 0.9776 0.9777 0.9776
+10 BSs 0.9943 0.9806 0.9788 0.9942 0.9955 0.9954 0.9955 0.9954
+
+ 
+
+the chart locations. The V2V mm-Wave channels are generated by generalizing the ray-
+tracing channel model of [21] in the same environment where the MPCC is constructed,
+and the average SNRs for V2V communications are computed as in (6).
+
+Figure 9 shows a scatter plot of the average SNR of the V2V pairs as function of physical
+and chart distances. As expected, the SNR of a V2V link decreases with increasing phys-
+ical distance, and the relation of SNR with chart distance also captures this. This figure
+indicates that MPCC preserves the distance-SNR relation. It can be seen from Fig. 9 that
+at smaller distances, when charting distance d© < 75, the probability that an average
+SNR of a V2V link is below a SNR threshold of yj, = 25 dB is zero, so for this charting
+distance, V2V communication is guaranteed to be successful with high data rates, or the
+transmitted power can be reduced to reduce the interference to other terminals.
+
+Using the collected data of the average SNRs and the physical distances, a benchmark
+LQP model is constructed. The outage probabilities Or(ynldy””) are empirically com-
+puted for the true location UEs, for different SNR thresholds yy, using a grid distance
+dy” . Using the collected data of the average SNRs and the corresponding CC distances, a
+LQP model is constructed. The outage probabilities Occ (yy, aye? ) of (18) are empirically
+computed for the chart UEs, for different SNR thresholds y,. The trained outage proba-
+bility model for different physical and CC distances and different thresholds 4; is shown
+in Fig. 10. The left plot represents the benchmark LQP model that can be used to predict
+the outage probability of an out-of-sample V2V pair by knowing the true distance. The
+right plot represents the LQP model that can be used to predict the outage probability of
+an out-of-sample V2V pair by just knowing the EMPCC (out-of-sample chart) distance
+between them. The CC LQP relation as a function of the CC distance is similar to the
+benchmark LQP as a function of true distance.
+
+To estimate the performance of LQP in the online RRM phase, a test set of J = 1000
+out-of-sample V2I UEs was generated. The large-scale radio features of V2I channels are
+
+ 
+
+ 
+
+ 
+
+50
+40 +
+30 F
+
+20 F
+
+SNR of V2V in [dB]
+SNR of V2V in [dB]
+
+    
+
+ 
+
+ 
+
+ 
+
+ 
+
+ 
+
+ 
+
+1 l * : pets l -AQ Ll I I . .- r : .
+0 50 100 150 200 250 300 0 50 100 150 200 250
+True Distance in [m] CC Distance
+
+Fig. 9 Scatter plot of the average SNR of V2V links as a function of true distance (left plot) and CC distance
+(right plot)
+
+ 
+
+ 
+
+ 
+
+Page 16 of 20
+Al-Tous et al. EURASIP Journal on Wireless Communications and Networking (2020) 2020:132 Page 17 of 20
+
+ 
+
+ 
+
+ 
+
+ 
+
+“4
+2,
+
+ 
+
+ 
+
+ 
+
+Outage Probability
+Outage Probability
+
+  
+
+ 
+
+ 
+
+ 
+
+ 
+
+L ig fa L L L L L L i iow L L L L L
+40 60 80 100 120 140 160 180 100 150 200 250 300 350 400
+True Distance in [m] CC Distance
+
+ 
+
+ 
+
+Fig. 10 Outage probability for different SNR threshold values as a function of true distance (left plot) and CC
+distance (right plot)
+
+ 
+
+ 
+
+ 
+
+used to map these out-of-sample UEs to the existing chart using the EMPCC algorithm.
+Again, 1,000,000 V2V pairs are constructed at random from these out-of-sample UEs.
+The V2V mm-Wave channels and the V2V SNRs are generated in the same way as that
+for the chart UEs.
+
+The true outage probabilities as the function of physical and chart distances are then
+constructed for this test set. As a result, we get the outage probabilities of out-of-sample
+UEs as Ogos (ven dy”) and Oos (vn lay”), respectively. Note that for comparison to the
+
+dy”? are used for the physical and chart
+
+LQP model, the same quantization grid dO and
+distances of the test set, as for the original trained UEs, respectively.
+
+The true outage probabilities can be compared to the ones predicted by the trained
+LQP. The relative mean square error for LQP of the outage probability from the data of
+
+chart UEs for a given yy, at chart distance dy? is given by:
+
+2, = (os (valds”) ~ Occ (vale) (20)
+
+a (Occtymlde)
+
+Similarly, the relative mean square error for the benchmark LQP of the outage probability
+from the data of UEs for a given yy, at physical distance dy”? is denoted as Boo:
+
+Figure 11 shows the error bo for different SNR thresholds as a function of the CC
+distance and the error 85 as a function of the physical distance. The largest relative
+
+ 
+
+ 
+
+ 
+
+ 
+
+ 
+
+ 
+
+ 
+
+ 
+
+Relative Error
+
+  
+
+ 
+
+ 
+
+ 
+
+ 
+
+ 
+
+1 0° 1 1 1 1 1 1 1 1 1 1 1 1 1 1 1
+40 60 80 100 120 140 160 180 100 150 200 250 300 350 400
+True Distance in [m] CC Distance
+
+Fig. 11 Relative mean-square error of prediction SB a (left plot) and 84 (right plot). The small values of SD,
+
+and So indicate that the LOP model provides reliable prediction of the outage probability of the
+out-of-sample UEs
+
+ 
+
+ 
+
+ 
+Al-Tous et al. EURASIP Journal on Wireless Communications and Networking (2020) 2020:132 Page 18 of 20
+
+mean square error ae = 3.0% is observed for threshold y,, = 6 dB, for a CC distance
+larger than 150. This indicates that the trained LQP model provides reliable prediction of
+the outage probability of the out-of-sample UEs just based on CSI of the V2I links. The
+relative error dp,g based on the true distance is smaller than the relative error 5¢,¢ based
+on the chart distance.
+
+6 Conclusion
+
+We have presented the concept of link quality prediction for V2V communications
+in dynamic environments based on multipoint channel charting. For this, the phys-
+ical locations of neither the vehicles nor the base stations are required. We have
+considered a network controlled V2V approach, where vehicles communicate with
+infrastructure BSs, and the large-scale radio frequency features of the V2I channels
+have been used to map vehicles to a logical map. A network control unit has been
+used to manage the selection and collection of enough SNR samples of V2V chan-
+nels and to construct a LQP model. In order to use the prediction in online RRM,
+the channel charting principle has to be extended to out-of-sample data CSI features,
+related to out-of-sample vehicle locations. For this, a MPCC has been constructed
+first using an original data set of V2I CSIs. The multipath components of the new
+CSI samples have been estimated at each BS and then processed using the data-
+driven dissimilarity computation as the original set. The dissimilarity vector of the
+out-of-sample vehicle has been used to generate the weighting vector for out-of-sample
+mapping. The resulting EMPCC algorithm has been used to map out-of-sample vehi-
+cles to the chart. The trustworthiness and continuity performance measures have been
+used to evaluate the EMPCC, and we found that out-of-sample extension works in a
+reliable manner.
+
+The method has wide applicability in cognitive RRM, where predictions of vehicle con-
+nectivity parameters would be used. Here, we have used the channel chart to predict V2V
+connectivity. Based on the Euclidean chart distance, the probability of outage of V2V com-
+munication between two out-of-sample vehicles has been predicted. This can be used by
+the network to identify which vehicles may communicate over direct V2V links. The only
+input for this prediction is the V2I CSI of the two involved vehicles, as measured by the
+infrastructure base stations. In simulation modeling of amm-Wave network, the LQP was
+found to perform well, with a typical relative mean square error of < 2%.
+
+In future work, the locations of V2V pair, not only the chart distance, are going to
+be used to improve the LQP model. An advanced LQP model based on deep learning
+will also be considered to predict the SNR of the link given the CC locations of the
+V2V pairs. Using channel charting for multihop V2V communication is another RRM
+problem that can be considered, i.e., selecting the relaying nodes for V2V communica-
+tion to achieve a desired link quality. Advanced mm-Wave channel models, in which the
+blockage probability, density, size, and speed of vehicles are taken into consideration, are
+important components when verifying channel charting-based RRM in such challenging
+scenarios.
+
+Abbreviations
+Al: Artificial intelligence; B5G: Beyond 5G; BS: Base station; CC: Channel charting; CSI: Channel state information; CT:
+Continuity; DSRC: Dedicated short-range communication; EMPCC: Extension-of-MPCC; LE: Laplacian Eigenmaps; LOP:
+
+Link quality prediction; MAC: Medium access control; ML: Machine learning; mMIMO: Massive MIMO; mm-Wave:
+Millimeter-wave; MPCC: Multipoint channel charting; PHY: Physical; PCA: Principal component analysis; QoS: Quality of
+Al-Tous et al. EURASIP Journal on Wireless Communications and Networking (2020) 2020:132 Page 19 of 20
+
+service; RRM: Radio resource management; Rx: Receive; SM: Sammon’s mapping; SNR: Signal-to-noise ratio; t-SNE:
+t-Distributed Stochastic Neighbor Embedding; Tx: Transmit; TW: Trustworthiness; UEs: User equipments; V21:
+Vehicle-to-infrastructure; V2V: Vehicle-to-vehicle; w-LE: Weighted-LE
+
+Acknowledgements
+Not applicable.
+
+Authors’ contributions
+
+OT proposed the idea and revised this paper. HA and TP wrote the manuscript and participated in the simulation. CS
+gave some suggestions and participated in the paper revision. All authors have contributed to this research work. All
+authors have read and approved the final manuscript.
+
+Funding
+This work was funded in part by the Academy of Finland (grant 319484). The work of C. Studer was supported in part by
+Xilinx Inc. and by the US NSF under grants ECCS-1408006, CCF-1535897, CCF-1652065, CNS-1717559, and ECCS-1824379.
+
+Availability of data and materials
+Data sharing not applicable to this article as no data sets were generated or analyzed during the current study.
+
+Competing interests
+The authors declare that they have no competing interests.
+
+Author details
+'Department of Communications and Networking, Aalto University, Espoo, Finland. 2School of Electrical and Computer
+Engineering, Cornell University, Ithaca, NY, USA.
+
+Received: 2 January 2020 Accepted: 23 April 2020
+Published online: 24 June 2020
+
+References
+
+1. V.Va, T. Shimizu, G. Bansal, R. Heath, Millimeter Wave Vehicular Communications: A Survey. (Now Publishers Inc.,
+Hanover, 2016)
+
+2. J. Kenney, Dedicated short-range communications (DSRC) standards in the United States. Proc. IEEE. 99(7),
+1162-1182 (2011)
+
+3. M.Giordani, A. Zanella, M. Zorzi, in Proc. of the 6th International Conference on Modern Circuits and Systems
+Technologies, (MOCAST), Millimeter wave communication in vehicular networks: challenges and opportunities,
+(2017), pp. 1-6. https://doi.org/10.1109/mocast.201 7.7937682
+
+4. J. Choi, V. Va, N. Gonzalez-Prelcic, R. Daniels, C. Bhat, R. Heath, Millimeter-Wave vehicular communication to support
+massive automotive sensing. IEEE Commun. Mag. 54(1 2), 160-167 (2016)
+
+5. S. Busari, K. Hug, S. Mumtaz, L. Dai, J. Rodriguez, Millimeter-Wave massive MIMO communication for future wireless
+systems: a survey. IEEE Commun. Surv. Tuts. 20(2), 836-869 (2018)
+
+6. E. Bjornson, E. G. Larsson, T. Marzetta, Massive MIMO: ten myths and one critical question. IEEE Trans. Commun.
+54(2), 114-123 (2016)
+
+7. S.Yang,L. Hanzo, Fifty years of MIMO detection: the road to large-scale MIMOs. IEEE Commun. Surv. Tuts. 17(4),
+1941-1988 (2015)
+
+8. A. Shahmansoori, G. Garcia, G. Destino, G. Seco-Granados, H. Wymeersch, Position and orientation estimation
+through Millimeter-Wave MIMO in 5G systems. IEEE Trans. Wirel. Commun. 17(3), 1822-1835 (2018)
+
+9. F. Guidi, A. Guerra, D. Dardari, A. Clemente, R. Errico, in Proc. of IEEE Globecom Workshops, (GC Wkshps), Environment
+mapping with Millimeter-Wave massive arrays: system design and performance, (2016), pp. 1-6. https://doi.org/10.
+1109/glocomw.2016.7848895
+
+10. N. Garcia, H. Wymeersch, E. Larsson, A. Haimovich, M. Coulon, Direct localization for massive MIMO. IEEE Trans. Signal
+Process. 65(10), 2475-2487 (201 7)
+
+11. A. Kato, K. Sato, M. Fujise, ITS wireless transmission technology. technologies of Millimeter-Wave inter-vehicle
+communications: Propagation characteristics. J. Commun. Res. Lab. 48(4), 99-110 (2001)
+
+12. M. Giordani, M. Polese, A. Roy, D. Castor, M. Zorzi, A tutorial on beam management for 3GPP NR at mmWave
+frequencies. IEEE Commun. Surv. Tuts. 21(1), 173-196 (2019)
+
+13. M. Giordani, T. Shimizu, A. Zanella, T. Higuchi, O. Altintas, M. Zorzi, Path loss models for V2V mmWave communication:
+performance evaluation and open challenges. CoRR (2019). https://doi.org/10.1109/cavs.2019.8887792
+
+14. M. Giordani, M. Mezzavilla, A. Dnhananjay, S. Rangan, M. Zorzi, in Proc. of the 22th European Wireless Conference,
+Channel dynamics and SNR tracking in millimeter wave cellular systems, (2016), pp. 1-8
+
+15. L.Liang, H. Ye, G. Y. Li, Toward intelligent vehicular networks: a machine learning framework. IEEE Internet Things J.
+6(1), 124-135 (2019)
+
+16. M.G. Kibria, K. Nguyen, G. P. Villardi, O. Zhao, K. Ishizu, F. Kojima, Big data analytics, machine learning, and artificial
+intelligence in next-generation wireless networks. IEEE Access. 6, 32328-32338 (2018)
+
+17. D.Gunduz, P. de Kerret, N. Sidiropoulos, D. Gesbert, C. Murthy, M. Schaar, Machine learning in the air. CORR.
+abs/1904.12385 (2019)
+
+18. C. Zhang, P. Patras, H. Haddadi, Deep learning in mobile and wireless networking: a survey. IEEE Commun. Surv.
+Tuts., 1 (2019). https://doi.org/10.1109/comst.2019.2904897
+
+19. Z. Jiang, S. Chen, A. Molisch, R. Vannithamby, S. Zhou, Z. Niu, Exploiting wireless channel state information structures
+beyond linear correlations: a deep learning approach. IEEE Commun. Mag. 57(3), 28-34 (2019)
+Al-Tous et al. EURASIP Journal on Wireless Communications and Networking (2020) 2020:132 Page 20 of 20
+
+20.
+
+21,
+
+22.
+
+23.
+
+24,
+25.
+
+26.
+
+2/.
+28.
+
+29.
+
+30.
+
+31.
+
+32.
+
+33.
+
+34.
+
+C. Studer, S. Medjkouh, E. Gonultas, T. Goldstein, O. Tirkkonen, Channel charting: locating users within the radio
+environment using channel state information. IEEE Access. 6, 47682-47698 (2018)
+
+J. Deng, S. Medjkouh, N. Malm, O. Tirkkonen, C. Studer, in Proc. of 52nd Asilomar Conference on Signals, Systems, and
+Computers, Multipoint channel charting for wireless networks, (2018), pp. 286-290. https://doi.org/10.1109/acssc.
+2018.8645281
+
+T. Ponnada, H. Al-Tous, O. Tirkkonen, C. Studer, in Proc. of 14th EAI International Conference on Cognitive Radio Oriented
+Wireless Networks, (Crowncom), An out-of-sample extension for wireless multipoint channel charting, (2019). https://
+doi.org/10.1007/978-3-030-25748-4_16
+
+M. Akdeniz, Y. Liu, M. Samimi, S. Sun, S. Rangan, T. Rappaport, E. Erkip, Millimeter wave channel modeling and cellular
+capacity evaluation. IEEE J. Sel. Areas Commun. 32(6), 1164-1179 (2014)
+
+A. Goldsmith, Wireless Communications. (Cambridge University Press, New York, NY, USA, 2005)
+
+R. Schmidt, Multiple emitter location and signal parameter estimation. IEEE Trans. Antennas Propag. 34(3), 276-280
+(1986)
+
+M. Ester, H. Kriegel, J. Sander, X. Xu, in Proc. of the Second International Conference on Knowledge Discovery and Data
+Mining, (KDD), A density-based algorithm for discovering clusters in large spatial databases with noise, (1996),
+
+pp. 226-231
+
+L. Maaten, E. Postma, H. Herik, Dimensionality reduction: a comparative review. J Mach Learn Res. 10, 66-71 (2009)
+P. Huang, O. Castaneda, E. Gonultas, S. Medjkouh, O. Tirkkonen, T. Goldstein, C. Studer, in Proc. of the IEEE 20th
+International Workshop on Signal Processing Advances in Wireless Communications, (SPAWC), Improving channel
+charting with representation-constrained Autoencoders, (2019), pp. 1-5. https://doi.org/10.1109/spawc.2019.
+8815478
+
+E. Lei, O. Castaneda, O. Tirkkonen, T. Goldstein, C. Studer, Siamese neural networks for wireless positioning and
+channel charting. ArXiv. abs/1909.13355 (2019). https://doi.org/10.1109/allerton.2019.891 9897
+
+M. Belkin, P. Niyogi, Laplacian eigenmaps for dimensionality reduction and data representation. Neural Comput.
+15(6), 1373-1396 (2003)
+
+Y. Bengio, J. Paiement, P. Vincent, O. Delalleau, N. L. Roux, M. Ouimet, in Proc. of the 16th International Conference on
+Neural Information Processing Systems, (NIPS), Out-of-sample extensions for LLE, Isomap, MDS, eigenmaps, and
+spectral clustering (MIT Press, Cambridge, MA, USA, 2003), pp. 177-184
+
+S. Hur, S. Baek, B. Kim, J. Park, A. F. Molisch, K. Haneda, M. Peter, in Proc. of the 9th European Conference on Antennas
+and Propagation, (EUCAP), 28 GHz channel modeling using 3D ray-tracing in urban environments, (2015), pp. 1-5
+M. Samimi, T. Rappaport, in Proc. of IEEE International Conference on Communications, (ICC), 3-D statistical channel
+model for millimeter-wave outdoor mobile broadband communications, (2015), pp. 2430-2436. https://doi.org/10.
+1109/icc.2015.7248689
+
+J. Venna, S. Kaski, in Proc. of the International Conference on Artificial Neural Networks, (ICANN), Neighborhood
+preservation in nonlinear projection methods: an experimental study, (2001), pp. 485-491. https://doi.org/10.1007/
+3-540-44668-0_68
+
+Publisher’s Note
+
+Springer Nature remains neutral with regard to jurisdictional claims in published maps and institutional affiliations.
+
+ 
+
+Submit your manuscript to a SpringerOpen®
+journal and benefit from:
+
+> Convenient online submission
+
+> Rigorous peer review
+
+> Open access: articles freely available online
+> High visibility within the field
+
+> Retaining the copyright to your article
+
+Submit your next manuscript at > springeropen.com
+
+ 
+
+ 
+
+ 

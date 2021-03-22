@@ -1,0 +1,2229 @@
+Theoretical Computer Science 843 (2020) 84-114
+
+Contents lists available at ScienceDirect
+
+Theoretical Computer Science
+
+    
+
+git ’
+
+LSEVIER www.elsevier.com/locate/tcs
+
+ 
+
+ 
+
+Verifying polymer reaction networks using bisimulation
+
+Check for
+updates
+
+ 
+
+Robert F. Johnson**, Erik Winfree?
+
+* Bioengineering, California Institute of Technology, United States of America
+> Computer Science & Bioengineering, California Institute of Technology, United States of America
+
+ARTICLE INFO ABSTRACT
+Article history: The Chemical Reaction Network model has been proposed as a programming language
+Received 8 January 2020 for molecular programming. Methods to implement arbitrary CRNs using DNA strand
+
+Received in revised form 6 August 2020
+Accepted 10 August 2020
+
+Available online 1 September 2020
+Communicated by L. Cardelli
+
+displacement circuits have been investigated, as have methods to prove the correctness
+of those or other implementations. However, the stochastic Chemical Reaction Network
+model is provably not deterministically Turing-universal, that is, it is impossible to create a
+stochastic CRN where a given output molecule is produced if and only if an arbitrary Turing
+
+Keywords: machine accepts. A DNA stack machine that can simulate arbitrary Turing machines with
+Verification minimal slowdown deterministically has been proposed, but it uses unbounded polymers
+Molecular computing that cannot be modeled as a Chemical Reaction Network. We propose an extended version
+Bisimulation of a Chemical Reaction Network that models unbounded linear polymers made from a
+Chemical Reaction Networks finite number of monomers. This Polymer Reaction Network model covers the DNA stack
+
+Polymer Reaction Networks
+
+machine, as well as copy-tolerant Turing machines and some examples from biochemistry.
+DNA strand displacement
+
+We adapt the bisimulation method of verifying DNA implementations of Chemical Reaction
+Networks to our model, and use it to prove the correctness of the DNA stack machine
+implementation. We define a subclass of single-locus Polymer Reaction Networks and show
+that any member of that class can be bisimulated by a network using only four primitives,
+suggesting a method of DNA implementation. Finally, we prove that deciding whether an
+implementation is a bisimulation is 119-complete, and thus undecidable in the general case,
+although it is tractable in many special cases of interest. We hope that the ability to model
+and verify implementations of Polymer Reaction Networks will aid in the rational design
+
+of molecular systems.
+© 2020 The Author(s). Published by Elsevier B.V. This is an open access article under the
+CC BY license (http://creativecommons.org/licenses/by/4.0/).
+
+1. Introduction
+
+We consider the problem of how molecules can compute: how do biological systems use their components to compute,
+and what computing systems can be built with biological or bio-compatible molecules? For relatively small molecules in a
+well-mixed solution, the well-studied Chemical Reaction Network (CRN) model is a natural way to describe them. Known
+examples of computation with CRNs include useful small devices such as the approximate majority CRN [3,17] and the
+rock-paper-scissors oscillator [32,20,49], boolean circuits [38] and neural networks [25], as well as more general results,
+including deterministic computation of arbitrary semilinear functions [2,15,21] and simulation of Turing machines with
+arbitrarily small error probability [47]. (For those not interested in computation per se, Turing universality may be taken as
+an assurance that these systems are capable of a wide class of complex behaviors.) Further, computationally interesting (or
+
+* Corresponding author.
+E-mail address: rfjohnso@dna.caltech.edu (R.F. Johnson).
+
+https: //doi.org/10.1016/j.tcs.2020.08.007
+0304-3975/© 2020 The Author(s). Published by Elsevier B.V. This is an open access article under the CC BY license
+(http://creativecommons.org/licenses/by/4.0/).
+R.E Johnson, E. Winfree / Theoretical Computer Science 843 (2020) 84-114 85
+
+uninteresting) CRNs can be “compiled” into physical devices: Soloveichik et al. [48], Qian et al. [42], and Cardelli [9], among
+others, give schemes to construct a DNA Strand Displacement (DSD) circuit that implements an arbitrary CRN.
+
+One assumption of the CRN model is that the molecules are in a “well-mixed solution”: that there is no concept of
+geometry or spatial organization of the molecules, that any pair of molecules is as likely to interact as any other, and that
+the only relevant information about the current state is the count (or concentration) of each molecule present. For small
+circuits like the ones mentioned above, this is quite reasonable. For classic models of computation and for biological systems,
+however, this assumption doesn’t match: Turing machines, DNA/RNA/Proteins, and the cytoskeleton are all fundamental
+examples and fundamentally geometric. A counting argument suggests why: consider a system with k “types of object” (e.g.
+chemical species, Turing machine tape symbols) and a state of that system with n total objects. In a well-mixed CRN, the
+number of possible such states is on the order of (but less than) n*; in a Turing machine or other geometric system, that
+number is on the order of k”. In uniform computation—a single machine built to handle arbitrarily large computations—we
+have a constant k with n scaling with the size of the computation; so for example, the CRN that simulates Turing machines
+mentioned above uses around 3” copies of a given molecule to simulate a Turing machine with n tape squares filled [47].
+
+For such reasons, researchers have begun building molecular computing systems that take advantage of geometry. There
+are a number of variations on the concept of a DNA walker moving around a surface, often DNA origami, in a programmable
+way; a particularly complex example is the cargo-sorting robot of Thubagere et al. [52]. Chatterjee et al. have built logic
+circuits on origami, using a constant number of components regardless of the size of the circuit [14]. In the examples
+closest to abstract CRNs, Cardelli and Zavattaro discussed a CRN-like model with association and dissociation [13]; Qian et
+al. proposed a DNA implementation of a generic stack machine [42]; and Qian and Winfree proposed a DNA implementation
+of CRN-like reactions localized on a surface [43].
+
+Also relevant to this topic are theoretical results on the computational power of well-mixed CRNs, and the difference
+in power between well-mixed CRNs and geometry-using models. The two most relevant results are that well-mixed CRNs
+that “always eventually” compute the right answer (in a certain sense well-defined in the theorem) can compute exactly
+the semilinear functions [2,15], and that the reachability problem for CRNs is decidable by a Turing machine [29,36]. The
+reachability problem is in an informal sense the CRN equivalent of the Turing machine halting problem; but since the
+Turing machine halting problem is undecidable, any CRN trying to simulate a Turing machine must have some reachable
+state that involves an error. Thus those CRNs that try to simulate Turing machines can either do so deterministically and
+space-efficiently in a non-uniform sense, where a single CRN can simulate a Turing machine with a given bound on its tape
+size by using separate species for each tape position, and thus a larger CRN must be created to simulate a larger Turing
+machine tape [38,28]; or do so uniformly but with some probability of error, and due to the counting argument above,
+using species counts exponential in the space used by the Turing machine [47]. In contrast, building on Bennett’s insights
+relating polymer biochemistry and Turing machines [7], formal polymer systems such as Computational Nucleic Acids [31],
+the Biochemical Ground Form [13], DNA stack machines [42,33], DNA Turing machines [55], DNA register machines [51],
+and Surface CRNs [43], can all simulate classical Turing machines with no chance of error and using the same amount of
+space as the Turing machine.
+
+We focus in this paper on verification of polymer systems. Specifically, we focus on the problem of, given an abstract
+description of a polymer system and a physical system, does the physical system “do the same thing” as the abstract
+description? For example, we might compare the abstract description of the DNA stack machine to its actual physical imple-
+mentation [42], and wonder if the properties of a stack machine are preserved. An analogous problem came up in the finite
+CRN case, where verification methods (based on serializability analysis [34], pathway decomposition [46], and CRN bisimu-
+lation [27]) found subtle errors in some of the proposed CRN compilation schemes. Each of those methods has advantages
+and disadvantages relative to the others, but all are capable of proving relevant correspondences between the behavior of
+physical CRN implementations and the abstract CRNs, or pointing out implementations that fail to correspond to the abstract
+CRNs in important ways. For example, our previous work on CRN bisimulation [27] discusses a method of “interpreting” the
+chemical species of the physical system as combinations of species of the abstract system, then asking if the possible quali-
+tative behaviors of the two systems are equivalent up to that interpretation. Two features of this theory—basing it on weak
+bisimulation where the implementation may involve multiple “silent” steps for each step of the intended formal behavior,
+and allowing that interpretations are one-species-to-multiple-species rather than one-to-one—are necessary for treating the
+implementation of CRNs using dynamic DNA nanotechnology [48,9,17,49], but result in the NP-completeness and PSPACE-
+completeness of several natural questions relating to finding and verifying bisimulation arguments [27]. (Methods more
+closely aligned with strong bisimulation, which in a sense require one-to-one steps and one-to-one interpretations, allow
+for much more efficient algorithms to verify bulk deterministic behavior and finite-volume stochastic behavior [10-12], but
+unfortunately these methods are not applicable to the prevailing DNA nanotechnology implementations. A variety of “equiv-
+alence” notions exist for process algebras [53]; even weaker notions such as trace equivalence can fail to respect key aspects
+such as the branching structure of a process or the pitfalls of deadlock. Some examples of this failure in CRNs are discussed
+in our work on CRN bisimulation [27].)
+
+In this paper, we show how CRN bisimulation can be adapted to polymer CRN-like systems and can help design practical
+systems. In Section 2 we define a model of “linear Polymer Reaction Networks”, henceforth referred to simply as PRNs, that
+may be considered a special case of CRNs with (usually) infinitely many species and reactions. The PRN model covers a
+wide range of polymer system behaviors while still being convenient for discussion of bisimulation. This model is based on
+species being arbitrary strings over a finite set of “monomers”, and a finite set of “reaction schemata” with wildcards from
+86 R.E Johnson, E. Winfree / Theoretical Computer Science 843 (2020) 84-114
+
+which concrete reactions can be enumerated. Because PRNs are a special case of infinite CRNs, and most of the theorems
+of CRN bisimulation do not require the CRNs to be finite, CRN bisimulation can with a few new concepts be adapted to
+PRNs, resulting in a new theory for PRN bisimulation. Thus, PRN bisimulation can be used to verify designs for physical
+implementations of polymer systems, which we show in Section 3 by proving correct an updated version of the DNA stack
+machine by Qian et al. [42]. Although many of the theorems (such as transitivity and modularity) from our previous work
+on CRN bisimulation [27] still apply to PRN bisimulation, the algorithms for finding or checking a bisimulation interpretation
+assume finite CRNs, and in Section 4 we show that the corresponding problems are undecidable for polymer systems.
+
+We believe that CRN and PRN bisimulation are not just useful for verifying systems once designed, but can be used as
+“goalposts” to help guide the design of CRN and PRN implementations. For example, a proof by bisimulation that a certain
+small class of reaction mechanisms is sufficient to implement any of a larger class of reactions, suggests a design strategy
+involving implementing that small class of reactions. In Section 5 we give an example of such a proof that any of a class
+of “single-locus reaction schemata”, which capture a notion of physically realistic single-step reactions, can be implemented
+up to PRN bisimulation by a specific set of five reaction primitives. Finally, since our linear PRNs are only one of many
+reasonable models of a polymer CRN-like system, in Section 6 we show how PRN bisimulation might be defined for other
+such systems, and suggest how our theorems might be extended accordingly.
+
+2. Definitions
+2.1. Multisets, languages, regular expressions, and automata
+
+N is the set of natural numbers, {0,1,2,...}. Where A is a set, N4@ is the set of multisets of elements of A, or equiv-
+alently, the set of functions from A to N. Where S ce N“, X € A we write S(X) for the count of X in S; this is consistent
+with S as a function A — N. Addition and scalar multiplication of multisets are defined componentwise. Comparison is also
+defined, S > T means VxS(X) > T(X), and $ > T if S>T and §¥T. As we are only concerned with finite multisets, if A
+is infinite we use N“ to mean the set of multisets 5 with >doxeaq 5(X) < 00. We use the notation {...|} for multisets, e.g.
+{X, Y|} or (2X, Z}.
+
+Where » is a set, &* is the set of strings of O or more elements of &. € is the empty string. @ is the empty set. A
+language is a set of strings. A regular language is the set of all strings that match a regular expression for some &. A regular
+expression is either a symbol in & U {¢, %} or it is a*, ab, or (ajb) where a and b are already-defined regular expressions.
+No strings match %, € matches €, x matches x for x € &, w matches (a|b) if w matches a or w matches b, w matches ab if
+W = W 1W?2 and wj matches a and w2 matches b, and w matches a* if w= w,w2 and w, matches a and wz matches a”.
+
+We use finite automata, stack machines, and Turing machines for various purposes. We generally assume familiarity with
+them, but give a brief description. A (nondeterministic) finite automaton (FA or NFA) is M=(Q,,6,qo, F). Q is a set of
+states, © an alphabet, 6c (Q x X= x Q) a transition relation, qg € Q a start state, F C Q a set of accepting states. If 6
+is a function (Q x X) > Q, then the automaton is deterministic (DFA). The automaton accepts a string w € &* if there
+is a sequence qgwjq1...Wngn with (qj_-1, Wi, gi) € 6 and qn € F. A language L Cc &* is the language accepted by a finite
+automaton if and only if it is the language that matches some regular expression, and we often use the two interchangeably
+[30]. We also use L(M) or L(e) to mean the languages of an NFA M or regular expression e respectively, so w € L(M) or
+w €L(e) mean w is accepted by M or matches e.
+
+A stack machine augments a finite automaton with one or more last-in-first-out memory stacks; the input string is
+initialized on the first stack and if the machine halts, the contents of the first stack are considered to be the output.
+The stack alphabet I’ is a superset of the input/output alphabet &. For a K-stack machine, the transition relation 6 C
+(Q x {1,..., K} x {Push, Pop} x I x Q) indicates an initial control state, which stack to interact with, whether to push or
+pop, the symbol being pushed or popped, and the next control state. In this paper we only consider deterministic stack
+machines, so at any given time there can be only one valid transition, or none when the machine halts. Similarly, a Turing
+machine augments a finite automaton with an unbounded bidirectional tape of memory, with & CT and the input and
+output strings being the initial and final tape contents. Here 6 C(Q x I’ x I x {L, R} x Q) specifies the initial head state,
+reads a symbol, writes a symbol, moves left or right on the tape, and enters a new head state. Again, here we only deal
+with deterministic Turing machines, where 6 is a function (Q x I’) > (I x {L, R} x Q).
+
+2.2. Chemical reaction networks
+
+Definition 2.1. A Chemical Reaction Network (CRN) is a pair (S,R), where S is a set of species and R c N® x N® is a set
+of reactions.
+
+We often use chemical reaction notation to write reactions: (R, P) = R — P. If (R, P) and (P, R) are both reactions, we
+write R = P. Consistent with chemical reaction notation, when unambiguous we often identify each species A with the
+multiset {JA}, so eg. A+B and {|A, Bj} refer to the same object. In general CRNs, each reaction is given a positive real
+
+Lo. , ; ; h
+number as a “rate constant”, so a reaction is a triple (R, P,k), sometimes written as R -. P. These rate constants affect the
+amount each reaction happens in a given time interval and, in the stochastic model, the likelihood of a reaction happening
+R.E Johnson, E. Winfree / Theoretical Computer Science 843 (2020) 84-114 87
+
+h r
+Nt At \\t Ct h
+
+B
+t r t ht
+
+m(tcop) = {IC, Dl}
+
+  
+     
+
+m(x,a) = {|Al}} m(aego) = {|C]} t
+h h h m(ia) = {A} h h
+NX Bt Xt Dot t At B t A At Bt
+m(xp)= {Bl} m(ezp) = {Dl} tx Ax txt*e Bx tx tx ne tx * Bx tx
+m Wy =
+
+ 
+
+t
+
+h
+t t
+
+r r h h
+Att Bt ATA t A t B t/A+B-C+D\t A Kt Bet
+
+tx Ax texte Bx tx v . tx Ax txt* Bx tx / . tx Ax tx te Bx tx
+
+h Att ne op ft B
+
+fuel t A t t r t h t
+
+ 
+
+Fig. 1. An example implementation CRN with interpretation. Various DNA complexes in the implementation system are modeled as species of the imple-
+mentation CRN with interpretations as multisets of formal species. (Complexes marked as “fuel” are assumed always present and are not modeled as species
+in the implementation CRN [48,27]. For example, the reaction on the left is enumerated as x4 — ig, ignoring the two fuel complexes.) Interpretations of
+trivial (left) and nontrivial (right) reactions follow from the interpretations of the species involved. Figure adapted from [27].
+
+relative to other reactions. The theory of CRN and PRN bisimulation deals with whether a thing can happen in CRNs, but
+not how likely it is or how much time it takes, and for those questions the values of rate constants are irrelevant (as long
+as they are all positive real numbers). Thus for the purposes of this paper we define reactions as pairs of reactants and
+products without rate constants. We further assume that no reactions R — P with R = P exist.
+
+We work with the stochastic model of CRN semantics, where a CRN starts with some count of each species present,
+and any possible reaction may occur, which changes the counts. Specifically, a CRN will at any point in time be at a state
+Se N®, a multiset of species, and for each reaction R — P where S > R the CRN can transition from state S to state
+S —R-+ P. Given rate constants, this process is a continuous-time Markov chain with transition rates dependent on the rate
+constants and the count of reactants in $; when we only care about which transitions are possible, the previous description
+is equivalent to that continuous-time Markov chain. A timed trajectory is an initial state So ¢ N© together with a (finite or
+infinite) sequence of reactions rj € R and times ¢; at which they occur. When we care only which reactions happened in
+what order but not at what exact time, we can define a trajectory as an initial state followed by a sequence of reactions,
+without the times.
+
+Consider a pair of CRNs (S,R) and (S’, R’), where (S, 7) is some abstract CRN and (S’,R’) a more realistic CRN
+intended to implement (S, 7). We call (S, 7) the formal CRN and (S’, Re’) the implementation CRN. We previously defined
+a concept of CRN bisimulation to check whether the implementation CRN is, in fact, a correct implementation of the formal
+CRN [27]. CRN bisimulation is based on an interpretation of each implementation species as a multiset of formal species,
+where the implementation is correct if (for some interpretation) from any initial state the possible formal trajectories and
+interpreted implementation trajectories are equivalent. An example DNA implementation with interpretation is shown in
+Fig. 1.
+
+Definition 2.2. An interpretation is a function m: S’ > N© from implementation species to multisets of formal species. We
+extend this linearly from species to states: for aj e N, m(>-y_, aj Xj) = 4 ajm(X;). We also define a natural interpretation
+of reactions: m(R’ > P’) = m(R’) > m(P’) unless m(R’) = m(P’), in which case m(R’ — P’) =T and we say the reaction is
+trivial. For example, if m(iq4g) = A+ B, m(xq) = A, and m(tgc) = B+C then m(igg +x4) =2A+B, and m(iqgg > X4 +tpc) =
+A+B-—->A+B8B+C. Trajectories are interpreted by interpreting the initial state and each reaction.
+
+In our previous work [27] we considered the possibility that an implementation of a reaction might have “spurious
+catalysts”, i.e. extra species formally present in the interpretation that are not involved in or affected by the intended formal
+reaction. For example, in a physical DNA-based implementation, an extra strand might bind to some part of the reacting
+complex without affecting the actual reaction mechanism. This turns out to be a major concern in even abstract polymer
+systems, so we bring in that definition here.
+
+Definition 2.3. Let (S,R) and (S’,R’) be a formal and implementation CRN with m: S’ > N® an interpretation of
+implementation species, which is extended to implementation states as in Definition 2.2. An interpretation of reactions
+m,: R’ > (N® x N®)U {t} is consistent with m if, for each R’ > P’ ER’:
+
+(i) If m(R’) =m(P’) then m,(R’ > P’) =T, and
+(ii) If m(R’) £m(P’) then m;(R’ > P’) = R— P for some R, P,C € N® with m(R’) =R+C and m(P’) =P+C.
+88 R.E Johnson, E. Winfree / Theoretical Computer Science 843 (2020) 84-114
+
+Naturally, the natural interpretation of reactions given an interpretation m is in fact consistent with m. In general be-
+low we abuse notation and use m to refer to all of the interpretation of species, the extension to states, and the chosen
+interpretation of reactions (natural or otherwise) consistent with the interpretation of species.
+
+We defined correctness of an interpretation in three ways: trajectory equivalence, three conditions, and weak bisimu-
+lation. Loosely, trajectory equivalence is what we want “correctness” to imply, the three conditions are easy to define and
+check, and weak bisimulation is the well-studied theory of which CRN bisimulation is an instance. A theorem from our
+
+previous work proves that these three definitions are equivalent, as desired. As notation, S — means reaction r can occur
+
+in state S, while S > T means that reaction r takes state S to state T. In the implementation CRN, S’ = and S$’ T’ mean
+the same for a sequence of zero or more trivial reactions followed by r’. Where S’ is an implementation state and r is a
+
+formal reaction, S’ > T’ means “S’ > T’ for some r’ with m(r’) =r”, and similarly for S’ > T’, S’ ->, and 5’. In the
+formal CRN, S => T is equivalent to S + T,
+
+Definition 2.4 (Three notions of correctness). An implementation CRN (S’,R’) is a correct implementation of a formal CRN
+(S,R) if a correct interpretation exists. An interpretation m: S’ — N® is correct, in which case we say m is a CRN bisimu-
+lation, if any of the following three sets of conditions are true:
+
+I Equivalence of trajectories
+(i) The set of formal trajectories and interpretations of implementation trajectories are equal.
+(ii) For every implementation state S’, the set of formal trajectories starting from m(S’) and interpretations of imple-
+mentation trajectories starting from S’ are equal.
+II Three conditions on the interpretation
+(i) Atomic condition: For every formal species A, there exists an implementation species xq such that m(x,) = {A}.
+(ii) Delimiting condition: The interpretation of any implementation reaction is either trivial or a valid formal reaction.
+
+(iii) Permissive condition: If S + and m(S’) = S, there exists an implementation reaction r’ such that m(r’) =r and S’ 4
+II] Weak bisimulation
+(i) For all implementation states S’:
+if S’ > T’, then S45 T where S =m(S’) and T =m(T’).
+(ii) For all formal states S, there exists S’ with m(S’) = S, and for all such S’:
+if S > T, then for some T’, S’ => T’ and m(T’) =T.
+
+Our previous work proved a number of theorems about CRN bisimulation. For this work, the relevant ones are those
+that do not assume the CRNs involved are finite. In particular, the equivalence of the three definitions of correctness, the
+transitivity lemma, and the modularity condition will all apply to polymer systems.
+
+Theorem 2.1. The three definitions of correctness, namely trajectory equivalence, the three conditions on the interpretation, and weak
+bisimulation, are equivalent.
+
+Lemma 2.1 (Transitivity). If mz is a bisimulation from (S”, R”) to (S’, R’) and m, is a bisimulation from (S’, PR’) to (S, R), then
+m=m om} is a bisimulation from (S”, R”) to (S, R).
+
+It is a convenient abuse of notation to write m, omz when m2 takes S” > N*’ and m takes S’ > NS. Intuitively, we
+extend m to an interpretation on multisets over S’; formally, for x € S”, m(x) = Di yes, ma(x)(y)mi(y), where m2(x)(y)
+means the count of y in m2(x) and is applied as a scalar multiplier for the multiset mj (y).
+
+Definition 2.5 (Modularity condition). Let m be a bisimulation from (S’, R’) to (S, R). Let S§ C S’ and So CS be subsets of
+implementation and formal species, respectively, where y € Sj > m(y) C So. We say that m is a modular interpretation with
+respect to the common (implementation and formal) species Sj and So if for any x € S’ there is a sequence of trivial reactions
+{lx} + Y4+Z where YC Sé and m(Z) N So = Y, i.e. all common formal species in the interpretation of x are extracted as
+common implementation species.
+
+Theorem 2.2 (Modularity). Let m, be a bisimulation from (S}, Fe) to (S1, 1) and mz be a bisimulation from (S5, R45) to (S2, R2)
+where m, and m2 agree on S} 1S}. Let S’'=S,US5, R’ =R{ URS, S = S1 US2, and R = Ry UR, andm: S’ > N® equal m,
+on S; and mz on S3. If m, and mz are both respectively modular bisimulations with respect to the common implementation species
+
+S} S35 and common formal species S|  S2, then m is a bisimulation from (S’, R’) to (S, R), and m is also modular with respect to
+S} M SS and S11 So.
+R.E Johnson, E. Winfree / Theoretical Computer Science 843 (2020) 84-114 89
+
+°@ "bO @-@ O-@
+
+© O@® OO ©
+de > *1 BBxs ”
+
+Fig. 2. A PRN is defined as a set of monomers (a), a regular expression restriction (which may be given as a compatibility relation, b), and a set of reaction
+schemata (one shown in c). The species of a PRN are the set of all strings of monomers that match the regular expression (three examples shown in
+d). Reactions are obtained by substituting strings of monomers for wildcards in the reaction schemata such that both sides of the reaction respect the
+compatibility relation; for example, *; = AB and *2 = BC in *;BAx2 — *;BBx 2 enumerates the reaction ABBABC — ABBBBC (e).
+
+2.3. Polymer reaction networks
+
+A Polymer Reaction Network, like a Chemical Reaction Network, will be a set of species and a set of reactions. Unlike
+a typical CRN, a typical polymer system allows arbitrarily long polymers to be made from its set of monomers, and allows
+the same “reactions” to occur among monomers regardless of the content of the rest of the polymer. When modeled as
+a CRN, such a system would typically have an infinite number of both species and reactions. To handle this with a finite
+specification, we define a Polymer Reaction Network as a finite species schema and a finite set of reaction schemata, which
+will then generate the set of species and reactions.
+
+The species of a polymer system are, in general, arbitrarily long polymers made up of a finite set of monomers. While
+polymers with branches and loops can exist, we wished to avoid the associated complexity. As many of the essential
+features we wish to study arise in linear polymer systems, we focus on those. We discuss further the reasons for this in
+Section 6. Thus our species will be strings over some finite “alphabet” or set of monomers. We assume that “left” and “right”
+are distinguished, so that the strings e.g. abc and cba are different molecules; a b monomer in this example would have
+two distinct binding sites, and the molecules differ in which site is bound to a and which to c. Again Section 6 contains
+discussion on what can happen if this assumption is not true.
+
+In a physical system, typically not every string of monomers can actually exist as a polymer; some pairs of monomers
+will have the appropriate interfaces for binding to each other, and other pairs will not. Similarly, we assume that only
+some monomers can occur on the left edge of a polymer, which we represent by +, and similarly for the right edge +;
+some monomers might not be stable when unbound. We model this by letting the set of species to be restricted to those
+that match a specified regular expression. We justify this by showing that a more physically meaningful restriction, of only
+allowing certain monomers to bind to each other and to the edges, is equivalent to a regular expression up to interpretation.
+
+One might ask why it is necessary to restrict the set of possible polymers at all. To answer that, intrinsic to our notion
+of CRN bisimulation is that the behaviors of the two CRNs are equivalent from any initial state, and we would like to have
+the same guarantee for PRNs. Many systems would have some polymers that can never exist physically, but if they could
+exist, would have absurd behavior that breaks the system. Either the regular expression restriction or the local compatibility
+restriction (as defined below) can solve this problem.
+
+Given an infinite set of species generated from a finite set of monomers, we would like to specify the possible reactions of
+those species with a finite set of rules. A reasonable assumption is that there are a finite number of “reaction mechanisms”,
+each of which depends on some features of its context but may be independent of others. To use an example from the stack
+machine of Qian et al. [42], a 02 (symbol O on stack 2) unit at the right end of a polymer can react with a query strand
+Q2, removing the 02 symbol while leaving the rest of that polymer unchanged, and releasing a signal strand, which we
+call oJ . This reaction depends on the 02 symbol being on the end of its polymer, but is independent of what else makes
+
+up the remainder of the polymer. We could write this reaction mechanism as *;02 + Q2 > *; + oJ, where the string «102
+means “any polymer that ends in 02”. Here +; is a wildcard, which can be filled in by any string, provided that the same
+wildcard is replaced by the same string in each of its appearances; since there are infinitely many possible strings that
+can replace «1, this reaction schema generates infinitely many reactions. So for example, 4212021202 + Q2 — A2120212 + oJ
+
+would match this schema, but A21202 + Q2 — Ao + oJ would not. Other mechanisms can also be described with wildcards:
+*1 + P > *; +*1 + P models P catalytically copying an arbitrary string, for example, while *;ABx2 — *;+*2 models AB
+removing itself from anywhere in a polymer. We thus define the reactions of a PRN by a set of reaction schemata, each of
+which is a reaction over strings including wildcards, and generate the reactions of a PRN by substitution into the wildcards
+of the schemata. A pictorial example is given in Fig. 2.
+90 R.E Johnson, E. Winfree / Theoretical Computer Science 843 (2020) 84-114
+
+As is usual in CRN notation, we will write R = P to represent the pair of reaction schemata R — P and P — R. This is
+valid if every wildcard that appears in either R or P appears in both, and if so, observe that the schema is truly reversible:
+any reaction enumerated by one direction will have its reverse reaction enumerated by the other.
+
+Definition 2.6. A Polymer Reaction Network is a triple (X,e, YW) of a monomer set &%, regular expression e over », and set of
+reaction schemata W. When the reaction schemata are irrelevant, we refer to the pair (Xe) as a species schema. A reaction
+schema yw € W is a pair (R, P) of multisets of strings over © U «yy where xj = {*1, *2,...}, such that any x*, that appears
+in either R or P appears at least once in R. Given a PRN, it induces an enumerated CRN (S, 7). (We sometimes write
+S(x,e), R(X, e, V).) S is the set of all nonempty strings over © that match e. To enumerate 7, consider a reaction schema
+w =(R,P) € W, and for each *, that appears in w, choose a string s, and substitute s, for each appearance of xy, to
+obtain a pair of multisets of strings over &. If every string obtained this way (in both R and P) matches e, then the pair of
+multisets is a reaction of species in S; 7 is the set of all such reactions.
+
+Definition 2.7. An augmented PRN is a triple (X,e, ¥) of a monomer set &, regular expression e over &, and set of aug-
+mented reaction schemata W. An augmented reaction schema w € W is a reaction schema (R, P) together with, for each x,
+that appears in the schema, a regular expression e,; over ©. The enumerated CRN (S, 7) has S enumerated as usual, while
+R is the set of reactions enumerated as for an unaugmented PRN with the additional restriction that in a schema w, each
+string s, substituted for *, must match ep.
+
+We do not discuss augmented PRNs much until Section 5, where among other results we show that an augmented PRN
+can be implemented, up to PRN bisimulation, by an unaugmented PRN.
+
+Consider a particular type of mechanism that restricts which strings over & are valid polymers: only some pairs of
+monomers have the complementary binding sites necessary to bind. We might also assume that only some monomers are
+stable on the left edge of a polymer, and only some monomers are stable on the right. We can write this as a relation ¢
+on monomers, where apb means ab can bind in that order in a polymer. Technically, we must expand the domain of the
+relation to indicate which monomers can occur on the left and right ends of a polymer. Such a relation cannot be more
+powerful than a regular expression, and up to an interpretation (as defined below), we show that it is as powerful as a
+regular expression.
+
+Definition 2.8. Given a monomer set = with notation + = © U {F}, H4 = UU {4}, where &N {+, 4} = Y, a compatibility
+relation is a relation 9 C %+ x X4. Given a monomer set & and compatibility relation p, the set of enumerated species
+S(X, pe) is the set of all w =x1...X, € &* such that all of Fox, xjoxj41, and X,o7. As we show below that any compat-
+ibility relation can be described by a regular expression, a PRN (augmented or not) can be given as (x, 0, VW) instead of
+(x,e, VW).
+
+Lemma 2.2. For any regular expression e over an alphabet &, there is a monomer set &', compatibility relation op’, and interpretation
+m : &! —> & such that a string x = x1 ...Xn € X* € L(e) if and only if there is a species x’ = x), ...xX, € S(X’, p’) with m1 (x,) = x; for
+1 <i <n. This construction can be done with X’ = &, Vy (x) = x if and only if e has the property that for x € X, uy, V1, U2, V2 € d",
+if uyXV1 and u2Xv2 match e then so does u4xv2; if so, we say that e is local. Conversely, given any monomer set & with compatibility
+relation p there is a local regular expression e with S(X, e) = S(%, p). All of these transformations can be computed in polynomial
+time.
+
+Proof. Consider a nondeterministic finite automaton M that recognizes strings that match e. Where Q is the set of states of
+M, let &’= x Q and let w((x,q)) =x. Let ((x1, G1), (X2,q2)) € p’ if and only if M can transition from state q; to state q2
+by reading xz, let (+, (x,q)) € p’ if and only if M can transition from its start state qg to q by reading x, and ((x,q), 4) € 0’
+if and only if q is an accept state of M. Valid polymers correspond exactly to accepting computation paths of M on their
+interpretations.
+
+If e is local, then for any states qj,qj; both of which have incoming transitions labeled x, either one of those transitions
+is not reachable on any string and can be removed, or given locality, the set of strings accepted after reaching q; and qj; are
+the same. In that case, an equivalent automaton has gq; and q; collapsed into one state. Repeating this process constructs a
+finite automaton that recognizes e where for each state x there is at most one state gq, with incoming transitions labeled x
+(it may be that qy =qy for x ¢ y). Applying the above construction to this new finite automaton and labeling the monomer
+(X, Gx) as x gives the desired (&, ().
+
+Given (&, (0), a finite automaton as above can be easily constructed: for each monomer x a state qx, with qx », y=
+
+XOY, do + qx <=> Fx, and qx accepts if and only if xo4. As above, valid polymers correspond exactly to accepting
+computation paths of M. O
+R.E Johnson, E. Winfree / Theoretical Computer Science 843 (2020) 84-114
+
+Dynamic Instability
+
+~
+
+ 
+
+ 
+
+ 
+
+@) xy tT ST
+) 80
+
+/ ST, 22. §Dx, *, DT 22s ¥1DD*5
+*,D 1000, Ky + Dy
+
+Os
+
+91
+
+Restriction Enzymes
+
+OOOO#
+OO G®)
+OO aE
+
+R; + *1 9) *2 —> R; + *1 5, + S; 4*2
+L+ *1 5, + $5 x9 > L+ *1 5; *2
+
+Rock- Paper- Scissors Oscillator
+
+pre nnnnnn nn nen nnnnn nnn nnnnnnnnnnnnnnnnnnnnnnesnnnanncnnennnnnn | pen annnnnnnn nnn nnnnnannnnnnnnan,
+
+|ege)
+
+(RCL
+
+\
+
+ 
+
+ 
+
+ 
+
+ 
+
+ 
+
+Neen mm em ee eee ENS LT
+
+ 
+
+ 
+
+ 
+
+ 
+
+ 
+
+ 
+
+ 
+
+NS. -
+
+R+uS>R+"SS R+1PP>R+"P : :
+a Machine
+
+f
+
+P+xyR>5P+*,:RR P4+*,SS > P48
+S4+"4P+4S+*:PP Sta RR S+ aR |
+
+ 
+  
+ 
+ 
+ 
+ 
+ 
+ 
+ 
+ 
+ 
+ 
+ 
+  
+
+ 
+ 
+ 
+ 
+ 
+ 
+ 
+ 
+  
+
+ 
+
+#$ S = 1 1 #T's = 1 000 70 #R = ff P — #f S = 1 VOU OOO®®
+100 \
+& a0 se (OL) *Can aa | a0 |W) |) Pe
+oO oD ia *1q10,*2 + *11iqo*2 *1q1 > *1 lige
+1 60 — 40} —R
+. . —p *1 G1 1,*2 => * 1, hxo
+& 40 ce 30: —s | *1920r*2 > *10193%2 *1qG2 — *10193
+= 2 20: *1qQ21,*2 — *11iqe*e2
+a 20 aD iol *1019q30;*2 + *1930;1,-*2
+«10193 > *1930,1,
+
+   
+
+200 400
+
+Time (s)
+
+600 800 1000 *111q30;*2 > *1q31,1,*2
+
+*1 11943 > *1q31,1,
+q3 q30r1,-
+
+Time (s)
+q30,*1 — q30,1,-*1
+*107931,*2 + *1q10;1,*2
+*1 11q31,*2 => *1Q@1,1,*2
+q3lr*1 > q1 0,-1.1
+
+String equality detection (one-step model)
+e=(0|1)*|Y
+
+String copying (one-step model)
+
+x \ e
+(A|T|G|C)*|P
+
+*y + #1 3 Y Binary Counter
+
+P+ Ax, ~ P+Ax, +A*,
+P+Tx*x,73 P4+T *, +7,
+P+Gx*,; > P+G*, +G*,
+P+Cx,; > P4+C*, 4+C%,
+
+Orr,
+
+e=»*
+
+ 
+
+P + Tx, > sPT*, :
+iP + Gx, > sPG*1| |
+P + Cx, > sPCx,
+
+Cx 4 1 x9 +C
+
+f xo | e
+_ S mins Spe ees model) @Q® (01 | i)" Sl
+( ) e=>* | | (Or | 1) . 2 +64 «06 *1+C > *,1C
+@O© © @) QA, yore re 00g bay 1 #2 +0
+! IP+ Ax, > sPA*,|| | *y1C' x2 + *,C0*2
+
+. ea
+
+#0000=1 #C=1
+
+      
+
+SZ OS *10; + Op*9 3 *1S*q *11, + 1,-*2 9 *1S *e c 6
+*,PAxg > *,aAPxo x PGxs — *,9gGPx2 an
+
+*1, PT x5 —> *1 tT’ Pxo *1 PC x = *1cC Px9 *10,50,.*2 = *1 S92 *11,$1,*2 ad *1 So Z
+*, Aax*kg > * a Axo *,At*xg > * tAxo = 4
+(x14) Say |
+
+*,P ad *1S +P
+*, AS'*5 —> *,S Axo
+
+*1 899 — *1 + *9
+*1SA*2 —> *1QS*2
+
+ 
+
+20 40 60 80 100
+
+Time (s)
+
+Fig. 3. These example Polymer Reaction Networks demonstrate various features of the PRN model. Shown for each PRN is the monomer set &; the regular
+expression e describing the set of polymers and/or, if e is local, the equivalent compatibility relation o; and the reaction schemata. Additionally for some
+PRNs, rate constants are assigned to each reaction schema and a sample stochastic simulation, as described above, from the given initial conditions is
+shown. Which of these PRNs are useful and/or interesting is left as an exercise to the reader.
+
+2.4, PRN examples
+
+To help get a feel for the PRN model, we provide several illustrative examples of PRNs and their behaviors in Fig. 3. Three
+of the examples are explicitly simulated, and in these cases we provide rate constants for each of the reaction schemata. It
+is important to note that some aspects of PRN behaviors may be sensitive to the rate constants (such as whether it is likely
+to reach some state from another state) while other aspects will be rate-independent (such as whether it is possible to
+reach some state from another state). CRN bisimulation and thus PRN bisimulation are rate-independent theories, and thus
+they can only speak to that aspect of the behavior. The guarantees they provide are stronger than just reachability; they also
+guarantee a correspondence between the trajectories - i.e. how one gets there. For example, bisimulation will distinguish
+between a clockwise and a counter-clockwise trajectory through a cycle, while analysis based purely on reachability would
+not; on the other hand, bisimulation would not distinguish between a clockwise trajectory that likely spends most of its
+92 R.E Johnson, E. Winfree / Theoretical Computer Science 843 (2020) 84-114
+
+time in one state and rushes through the others, versus a clockwise trajectory that distributes its time roughly uniformly. It
+is a useful exercise to consider which behavioral features of the examples in Fig. 3 are rate-independent, and thus likely to
+be captured by PRN bisimulation.
+
+Because a PRN is an infinite CRN, we can simulate a PRN using the semantics of a stochastic CRN, such as Gillespie’s
+algorithm [23]. Although the number of reactions in a PRN may be infinite, if at a given time there are a finite number
+of polymers each of finite length, then at that time there will be a finite number of reactions possible. The only difficulty
+is that the set of possible reactions in general must be re-computed every time a new species is produced, preventing
+various methods of optimizing the Gillespie algorithm that are possible for a finite CRN. However, implementing the basic
+Gillespie algorithm is possible using a “just-in-time” reaction enumeration approach, which has been done in Visual DSD for
+polymer-like systems created from DNA strand displacement networks [35]. A second issue that must be addressed is how
+to assign rate constants to each specific CRN reaction that is derived from the PRN schemata. Here, we assume that each
+reaction schema has a rate constant, that every reaction enumerated from that schema has that schema’s rate constant, and
+that the same reaction enumerated multiple times (from different schemata and/or different substitutions into the same
+schema) has as its rate constants the sum of schema rate constants from all of its enumerations (which is guaranteed to be
+finite). Other methods of specifying rate constants are possible.
+
+Fig. 3 gives examples that showcase various relevant features of the Polymer Reaction Network model. Code for simulat-
+ing all these systems can be found in our Mathematica package [54]. We discuss some of those examples in further detail
+here.
+
+Example 2.1 (Dynamic instability ). Shown in the upper left of Fig. 3, this PRN has 5 monomers, & = {D,T,S, Dy, Tf}; regular
+expression restriction SD*T* | Df | Tf, which is equivalent to the compatibility relation shown; and 5 reaction schemata.
+
+We give an example PRN that describes a model of dynamic instability, inspired by (but an oversimplification of) biolog-
+ical microtubules [18]. Our model, in English, is as follows: A polymer is a seed S followed by any number of D monomers
+then any number of T monomers; those latter two types of monomers can also exist free-floating in solution, represented
+by Dy and Ty. A free Ty monomer can attach onto the right end of a polymer as a T; T monomers can convert into D
+monomers starting from the left end of a polymer; and only D monomers can fall off the right end. In solution, free D
+converts back into Ty, to complete the cycle.
+
+In the compatibility relation, first observe the patterns (F, Df), (Dy,4) and similarly (+, Tf), (Tf, 4), with no other
+occurrences of Dy or Ty; the result of this is that Ds and Ty can exist as monomers but can’t polymerize. Effectively, D +
+and Ty are CRN species. The only other presence of F is (F, S), so any polymer must start with S, and given (S, 4) € p, can
+end immediately. Otherwise, (S,D), (D, D), (D,T), (T,T), and (T, 4) allow for one or more D then one or more T, while
+(S,T) and (D,-—) allow the possibility of 0 D’s or O T’s, respectively. Thus the set of possible polymers is, as claimed in
+Fig. 3, represented by the regular expression SD*T* | Dy | Ty.
+
+The reaction schemata then correspond to the above description of the system’s behavior; for example, *; + Tr > *1T
+is a free Ty attaching to the right edge of a polymer, while *;D — *; + Df is a D falling off the right edge. Recall that
+in enumerating reactions, a string can only be substituted for a given wildcard if doing so respects p in both the reactants
+and the products. Thus in the reaction schema *; + Ts — *;T, while for example *; = Dy would make valid reactants
+Dy +Ty, the product DfT does not respect p, and Dr + Ts — DfT is not a reaction in this PRN. (This reaction schema is
+the only one in this figure for which this consideration is relevant. Replacing *; + Ts — *1T with either the one schema
+S *1 +Ts — S *;,T or the three schemata S + T, > ST, *;D+Ty — *,DT, and *,T + Ts + *;TT would give the same
+set of reactions without taking advantage of this technicality, and the generalization of this is discussed further elsewhere
+in this paper.)
+
+The graph shown is from a Mathematica simulation [54] of this PRN as discussed previously, from an initial state with 11
+copies of (the length-1 polymer) S and 1000 copies of T+. Mathematica was instructed to track the length of one individual
+S polymer, and the plot shows that one polymer’s length over time. Several phenomena are evident: growth of polymers
+while the cap of T remains stable, shrinkage during a catastrophe event when the cap of T dissolves, and occasional rescue.
+
+Example 2.2 (Copy-tolerant Turing machine). Shown in the middle right of Fig. 3, this PRN has 8 monomers; a regular ex-
+pression restriction (0; | 1;)*(q1 | q2 |.q3 |h)(0; | 1-)*; and 15 reaction schemata corresponding to the 6 transition rules of a
+particular 3-state Turing machine.
+
+The PRN shown in Fig. 3 simulates a particular 3-state Busy Beaver Turing machine with transition rules shown in
+Table 1. This Turing machine, from state g; on a blank (all-O) initial tape, halts after 14 steps with 6 1’s on the tape [37].
+Similarly, in the PRN the polymer q, will, after 14 unimolecular reactions, become the polymer 1)1;1;h1;1;1,; (and any
+polymer with q; preceded by any number of 0; and followed by any number of 0; will have a similar trajectory).
+
+This PRN is an instance of a general method of simulating Turing machines with linear PRNs, using unimolecu-
+lar reaction schemata corresponding to the transition rules of the Turing machine; for example, the reaction schema
+*1q10;-*2 —> *11/G2*2 Corresponds to the rule “in state 1, reading O, write 1, move right, and transition to state 2”. Transition
+rules reading a O require an additional reaction schema for the right edge of the tape, assuming blank spaces are treated as
+R.E Johnson, E. Winfree / Theoretical Computer Science 843 (2020) 84-114 93
+
+Table 1
+The transition rules of the Turing machine whose
+polymer implementation is shown in Fig. 3.
+
+ 
+
+q1 q2 q3
+0) 1, R, q2 0, R, q3 1, L, q3
+1 1, R, h 1, R, q2 1, L, a1
+
+O, and transition rules moving left require multiple reaction schemata for a 0, 1, or left edge of the tape to the left of the
+current square; this causes the 6 transition rules of the 3-state, 2-symbol Turing machine to require 15 reaction schemata.
+
+A state of a Turing machine tape is any number of tape symbols, followed by a Turing machine head state, followed
+by any number of tape symbols. For a 2-symbol 3-state Turing machine this can be described by the regular expression
+(O | 1)*(q1 | g2 | q3 | h)(O | 1)*, which is not local. If we wanted to physically implement this restriction, we could not do
+so using only nearest-neighbor interactions. Applying the construction from Lemma 2.2 requires 0 and 1 to each have two
+monomers representing them, leading to the regular expression (0, | 1;)*(qi | G2 | q3 | h)(O; | 1-)* shown in Fig. 3. (One could
+imagine some creative methods to physically implement the nonlocal regular expression, such as having a qj Monomer
+destabilize 0 and 1 monomers to its right and left in different ways. We would argue that such creative solutions are
+best modeled by treating “O destabilized by a q on its right” and “O destabilized by a q on its left” as distinct monomers,
+since they would be physically distinct and have different behaviors. This is equivalent to the 0;,0, model shown.) As this
+regular expression is local, it can be implemented by a compatibility relation o containing pairs (F,0;), (F, 11); (a,b) for
+a,b € {0), 11}; (a,q) for a {0), 11}, 9 € {91,92,93,h}; (q,a) for q € (91, 92.93,h}, a € {0;, 1r}; (a,b) for a,b € {0;, 17}; (0;, 4),
+and (1;, 4). The generalization to a Turing machine with any number of states and/or tape symbols is obvious.
+
+We previously mentioned that well-mixed CRNs can simulate Turing machines with arbitrarily small probability of error
+but using species counts exponential in the space of the Turing machine [47], and provably cannot simulate Turing machines
+deterministically [2,15,36]. Formal polymer systems such as Qian et al.’s stack machine [42] and Cardelli et al.’s Biochemical
+Ground Form (BGF) [13] are already known to be able to simulate Turing machines deterministically, in some cases with
+no time or space slowdown. The PRN shown in Fig. 3, if it can be implemented, has a feature that the DNA stack machine
+and the BGF register machine do not: because a Turing machine tape is encoded in a single polymer and its transitions are
+all unimolecular reactions, multiple copies of the Turing machine can coexist in the same solution without interfering with
+each other. Bennett’s hypothetical polymer Turing machine [7] also shares this desirable feature.
+
+Example 2.3 (String copying). The middle left and lower left of Fig. 3 show respectively a one-step nonlocal and a multi-step
+local model of string copying with PRNs. The one-step model has monomers & = {A, T,G,C, P}, local regular expression
+restriction (A | T | G| C)* | P, and four reaction schemata to copy, in one step catalyzed by P, any string that starts with A,
+T, G, or C. The local model takes a string made of monomers A, T,G, C and transcribes the corresponding string of a, t, g,c,
+using monomers P, s, and S to copy one monomer at a time and eventually split the two strings.
+
+The string copying PRNs illustrate an interesting feature of wildcards using models inspired by, but not accurate to the
+mechanisms of, DNA and RNA polymerases. The one-step model can be thought of as an abstraction of the result of DNA
+polymerase: where P exists only as a monomer and any string over A, T, G, C is possible under e, the PRN has four reaction
+schemata of the form P + xx; > P +x *1 +x*, for x e {A,T,G,C}; note that given e, this implies that *; must be made
+of A,T,C,G. (The reaction schema P + *; — P + *; + *; would have allowed the reaction 2P — 3P, which is certainly
+not what we wanted and is known to go to infinity in finite time [16]. If we were to use an augmented PRN model to
+constrain *; to match (A|T|C|G)*, then this single reaction schema would suffice.) Because when enumerating reactions
+from a schema, each instance of a given wildcard is substituted by the same string, the result of these schemata is to copy
+any string made of A,T,G,C, catalyzed by P. However, the idea that a second copy of an arbitrarily long string can be
+produced in one step is not physically realistic, and while this PRN may represent the result of DNA polymerase, it certainly
+does not represent its mechanism.
+
+The local model of string copying is a more realistic PRN that accomplishes the result of RNA polymerase, i.e. given a
+string over A, 7T,G,C it creates an additional copy of the corresponding string over a,t, g,c, catalyzed by P. (While this is
+a more physically realistic mechanism with a result analogous to RNA polymerase without the t vs u distinction, it is not
+in fact the mechanism of RNA polymerase, because that mechanism cannot be modeled with only linear polymers.) This
+concept of local mechanisms as “physically realistic”, in a sense that many exotic uses of wildcards are not, is formalized in
+the concept of single-locus PRNs in Section 5.
+
+2.5. PRN bisimulation
+
+Because a PRN is an infinite CRN, we can extend the definition of CRN bisimulation from CRNs to PRNs, but doing so
+requires an infinite interpretation. To finitely express an infinite interpretation, we build an interpretation of species from
+an interpretation of monomers. The obvious thing to do is to have the interpretation of a polymer be the concatenation
+of interpretations of its monomers, but that would not allow interpreting one implementation polymer as a multiset of
+94 R.E Johnson, E. Winfree / Theoretical Computer Science 843 (2020) 84-114
+
+(a)
+
+(0) oN
+I,
+
+ 
+
+(d)
+*1
+
+(8 N f8®N fOIN
+KGS QOS QOS
+
+*,B *9 +C' — *,BC'*,
+
+Fig. 4. Features of a polymer interpretation. An implementation monomer x has a pair of interpretations (x) and j1(x), shown respectively in the top,
+middle, and bottom parts of the node (a). An implementation polymer (e.g. Icjr;) is interpreted by concatenating z-interpretations and adding p-
+interpretations (b). Given an interpretation of species, interpretations of states and reactions (c) follow as in CRN bisimulation [27], Definitions 2.2 and
+2.3. Intuitively, interpretations of reaction schemata can follow from interpretations of monomers (d, see also Theorem 2.3); see text for details.
+
+formal polymers (as is possible in the finite case). We therefore require that our interpretation be built from two finite
+functions, j2 and zz, defined on the implementation monomers. Here z(x) is the contribution of the monomer x to the
+polymer it is contained in and p(x) is a multiset of additional, free-floating species represented by x. We sometimes say
+that x polymerizes as m(x) and carries t4(x). A convenient diagramatic notation that highlights monomer names and their
+interpretations, is illustrated in Fig. 4. Because in PRNs every species is thought of as a polymer, even monomers that never
+“polymerize”, in such cases we will typically encode the interpretation in 2 and leave jz empty. Note that with this notion
+of interpretation, a single implementation monomer cannot represent (“polymerize as”) monomers of two distinct arbitrary-
+length polymers, as would be needed if we wanted arbitrary DNA duplexes to represent the multiset containing the two
+strands as separate species. We refrain from attempting that generalization here.
+
+Definition 2.9. Given a formal PRN (X,e, ¥) and implementation PRN (2’,e’, W’), a polymer interpretation is a pair (77, 1)
+of functions mw : / > (XU {+})* and w: x’ > N®. These functions induce an interpretation m: S’ >» N~" defined by
+
+M(X1 ...Xn) = (X41)... (Xn) + YS) w(x).
+i=1
+
+As a notation, we use 70 (xX; ...X,) to Mean 7 (x1)... (Xn) and [L(xX1 ...Xp) to mean 4 [L(X;), SO Where Ss = xX1...X, € S’
+the above could have read m(s) = 7 (s) + [L(s).
+
+The symbol + is interpreted as breaking a polymer, matching the notation for separate CRN species (see Fig. 4): if
+the z-interpretation of a polymer reads as e.g. AB + CD, then it is interpreted as separate species AB and CD (plus its
+j.-interpretation). For example, if 7(x) = AB+ CD and u(x) = EF + 2GH then m(xx) = AB+CDAB+ CD + 2EF + 4GH.
+Redundant + are allowed and treated as redundant. If an implementation species x carries nothing, (x) = @, and if it
+polymerizes as nothing, 7 (x) = €, the empty string. Note that an empty-string polymer is not considered to be a species,
+so if all 2 (xj) =€ (or some number of + with no actual formal monomers) then m(x1...Xn) = i [L(x;). As in CRN
+bisimulation it is possible for a given m(x1...X,) =, in this case if all (xj) =e and all (xj) = 9.
+
+The induced interpretation m maps S’ to N~’, multisets of strings of formal polymers, while what CRN bisimulation
+wants is an interpretation that maps S’ to N°©, multisets of formal species (i.e., strings that match e). If we had that, we
+could straightforwardly adapt the definition of CRN bisimulation to PRNs, although there is one remaining snag. Consider
+an interpretation where z (x) = X and u(x) = Y while 2(z) = Z and «u(z) =, in which case the reaction scheme *1x*x2 —>
+*1Z*2 intuitively should be interpreted as *1.X *2 +Y — *1Zx*2. However, substituting x for *; and © for «2 yields xx — xz,
+which would be interpreted as XX + 2Y — XZ+/Y, which cannot be obtained by substituting any two strings into the
+given formal reaction scheme. Avoiding this requires using the spurious-catalyst extension of CRN bisimulation from [27],
+in which an implementation reaction whose interpretation has catalysts can be labeled as a formal reaction without some
+or all of those catalysts. In the default case, we assume any species present in 4 of some monomer in a wildcard are
+spurious catalysts. The intuition here is that we expect the reaction schema to correspond to a molecular mechanism, so
+the monomers that are explicitly represented (i.e. not in a wildcard) are the only ones that could be playing an important
+R.E Johnson, E. Winfree / Theoretical Computer Science 843 (2020) 84-114 95
+
+(e.g. catalytic) role. In more complex cases, such as ones similar to those where the spurious catalyst interpretation would
+be necessary in CRN bisimulation, a different definition of spurious catalysts may be necessary.
+
+Definition 2.10. Let r’ = R’ > P’ € R(d’,e’, W’) be an implementation reaction that can only be enumerated in one way,
+and w’ € W’ be the reaction schema from which r’ is enumerated. Let *1,...,%*, be the wildcards appearing in w’, aj be
+the count of appearances of *; in the reactants of yw’ and b; the same for the products, and s;,..., 5, the substitutions that
+enumerate r’ from yw’. Where Cr = >-j_, aif4(si) and Cp = )-;_, bit(si), if Cg =Cp then the multiset of wildcard-based
+catalysts of r’ is C=Cr =Cp, and the wildcard-based interpretation of r’ is m(r’) = R’—C > P’ —C.
+
+If somehow two distinct implementation schemata produce identical implementation reactions that would have different
+spurious catalysts (for example, xy*; — xa*; and *,yz— *,az both enumerate the reaction xyz — xaz), then the above
+wildcard-based interpretation of that reaction would depend on which schema it was enumerated from; this is inconsistent
+with our formalism that does not allow CRNs to have multiple copies of identical reactions and with the requirement
+that the interpretation of a reaction must be a single formal reaction (or Tt). Although these situations are avoided in
+the examples and theorems discussed in this paper, such situations could arise in some cases. For example, there may
+be distinct schemata that represent distinct physical mechanisms that, in some cases, happen to produce the same result.
+Another situation might be when schemata are generated by an algorithm that is allowed to be redundant as long as it
+covers all cases. In such cases, the user of the PRN bisimulation theory would have to make decisions about how to assign
+spurious catalysts or augment the theory.
+
+Most of our theorems are not affected much by this edge case. Section 3 discusses a particular system in which this
+edge case does not occur; Section 4 discusses complexity results that are not made harder by the edge case; and theorems
+in Section 5 either construct a system in which the edge case doesn’t occur, or assume the existence of a bisimulation
+interpretation which implicitly assumes that, if the edge case does occur, then the interpretation specifies how to handle it.
+
+We can get a proper interpretation m: S’ > N°® in either of two ways. The obvious way is if x € S’ guarantees m(x) CS:
+
+Definition 2.11. Let (X,e) and (’,e’) be a formal and implementation species specification, with z-interpretation z :
+>’ + (XU {+})*. Introduce notation for regular expression e that e[+] = (elé)(+(ele))*, i.e. a string matches e[-+] if it is
+a +-separated list of strings that each match e or are empty. We say that z satisfies the compatibility condition if x1 ...Xp
+matching e’ implies (x1)... (Xn) € L(e[+]).
+
+In this case, given that any jz by assumption is a function ©’ + N°, the induced m will in fact be a CRN interpretation
+S' — N® as desired, and asking whether m is a CRN bisimulation is well-defined.
+
+If 2 does not satisfy the compatibility condition, the structure of the implementation reaction schemata may still make
+the system well-behaved. For example, consider the following implementation for the Rock Paper Scissors Oscillator of
+Fig. 3:
+
+r+ +*1S > r+ +*1S0S p+*1r > p+ *1ror S+*1p > S+*;1pop
+r+x*,pop—>r-+*4 p+*1sos > p+*1S Ss+x*,ror > s+ %*1r
+
+with the interpretation m(r) = (R,@), m(p) = (P,@), m(s) = (S,@), m(o) = (€,@) and the species regular expression e’ =
+(r|p|s)(o(r|p|s))* that allows o to bind to any information-bearing monomer on its right or left. This PRN does not satisfy
+the compatibility condition because, for example, rop € L(e’) but RP ¢ L(e). Nonetheless, started from any implementation
+state whose interpretation is a valid formal state, only valid next states can be produced. For example, sosos € L(e’) and
+r+sosos + r+ sososos € R(X’, e’, &’) preserves the restriction that polymers are of homogeneous type.
+
+We capture this concept as follows:
+
+Definition 2.12. Let (X,e) be a formal species specification and (’, e’, YW’) an implementation PRN, with z-interpretation
+am: d’ + (XU{+})*. We say that z satisfies the consistency condition if, for any reaction R’ > P’ enumerated from a schema
+in W’, if all xe R’ has w(x) € L(e[+]) then all y € P’ has z(y) € L(e[+]).
+
+If (7, 4) is a polymer interpretation where z satisfies the consistency condition, then let Sf = {x € S’ | 1(x) € L(e[+])}.
+Naturally, m restricted to Sj will be a function Sj > N°; the consistency condition implies that “restricting” the enu-
+merated implementation CRN to S$ is well-defined. That is, the CRN (SG, RG) where Ro is the set of reactions with all
+reactants and products in Sj contains every reaction with all reactants in Sj. Then m: Sp > N® is a CRN interpretation
+from that CRN to the enumerated formal CRN, and asking whether m is a CRN bisimulation is well-defined.
+
+Definition 2.13. Let (X,e, YW) and (’,e’, W’) be a formal and implementation PRN, with polymer interpretation (77, 4) and
+induced CRN interpretation m. Let S = S(X,e) and S’ = S(>’,e’). We say (7, 4) is a PRN bisimulation if mz satisfies the
+compatibility condition and m is a CRN bisimulation. We say (77, j4) is a PRN bisimulation up to reachability (from valid initial
+states) if 2 satisfies the consistency condition and m (restricted to Sj as defined above) is a CRN bisimulation.
+96 R.E Johnson, E. Winfree / Theoretical Computer Science 843 (2020) 84-114
+
+In our previous work we proved that CRN bisimulation was equivalent to up-to-interpretation trajectory equivalence
+[27], and that result holds for infinite CRNs and thus for PRNs. Because of this, we use CRN bisimulation (with either
+the compatibility condition or the consistency condition) as the definition of PRN bisimulation, despite the fact that the
+atomic, delimiting, and permissive conditions now each refer to an infinite set of objects. We could, instead, have defined
+similar conditions on the polymer structure of a PRN, and showed that those conditions imply the three conditions of CRN
+bisimulation, just as a polymer interpretation induces a CRN interpretation. Such conditions would capture most of the
+typical PRN implementations, while missing some edge cases that nevertheless satisfy CRN bisimulation. Although not the
+definition of PRN bisimulation, one such set of sufficient conditions is useful for proving that common implementations
+satisfy PRN bisimulation.
+
+Theorem 2.3. Let (X,e, YW) and (x’, e’, W’) be a formal and implementation PRN with polymer interpretation (zr, 1). Assume either
+zt satisfies the compatibility condition and m is the induced CRN interpretation, or the system satisfies the consistency condition and
+m is the CRN interpretation restricted to formally valid species and reactions. If (7, 4) satisfies the following three conditions, then
+m is a CRN bisimulation (and thus a PRN bisimulation or PRN bisimulation up to reachability depending on whether it satisfies the
+compatibility or consistency condition):
+
+1. Polymer Atomic Condition: For each formal monomer X there is a canonical implementation monomer Xo with z (x9) = X and
+[L(X9) = W. e and e’ are local and equivalent to compatibility relations p and p’ respectively, where for all formal monomers X, Y
+with canonical implementation monomers xo, Yo respectively, (X,Y) € 0 => (Xo, Yo) € p’ (also X = =Xg or Y =HA= yo).
+
+2. Polymer Delimiting Condition: For each reaction schema in the implementation PRN, each wildcard appears the same number of
+times in the products as it does in the reactants, and syntactically replacing each non-wildcard monomer with its 7 and ju either
+produces equal expressions for the reactants and products or produces a formal reaction schema.
+
+3. masa CRN interpretation satisfies the permissive condition.
+
+Proof. The polymer atomic condition implies the atomic condition: any formal polymer can be built up from its correspond-
+ing implementation monomers. The polymer delimiting condition implies the delimiting condition: any implementation
+reaction enumerated from a schema will be interpreted as trivial or as a formal reaction enumerated from the “syntactically
+interpreted” formal reaction schema. (This last statement requires either the compatibility condition to imply that the re-
+sulting formal reaction is valid, or the consistency condition for an implementation reaction in the restricted subsystem to
+imply the same.) O
+
+Note that the above conditions are sufficient, but not necessary, for PRN bisimulation. In some sense they describe a
+“natural” or “polymer” way to satisfy the conditions of PRN bisimulation. However, a pair of PRNs with a compatible or
+consistent interpretation may happen to satisfy the conditions of CRN bisimulation, and thus PRN bisimulation, without
+satisfying the stronger polymer conditions.
+
+3. Verifying the DNA stack machine
+
+We show the use of the Polymer Reaction Network model, and PRN bisimulation, by analyzing an existing DNA strand
+displacement system that uses polymers. Specifically, we analyze the system proposed by Qian et al. to implement arbitrary
+stack machines using DNA strand displacement [42]. This system uses a reversible addition primitive to add units repre-
+senting stack symbols onto a growing stack, and uses a systematic CRN implementation for state transitions. The reversible
+addition primitive can grow polymers of unbounded length (as desired for a stack machine), and thus the system cannot
+be modeled as a Chemical Reaction Network. Modeling the DNA stack machine as a Polymer Reaction Network allows us
+to check whether the strand displacement system is a correct bisimulation of an abstract stack machine. We show that the
+obvious interpretation on the DNA stack machine, with a correction for irreversible reactions, is a bisimulation between the
+DNA strand displacement system and the set of abstract reactions discussed in the original stack machine paper.
+
+To prove that two systems are (or are not) equivalent using PRN bisimulation, we need to find an interpretation (or con-
+sider all potential interpretations for the negative case), check the compatibility or consistency condition (the stack machine
+as we model it will satisfy the compatibility condition), then check the atomic, delimiting, and permissive conditions. All
+of that assumes the two systems are a formal and implementation PRN; if not, we need to model each system as a linear
+PRN. For the stack machine, the formal system is a linear PRN and the implementation a DSD system; we use reaction
+enumeration as described below to describe it as an implementation PRN. To take advantage of the modularity condition
+from our previous work [27], we will add an additional step of dividing both systems into modules before checking the
+three conditions of CRN bisimulation. Thus the steps are as follows: enumerate the reaction schemata of the DSD system
+as an implementation PRN; construct an interpretation; check the compatibility condition; modularize; check the atomic,
+delimiting, and permissive conditions for each module.
+
+When enumerating a DSD system without polymers as a CRN, every new DNA complex is a new species in the CRN. With
+polymers, on the other hand, most DNA complexes are polymers made out of monomer subunits; this requires identifying
+which patterns of DNA strands are the formal monomers. The naive approach, of having each strand be a monomer, might
+R.E Johnson, E. Winfree / Theoretical Computer Science 843 (2020) 84-114 97
+
+ 
+
+Fig. 5. Choice of monomers in Qian et al.’s DNA stack machine [42]. The z and yu interpretations are shown as “?” because our next challenge will to figure
+out what they should be.
+
+work in a model that explicitly permits branched polymers, but fails in our linear polymer model given strands with more
+than two binding domains. We do not currently have a way to automate the identification of monomer subunits in polymer
+DSD systems. Therefore we describe below (and in Fig. 5) which DNA complexes we choose as monomers in »’, after which
+e’ is a local regular expression generated from a p’ where monomer complexes can bind if they have complementary long
+domains and W’ is determined by the enumerated set of strand displacement reactions. Although currently Peppercorn [5]
+cannot automatically enumerate polymer reaction schemata, below we give an implementation PRN that we claim is the
+result of applying Peppercorn’s condensed semantics to the DSD stack machine [42], and invite the reader to confirm that
+this is the case. For the six-state three-stack machine in Figure 4(a) of Qian et al. [42], the resulting implementation PRN is
+(d’, e’, W’) as follows:
+
+B= {01,07 ,11,1/,41, a4, 02,05, 12, 14, 42,4, 03,04, 13, 14,23, a4,
+O7,0;.17.17.A7.A7.05,05,17.17,45,.45.037,03,17,15,.A7,A5,
+
+Q,Q1, Q2, 03,17, 19, 12, $1, $2, $3, $4, $5, Se,
+
+p1012Q_,1012Q 71012Q ,1012Q 71114Q ;1114Q )1114Q 1114
+1 ’ 2 ’ 3 ’ 4 ’ 1 ’ 2 ’ 3 ’ 4 ’
+1416 71416 71A16 71416
+pprt6 pAAte pile yt
+
+’
+
+20302 20302 722302 ,2Q302 ,3Q103 ,3Q103 ;3Q103 ,3Q103
+
+2 »*3 »*4 | »*2 »*3 714 ,
+20512, (30512 130512, (40512 113 52113 O13 5113
+W1, W2, W1012Q , W1114Q, W1216, W2Q9 302, W3Q 103, W4Q512; W5Q 113}
+e = 21001 | 11)*(0F 107 [AF | 1p led lay lay lof jaf jaf
+| A202 | 12)*COF 10; |1F JAP ley lad ay of jag jag
+| 43(03 | 13)*(OF 105 | 1F 115 Le) 1A | Az 105 | 15 14
+1Q1Q1 | Q21 Q3 IP LIP | IP | $11 S21 S31 S41 55 | So
+| 10120 | 110120 | 110120 | 110120 | 114e 13140 1140 | p40
+
+pi416 pi416 pi416 p1416
+
+| 1 | 2 | 3 | 4
+
+2Q302 , ,2Q302 , ,2Q302 , ;,2Q302 , ,3Q103 , ;3Q103 , ,3Q103 , ,3Q103
+[Ty | 15 | 13 | 14 | | 15 | 13 [Ty
+
+40512 40512 40512 40512 50113 50113 50113 50113
+P18 | O28 | BSP! | POP? | Pets | POs | Petts | pe
+
+|wW1 | W2/Wi012@ | W1114a | W1a16 | W2Q302 | W3Q103 | W4q512 | W590 113
+98 R.E Johnson, E. Winfree / Theoretical Computer Science 843 (2020) 84-114
+
+We give the reaction schemata in ©’ in multiple groups based on their intended function. The reaction schemata that
+implement pushing and popping onto the stack are, for each stack i € {1, 2, 3} and symbol x € {0, 1}, where 4 indicates the
+bottom of the stack:
+
+ky = 1X; (1)
+1X, +x! xT (2)
+«1X, = 41x} + Qi (3)
+ay tad eat (4)
+A hit Qi (5)
+
+For each stack i, interchangeability of Q is implemented by:
+Qi= IP (6)
+I> =Q (7)
+
+The irreversible stack machine transitions as shown in Figure 1 of Qian et al. [42] are incorrect according to CRN bisim-
+ulation, as discussed in our previous work: releasing the output species before the first irreversible step allows the reaction
+to reverse itself, producing a small probability of formally incorrect pathways [27]. As one would expect, this would be
+incorrect according to PRN bisimulation as well. Qian and Winfree have come up with a corrected version of the DSD mech-
+anism (unpublished), and we give the reaction enumeration of the corrected version below. The stack machine transitions
+of the form S; + A— S; +B, where A and B are either free stack symbols x! or Q (which correspond to the seven classes
+of 1'4J8 monomers), are implemented by:
+
+518 @
+piAiB yg iAiB (9)
+NP, PAP st wy (10)
+pJP IAP 4 B (11)
+MP —> WiAjB + W2 (12)
+
+The formal PRN that describes the stack machine is given in Figure 4(d) of Qian et al. [42]. Adapted to our notation, the
+formal PRN is (x, e, Y) as follows:
+
+= {07,07 11, 14,21, a4, 27, 02,05, 12, 13, 42,04, 25, 03,04, 13, 14,43, a, 45,
+Q, Q1, Q2, Q3, $1, $2, $3, S4, $5, S6}
+€ = )1 (04 | 11)* | Az (O2 | 12)* | A3(03 | 13)*
+}OF | 14 Ay Lay 103 113 [ag | az 10f | 14 Jag fag
+| Q | Q1 | Q2 | Q3 | $1 | $2} $3 | $4] $5 | Se
+
+With W containing the reaction schemata:
+
+5, +0/ +5.+Q
+Si +1! + 54+Q
+5; +al > Sg+al
+So + Q > $3 +08
+53+Q > 5, +04
+S4at+Q—> S544
+Ss+Q>S1+14
+
+Q=—=Q; |i € {1, 2, 3}
+
+1 tx] = 1x + Qi [xe (0, 1}, i € (1,2, 3)
+ay taf aaj + Qi lie (1, 2,3}
+R.E Johnson, E. Winfree / Theoretical Computer Science 843 (2020) 84-114 99
+
+ 
+
+ 
+
+ 
+
+Fig. 6. Enumeration of reaction schemata and interpretation of the monomers in Qian et al.'s DNA stack machine [42] as enumerated in Fig. 5.
+
+Theorem 3.1. There exists a polymer interpretation (zc, (4), from the implementation PRN as described above to the formal PRN as
+described above, that is a PRN bisimulation.
+
+The proof of Theorem 3.1, including constructing z and wp, is the remainder of this section. While the proof is given as
+though for this specific stack machine, it is in fact general and should apply to any instance of the DNA stack machine [42].
+
+Given the formal and implementation PRNs, since we are proving that the implementation is correct, the next step
+is to construct an interpretation. For the stack machine, as with most engineered implementation systems, the rationale
+behind the construction suggests a natural interpretation which, if the implementation is correct at all, will be a valid PRN
+bisimulation. When we give this interpretation, recall the notation m(x) = (A; B) as a shorthand for 2 (x) = A, w(x) = B
+where x is an implementation monomer, A a string of formal monomers, and B a multiset of formal species. Here the
+natural interpretation, shown in Fig. 6, is as follows:
+
+1. A monomer x that appears in both the formal and implementation PRNs, such as x = $3 or x = 02, has m(x) = (x; 9).
+Note that this covers all formal monomers.
+
+2. For monomers involved in pushing and popping from the stack, for each stack i € {1, 2, 3}, m(s; ) = (€; B) for s € {0, 1}
+and m(s;") = (sj; Q) for s € {0, 1, A}. (The case m(A,;) = (A; ; M) is covered as 4, is a formal monomer.)
+
+3. For intermediates ior? in the stack machine transitions, implementing $; + A > S; +B for A, Be (x! x} xd ,Q}, we
+have (1) = ¢ while wi?) = Si, Te =S +A, Te = B, and wi?) = J, Similarly for the interchange
+of Q, m(I?) = (€; Q). Each mw...) = (€;9).
+
+Given an interpretation, we check the compatibility condition or the consistency condition to see if CRN bisimulation
+is even definable. In this case, the stronger, compatibility condition holds: the z-interpretation of any valid implemen-
+tation species is a valid formal species or ¢. Start with e’, which describes all valid implementation species: 3 regular
+expressions describing stack polymers, and a number of species that exist as monomers (i.e., length-1 polymers). The
+stack polymer expressions are of the form A;(0; | 1;)*(0;" | 0; | 1° | 1; | €); since 70°) = 2 (0;) =0;, 71177) =7(1j) = 1i,
+m(0,) = 71, ) =, and (Aj) = Aj, any implementation polymer matching this expression will have its z-interpretation
+match the ;(0; | 1;)* subexpression of e, and thus be a valid formal polymer. The monomers are I-type species whose
+zc -interpretation is €; formal species Q, Qj, Si, x! , and A; whose z-interpretations are themselves and which appear in e
+as valid formal length-1 polymers; and the ay species whose zr-interpretation A; matches the 4;(0; | 1;)* subexpression of
+p. This covers all cases in e’, proving that the compatibility condition holds.
+
+Given the compatibility condition, the induced interpretation m (see Definition 2.9) is in fact a CRN interpretation, and is
+a PRN bisimulation if and only if it is a CRN bisimulation (Definition 2.13). Thus the last thing we need to do is show that m
+satisfies the atomic, delimiting, and permissive conditions (Definition 2.4.II). Again, for a PRN treated as an infinite CRN, an
+algorithmic way of doing this is generally infeasible; in fact we will show in the next section that checking the permissive
+100 R.E Johnson, E. Winfree / Theoretical Computer Science 843 (2020) 84-114
+
+condition in the general case for linear PRNs is undecidable. To check an engineered system, one would typically rely on
+the intent of the designers being formalizable into a proof of correctness. The stack machine was designed in subsystems,
+each of which correctly implements one formal reaction or formal reaction schema, which when combined form a correct
+implementation of the formal PRN. The modularity condition from Theorem 2.2 covers exactly this case: we will only need
+to prove each module correct, and the correctness of the whole system will follow. Thus, the next step is to divide the
+enumerated formal and implementation CRNs into modules.
+
+To specify each module we must specify a set of formal species, formal reactions, implementation species, implementa-
+tion reactions, and sets of “common” formal and implementation species, each subsets of their respective sets of species.
+The modularity condition expects each module to have an interpretation; since we already have m defined, each module’s
+interpretation is just m restricted to its implementation species. For each stack i, we have one module consisting of: all
+formal species matching ;(0; | 1;)* | A; jad | o! | 1 | Qi, the formal reaction i; +22 =A; + Qj, and all formal reactions
+enumerated from the two reaction schemata + +x! = «1X1 + Q; | x € {0, 1} (recall that a reversible reaction schema is a
+shorthand for two irreversible schemata); all implementation species matching Aj(0; | 1;)*(0; | 0; | 1,7 | 17 |e) |ay lap |
+o! | 1 | af | Q;, and all implementation reactions enumerated from reaction schemata of type (1) through (5) for stack
+i; and the common formal species being all formal species, while the common implementation species are all those with
+the same name as a formal species. For each stack i, we have a separate module containing formal species Q and Qj; and
+reactions Q = Q;; implementation species Q, Q;, and I? and reactions of type (6) and (7) for stack i; and {Q, Q;} is
+again both the set of common formal species and of common implementation species. For each formal reaction of the form
+S; + A — S; +B, we have a module consisting of those formal species and that formal reaction; implementation species Sj,
+S;, A, B, and all re species, and reactions of type (8) through (11) for this formal reaction; and again, all formal species
+are common and all implementation species with the same name as a formal species are common. In this three-stack, six-
+state, seven-transition stack machine, this gives 13 modules, shown in Fig. 7; we prove below that each of those 13 modules
+satisfies the atomic, delimiting, permissive, and modularity conditions.
+
+Recall the polymer atomic and polymer delimiting conditions from Theorem 2.3. The argument that the whole system
+satisfies the atomic condition starts similarly to the polymer atomic condition: each formal monomer x has an implemen-
+tation monomer with the same name and with m(x) = (x; @). Then observing that e is a subexpression of e’, any formal
+species w € S (i.e., string matching e) will also match e’, thus w € S’ and will have m(w) = {|w}}. Because each module, for
+each formal species it contains, also contains the implementation species with the same name, each module satisfies the
+atomic condition.
+
+The whole system satisfies the polymer delimiting condition, which we prove by going through the types of implemen-
+tation reaction schemata. The reader can verify that schemata of types (1) and (3), and reactions of types (5), (7), (8), (9),
+and (11) are all trivial (for example, type (3) is syntactically interpreted as «1x; + Qj = «1x; + Q;); schemata of type (2) are
+syntactically interpreted as «1 +x! = *1x; + Q;; reactions of type (4) as A; + af =; + Q;; type (6) as Q; = Q; and type
+(10) as the appropriate S$; + A — S; + B. All of those nontrivial syntactically interpreted reactions or schemata appear in
+the formal PRN, so the polymer delimiting condition is satisfied, which proves that the whole system satisfies the delimit-
+ing condition. Again, each module, for each nontrivial implementation reaction it contains, also contains the corresponding
+formal reaction, so each module satisfies the delimiting condition.
+
+The permissive condition is where the division into modules matters. To prove the permissive condition we will have
+to check each formal reaction within each module; since no formal reaction appears in multiple modules, modularity does
+not increase how much we have to check, and since the size of each implementation module is smaller than the whole
+implementation CRN, we have less to check per reaction, thus less overall. As discussed in our previous work on CRN
+bisimulation, we prove the permissive condition by showing that for each formal reaction, for each minimal implementation
+state whose interpretation contains all the formal reactants, that reaction can be implemented; since if every minimal
+implementation state can do something, then every implementation state can do the same thing [27]. This is illustrated in
+Fig. 8.
+
+To treat the simple cases first, consider the formal reactions that are not schemata (i.e. have no wildcards). A formal
+reaction of the form S; + A — Sj; +B appears only in its own module, in which the minimal implementation states con-
+taining S; +A in their interpretation are {S; + A}, qu? + Al}, and qs? y. These states implemement S; + A— S;+B
+by, respectively, forward reactions of type (8) then (9) then (10); (9) then (10); or just (10); (8) and (9) are trivial reactions
+followed by (10) which is interpreted as S; + A — S; + B. As an edge case, if A = B (as is the case for S1 +4 — S6 +24),
+
+then any of the above three states with A replaced by I"!” is also a minimal state. Such a state implements 5;-+ A > S;+B
+by the forward reaction of type (11) followed by the appropriate sequence mentioned above. Similarly, the formal reactions
+Q = Q; each appear only in their own modules, in which the minimal states for Q — Q; are {(Q]}} and ql? }, and the only
+minimal state for Q; — Q is {|Q;|}. Those three states implement the appropriate formal reaction respectively by forward
+(6) followed by forward (7); just forward (7); and just reverse (7).
+
+The remaining formal reactions all derive from the stack modules: the A; + af =A; + Q; reactions and the reactions
+f
+
+enumerated from the *; +x; = *1X;+ Q; schemata. Each of the three stack modules thus contains infinitely many reactions:
+R.E Johnson, E. Winfree / Theoretical Computer Science 843 (2020) 84-114 101
+
+*05 *S3
+*o t ta t | 0 +t /S t/L
+a —vr>- ra > ——>
+“S3* te Le
+
+te "Sox te *Qe te lt 09* te
+
+ed
+
+Manne ene een
+Tg FQ
+
+EEE EEE
+
+*
+
+ 
+
+’
+i
+'
+1
+1
+1
+'
+1
+1
+1
+'
+a
+
+?
+
+ona aay
+®eune ees
+
+@?
+
+eee eee eee
+
+t 707 t *Qo* ts
+
+* YK.
+
+Wit nna att
+t Poe te 709 te *Q5
+
+ee ee ere tT)
+
+ee eee==
+
+ 
+
+ 
+
+ 
+
+a
+i
+1
+1
+'
+'
+1
+1
+'
+u
+
+4
+
+“83 t
+
+See ee eee ew
+
+eS aeee eee
+
+esa
++
+WD
+w
+
+et td
+
+ocmsees
+wena
+
+LT ld
+
+ 
+
+ema a eee
+
+eee?
+
+ 
+
+ 
+
+Fig. 7. Examples of the three types of modules. Top left: the stack module for stack 2. Bottom left: the Q exchange module for stack 2. Right: the stack
+
+machine transition module for formal reaction $2 + Q — S3+ of . Common species are outlined in red dashed lines. DNA complexes covered in gray boxes
+are fuel complexes, which are not explicitly included in the implementation PRN.
+102 R.E Johnson, E. Winfree / Theoretical Computer Science 843 (2020) 84-114
+
+ 
+
+At > Ay +4
+
+Fig. 8. The “minimal states argument” from our previous work on CRN bisimulation [27] is often the most effective way to prove the permissive condition.
+Here we show some of the minimal implementation states (within the stack 2 module) in which the formal reaction A2 + Q2 > Az +ad should be able to
+
+occur. Arrows between states represent trivial implementation reactions; the arrow with no target represents the implementation reaction ay > dy + af ,
+which is interpreted as the desired formal reaction. As in the finite CRN bisimulation case, reversible reactions from a minimal state to a non-minimal state
+may be shown as irreversible arrows between minimal states, e.g. 115 = *112 + Q2 taking A2 + 21215 to (a non-minimal state containing) A2 + Qo.
+Unlike the finite CRN case, here we have infinitely many minimal states (for example, every state of the form A2 +A2w17, w € {02, 12}*), so the permissive
+condition cannot be verified by simply checking for paths in this graph; however, the argument given in the text based on this graph can prove it.
+
+in stack module i € {1, 2, 3}, for each w € {0, 1}* and x € {0, 1}, where w; is w made up of 0;’s and 1;’s, *1 +x! = *1Xj + Qj
+enumerates a pair of reactions A; wj +x! = )jwixX; + Qi.
+
+There is only one minimal implementation state for A, +11 > i+ Qi, (A; +11 }, which implements the formal reaction
+by a forward reaction of type (4). Aj;w; +x! — hj; wjx; + Q; has four minimal states, namely x! plus any one of A; wij, A;wi0, ,
+Aiwil, , Aiwiy; if w=w’y for y € {0, 1}, or ay if w = €. These states implement the formal reaction as follows: Aiwiyy
+becomes A,;w; + Q; by a reaction of type (3); rr becomes A; + Q; by a reaction of type (5); A;wi(1 — x); becomes A;w; by
+a reverse reaction of type (1); A;w; becomes A;w;x; by a forward reaction of type (1), all of the so-far-mentioned reactions
+
+being trivial; and Aj; w;x; +x! implements the formal reaction by a reaction of type (2). The reverse reactions are slightly
+
+more complex, because the Q; can be provided by any implementation species in the module whose interpretation contains
+Q;, namely Q; itself, a, or any AMiy; for u € {0,1}*, y € {0, 1}. The minimal states for Aj + Qi > A; +ad are then either
+rr by itself, or one of A;, A;0;', or A;1, plus one of any species providing Q; (other than a, in which case the state would
+not be minimal). Similarly, the minimal states for Aj;w;x; + Qj > Ajw;j +x! are either AGWixy by itself, or one of AjwjXx;,
+Aji W;ix;0, , or A;w;xX;1, plus one of any non-Ajwix; species providing Qj. These states implement the formal reaction as
+follows: any species providing Q; releases the implementation Qj; by a reaction of type (3) or (5) as appropriate; any 0;
+
+or 1, “falls off’ by a reverse reaction of type (1); free Qj; joins 4; by a reverse reaction of type (5) or A;w;x; by a reverse
+reaction of type (3); and finally the formal reaction is implemented by a reverse reaction of type (2) or (4) as appropriate.
+R.E Johnson, E. Winfree / Theoretical Computer Science 843 (2020) 84-114 103
+
+This covers all modules, and proves that within each module, the permissive condition is satisfied; but does not prove that
+the permissive condition is satisfied for the whole system.
+
+From our previous work, the modularity theorem proves that, if each module satisfies the permissive condition and the
+modularity condition, then the whole system satisfies the permissive condition (and the modularity condition) [27]. So the
+last step is to prove that each module satisfies the modularity condition: each implementation species can “decompose”,
+via trivial reactions, into one multiset of common implementation species and another multiset of implementation species
+whose interpretation contains no common formal species. For common implementation species, and for implementation
+species containing no common formal species, this decomposition is already done. The non-common implementation species
+are the ye intermediates, I? intermediates, rr AG af and x! monomers, and stack polymers matching the expression
+Ai(O; | 1;)*(OF | 0; | 1;° | 1; | €), but of those only pe fork £4, 12, a;*, and species matching ;(0; | 1;)*(0;' | 1;°) contain
+common formal species. Each of those species decomposes as follows: I!” to 5; via reverse reaction (8); If!" to A+ S;
+via reverse reactions (9) and (8); Ne to a +B via reaction (11); I? to Q via reaction (7); A to Aj + Qj via reaction
+(5); and a species of the form AiWix; to A;w;xX; + Q; via a reaction enumerated from reaction schema (3). This satisfies
+the modularity condition, meaning that the permissive condition will be satisfied when the initial implementation state
+combines species from different modules. This completes the proof that the given (7, w) is a PRN bisimulation from the
+DNA stack machine to its formal description, which implies that the two systems will have the same set of trajectories
+from any initial state. Since it is intuitive that the formal system, when started in the appropriate initial states, performs a
+rate-independent simulation of an abstract stack machine, so does the DNA system.
+
+4. Hardness results
+
+Having defined a concept of correctness of an implementation of a polymer network, we would like to be able to algo-
+rithmically check, given two polymer networks and an interpretation, whether that interpretation is a bisimulation. Knowing
+that polymer networks are capable of Turing-universal computation, we might suspect that to be impossible. A next best
+thing would be if bisimulation or non-bisimulation was recursively enumerable: either that any correct interpretation would
+have a proof of correctness, or that any incorrect interpretation would have a proof of incorrectness. Unfortunately, neither
+one is the case. We show that verifying our notion of bisimulation for PRNs is equivalent to the uniform halting problem,
+which given a Turing machine, asks if every possible configuration of the Turing machine will eventually lead to a halting
+configuration [24]. This problem is in the class I2, the complement of the second level of the arithmetic hierarchy, which is
+the class of all languages L = {x | Vyd7(x, y, Z)}, where ¢ is a decidable predicate. Since each level of the arithmetic hierar-
+chy strictly contains the previous levels, a T1$-complete problem cannot be recursively enumerable, nor can its complement
+[30]. Since the uniform halting problem is T19-complete [24], so is PRN bisimulation. It is also interesting to note that the
+atomic condition, which is trivial to check for finite CRNs, becomes PSPACE-complete for Polymer Reaction Networks, proven
+by reduction from the problems of checking whether a regular expression describes the language of all strings, or whether
+two regular expressions describe the same language or languages one of which contains the other [26,50,39].
+
+Lemma 4.1. Given a formal species schema (=, e), implementation species schema (=’, e’), and interpretation (zc, 1), the problem of
+checking the atomic condition and that of checking the compatibility condition are both PSPACE-complete. If one or both are required to
+be local, or equivalently, given as a compatibility relation (X, 0) and/or (x’, op’), then checking the atomic condition remains PSPACE-
+complete. In contrast, checking the compatibility condition can be done in polynomial time if the formal schema is known to be local,
+while it remains PSPACE-complete if only the implementation schema is known to be local.
+
+Proof. To show that a decision problem is PSPACE-complete, we must show that (a) it is in PSPACE, i.e. that it can be
+decided by a Turing machine that uses polynomial space, and (b) that it is complete, e.g. by exhibiting a polynomial-time
+reduction from a known PSPACE-complete problem to this one. The problems of, given a pair of regular expressions (e€1, e2)
+over &, deciding whether the language of e; is contained in that of e2, deciding whether the languages are identical, and
+deciding whether L(e;) = &*, are all PSPACE-complete [26,50,39] (and there are simple reductions between them).
+
+Recall that the CRN atomic condition requires that for every formal (polymer) species, there is an implementation species
+interpreted as exactly one copy of that formal species. The compatibility condition states that the z-interpretation of a valid
+implementation polymer cannot result in an invalid formal polymer: x; ...x, € L(e’) implies 7 (x1)... (Xn) € L(e[4]).
+
+To check the atomic condition in polynomial space, we choose e; =e to describe the set of formal polymer species
+allowed in the formal PRN, while e2 will describe the set of interpretations of polymers in the implementation that cor-
+respond to exactly one formal polymer. This is laborious but straightforward: e2 is an expression for z-interpretations of
+strings matching e’ that polymerize as a single formal polymer and carry nothing, union with the (finite) set of A € d*
+produced as the only formal polymer carried in the j-interpretation of an implementation polymer that polymerizes as
+nothing. The CRN atomic condition holds if L(e;) C L(e2). (The compatibility condition implies that L(e2) C L(e1), in which
+case these two sets of formal polymer species need to be identical. However, for PRN bisimulation up to reachability, the
+consistency condition may allow for implementation species to exist that do not correspond to formal polymers, so long
+as they will not be reached. In that case the atomic condition still requires L(e;) C L(e2).) To construct the first part of
+104 R.E Johnson, E. Winfree / Theoretical Computer Science 843 (2020) 84-114
+
+€2, we start with e’ and restrict it to use only monomers x € &’ with f(x) = W, replace each valid monomer with its 7 -
+interpretation, and intersect with +*X*+*. This can be done in polynomial time. To construct the second part of e2, we
+look for strings A € &* such that some Xo has 2(xX9) = € and (Xo) = {A} and there exist u, v with uxgv € L(e’) where
+all monomers x in uv have m(x) = (€,@), i.e. they are “empty monomers”. Given an NFA for e’, which can be obtained in
+polynomial time from e’, this is simple: identify all states of the NFA reachable from the start using only empty monomers,
+identify all states that can reach an accepting state using only empty monomers, and identify all desired x9 that transi-
+tion between them. Then with e; and e2 constructed, we use the known PSPACE algorithm for testing the containment of
+languages described by regular expressions.
+
+To show completeness, we are now given arbitrary e; and ez for the regular expression containment problem. To reduce
+this problem to checking the atomic condition for PRNs, we are free to choose a formal PRN with arbitrary e, along with
+an implementation PRN containing the same monomers but a different regular expression e’, and an interpretation where
+every monomer polymerizes as itself and carries nothing. It follows that we can set e =e, and e’ =e? such that the atomic
+condition holds iff L(e;) C L(e2). Thus, checking the atomic condition is PSPACE-complete.
+
+Similarly, to check the compatibility condition, ez = e[+] and ej is the expression of z-interpretations of strings match-
+ing e’, this time regardless of their jz-interpretations, and we use the known PSPACE algorithm that decides containment
+for regular expressions. Again, proving completeness uses ©’ = » and m(x) = (x; 9), which allows reduction from regular
+expression containment since our interpretation does not use “+”. Given arbitrary e; and e, L(e;) C L(e2) if and only if the
+compatibility condition is satisfied for a formal PRN (x, e2) and implementation PRN (%, e1).
+
+If one or both species schemata are given as local regular expressions or compatibility relations, then we recall
+Lemma 2.2, that given any regular expression there is a compatibility relation on an implementation monomer set and
+a yv-interpretation under which they allow the same set of strings. Here we use that deciding whether a regular expression
+e matches all strings over & is also PSPACE-complete [26,50,39]. For the atomic condition, consider a formal species schema
+(x, 0) with p = X- x YX (allowing all strings) and implementation schema (»’, o’) and z-interpretation implementing e
+according to Lemma 2.2. In such a case, the atomic condition is true if and only if e matches all of &*. This proves PSPACE-
+completeness of the atomic condition when both formal and implementation regular expressions are local, which a fortiori
+also applies when only one is local.
+
+We have already established the PSPACE-completeness of checking the compatibility condition when both formal and
+implementation schema are allowed to be nonlocal; here we will cover the other three cases. It turns out that whether the
+implementation schema is local does not affect the complexity. When the formal schema is allowed to be nonlocal, consider
+an unrestricted implementation PRN (X, &*) and formal PRN (=, e) with an arbitrary regular expression e, where m(x) =
+(x; J). X* is of course local and the implementation is correct (with respect to compatibility) if and only if L(e) = &*, thus
+proving that checking the compatibility condition remains PSPACE-complete even when the implementation schema must
+be local. However, when the formal schema is required to be local—or equivalently, given by a compatibility relation—the
+result changes. Given a formal schema (=, 0) and implementation schema (’, e’) where e’ may be local or not, we show
+how to test the compatibility condition in polynomial time. We first check that for every implementation monomer x, there
+are no violations of 0 within zr (x) itself; this requires checking boundary conditions (with F and —) only if and where z (x)
+contains a + symbol, because we don’t yet know whether x can begin or end a polymer according to e’. If this test passes,
+we must further test that when the z-interpretations of monomers in an implementation polymer are strung together,
+there are no violations of o at the boundaries. A complication is that since a monomer may polymerize as nothing, the
+z-interpretation of a monomer may abut the z-interpretation of another monomer that is distant in the implementation
+polymer. We check this with a pseudo-compatibility relation o; which represents implementation monomers that can be
+connected to each other by zero or more monomers that polymerize as nothing, which can then be compared to the
+formal p. Define o, such that xply if any uxvyw € S(x’,e’), u,v, w € (’)*, with 2(v) =e; the case x =F (resp. y =)
+corresponds to vyw € S(’,e’) (resp. uxv € S(d’,e’)) with the same restrictions on u,v, w. This can be computed in
+polynomial time with reachability questions on the nondeterministic finite automaton associated with e’. It is in general
+not true that S(X’, e’) = S(x’, p,), but where z(x); and 7 (x)_ are the first and last characters, respectively, of 7 (x), it
+is true that the compatibility condition is true if and only if for all x ¢ ©’ U{F} and y € »’ U {+} with w(x) 4eEF¥T(y),
+XOLyY => 1 (x)-1e7 (y)1, with the convention 7 (F)_; = and m(H); =A, and where +py = > py, xo+ <> xc. Thus
+when the formal schema is local, the compatibility condition can be computed in polynomial time. O
+
+Theorem 4.1. The problem of, given a formal PRN (x, e, W), implementation PRN (’, e’, &’), and interpretation (zr, 1), deciding
+whether that interpretation is a bisimulation is T19-complete.
+
+Proof. Weak bisimulation is the statement that forall pairs of related states and steps in one of the two states there exists a
+corresponding sequence of steps in the other state, which is naturally a ms statement. (In PRN bisimulation this description
+applies to both the delimiting and permissive conditions, while the atomic condition is decidable in PSPACE by Lemma 4.1.)
+To prove completeness, we reduce from the uniform halting problem: given a Turing machine, is true that from any com-
+bination of state and tape contents, the Turing machine halts? Since PRNs can simulate Turing machines, we show that the
+condition that, for all states of a PRN, a given reaction can happen is equivalent to the condition that, for all configurations
+of a Turing machine, the Turing machine will halt. In the case of PRN bisimulation, the above condition corresponds to the
+R.E Johnson, E. Winfree / Theoretical Computer Science 843 (2020) 84-114 105
+
+permissive condition, in an implementation PRN where the delimiting condition is true. Since the uniform halting problem
+is T1§-complete [24], so is bisimulation.
+
+Given a Turing machine M with alphabet {0, 1} (blank squares treated as 0), with set of states Q including a start state
+qo and halt state qy, we construct a pair of PRNs and an interpretation which is a bisimulation if and only if M halts from
+every instantaneous description. The formal PRN is ({Q,H}, Q | H,{Q — H}). The implementation PRN is the simulation
+of M generalized from Example 2.2, simulating M using state monomers q; and tape squares 0! and 1! to the left of the
+state, 0’ and 1" to the right, and between one and six reaction schemata for each transition in M. u(x) = @ for all x,
+m (0!) = 2 (0") = (1!) = 21") =e, (gj) = Q for each non-halting state q;, and m(qy) = H.
+
+Given e’ = (0! | 1')*(q;)(0" | 1")* from the generalized Example 2.2, the valid implementation polymers are exactly the
+valid instantaneous descriptions of M, and the only reactions that can happen are simulations of steps of M. Any valid
+implementation species has only one state q;, and thus interprets to either Q or H, both of which are valid formal species,
+which also satisfies the atomic condition. Any implementation reaction is a transition of M, so the corresponding formal
+step is either trivial, if the transition is not to qy, or Q — H if it is, satisfying the delimiting condition. In any formal state
+with a Q, and any implementation state interpreted as that formal state, there is at least one polymer representing a non-
+halting instantaneous description of M, and the statement that all such states can eventually do Q — H (the permissive
+condition) is equivalent to the statement that all instantaneous descriptions eventually halt. O
+
+While the general case is undecidable, it would be valuable to identify restricted (yet useful) classes where PRN bisimu-
+lation can be efficiently determined algorithmically.
+
+5. Single-locus networks
+
+Given a class of interesting Polymer Reaction Networks, we would naturally want to find a physical implementation of
+some or all of those networks. So far, theoretical steps taken towards implementing polymer reactions with DNA nanotech-
+nology include the stack machine implementations by Qian et al. [42] and by Lakin and Phillips [33], the Turing machine
+implementation by Yahiro and Hagiya [55], the register machine by Tai and Condon [51], and the surface CRN implementa-
+tions by Qian and Winfree [43]. To illustrate one challenge in implementation, recall the string copying and equality/reverse
+detection PRNs from Fig. 3. For example, the one-step string copying PRN uses reaction schemata of the form
+
+P+ Ax; > P+Ax*,+A *1.
+
+While this schema describes the copying of an arbitrarily long string starting with A and catalyzed by P, physical systems
+(biological, engineered, or otherwise) tend not to copy arbitrarily long strings in one step. The local model string-copying
+PRN in Fig. 3 transcribes a string of length n in O(n) steps, each of which affects only a constant number of monomers
+(specifically, at most 3). In general, physical systems will—on the most realistic level—be modeled as such local and bounded
+reactions, by which we mean reactions that only “read” and “write” a finite number of monomers and/or connections
+between monomers.
+
+If we try to model the local mechanism of DNA polymerase as an implementation of P + Ax; > P + A x1 +Axj, an
+immediate problem is that the structure is no longer linear, but branched. This problem is somewhat related to an issue
+with naively enumerating a PRN from a DNA strand displacement system: in the stack machine, for example, treating a
+single strand as a monomer will fail when some strands have enough domains to bind to three other strands at once. In that
+case, since the “third branch” never exceeded a fixed size, a clever choice of DNA complexes to be treated as implementation
+monomers allowed us to model the system as a linear PRN, but the same is not true for DNA polymerase. A DNA polymerase
+“implementation” network could be modeled in Cardelli’s Biochemical Ground Form [13], or in the branching PRN extended
+model we discuss in Section 6, but not in the linear Polymer Reaction Network model. Even if we use a model with
+branching polymers, the implementation will not be correct according to bisimulation: in the formal network, the second
+copy of the arbitrarily long polymer Ax, is produced in one step, which is impossible in an implementation network made
+up of only local and bounded reactions. (The network could be correct according to CRN bisimulation on the induced infinite
+CRNs, where for each polymer w the branched structure being built up from an initial Ax; = w is interpreted as w+ P until
+the final dissociation step, at which point each copy of w is interpreted as w. However, PRN bisimulation would require
+each individual monomer to have an interpretation, preventing this workaround.)
+
+The key obstacle here is the (so far informal) concept of “local and bounded”, and the difficulty of implementing formal
+reaction schemata that are not “local and bounded” using only implementation schemata that are. (Or at least, the difficulty
+of doing so in a way bisimulation can recognize and verify.) For the moment, therefore, we will turn to implementation
+of reaction schemata that are local and bounded, with a suitable definition. We define a concept of a single-locus reaction
+schema, which we feel captures the informal concept of “local and bounded” (see Fig. 9). We will show that these single-
+locus reaction schemata can be implemented up to bisimulation by a set of four polymer primitives, three of which have
+candidate DNA implementations from the stack machine [42] or surface CRNs [43]. We show that a class of infinite CRNs,
+which is intuitively the class of single-locus PRNs plus compatibility relation-based computational power, is closed under
+bisimulation and any member of that class can be implemented by the given primitives, suggesting that the concept of
+single-locus schemata is a natural class to discuss.
+106 R.E Johnson, E. Winfree / Theoretical Computer Science 843 (2020) 84-114
+
+ 
+
+Fig. 9. Single-locus reaction schemata are, intuitively, schemata whose reactions occur entirely within one region whose size is not affected by wildcards.
+This region may be in the middle of one polymer (if *; and *2 are on different edges of the same polymer), at the joining of two polymers (if *; and «2
+are on separate polymers), or at either end of one polymer (if either «; and/or «2 does not exist). The schema may consume, produce, and/or be catalyzed
+by any number of additional, finite polymers, since such a reaction can still be thought of as taking place within a finite region.
+
+Definition 5.1. A reaction schema is single-locus if:
+
+(i) Any wildcard that appears at all, appears exactly once in the reactants and exactly once in the products.
+(ii) Wildcards appear only at the beginning or at the end of a polymer, and each wildcard that appears, appears at the
+same place (beginning or end) in the products as in the reactants.
+(iii) All wildcards that appear at the beginning of a polymer must have the same numerical subscript, and likewise for all
+wildcards that appear at the end of a polymer.
+
+For the purpose of conditions (ii) and (iii), a wildcard that is the entire polymer can be counted as at the beginning or
+at the end, and the reaction schema is single-locus if it satisfies the conditions for at least one of those two choices. For
+example, *1 = *1E, *1 = Ex1, and *1 + *2 = +1] *2 are all single-locus.
+
+A PRN (%,e, W) is single-locus if e is local and each reaction schema in W is single-locus. An augmented PRN (%,e, WV)
+is augmented single-locus if each reaction schema in W, ignoring its regular expression restrictions, is single-locus; in the
+augmented case e is not required to be local.
+
+Intuitively, a reaction schema is single-locus if it only “reads from” (is conditional on) and “writes to” (changes) one
+region of finite size, i.e. containing no wildcards. *;ABx*2 — *,;CDEx2 is the ideal example of this; it “reads” AB and
+“writes” CDE, a region of size at most 3, while leaving «; and «2 unchanged. Similarly, in *;A *2 +B — *1Cx2, the “region”
+includes both the region A on the polymer *;Ax*2 and the free monomer B, which since the monomer B has no wildcards
+is still a finite size. A reaction schema *; + Ax; — *; + Bx; would not be single-locus, since to check that both polymers
+have the same sequence substituted for the wildcard *; requires reading that sequence, and a wildcard’s sequence is not
+bounded by a finite size. Similarly, *; A *2 B*3 — *1C *2 D*3 requires reading both the A and B and writing both C and D,
+which thanks to the intervening «2 cannot be included in one region of finite size. (These examples correspond to violations
+of conditions (i) and (ii), respectively.) A schema such as +1; A *2 + *3 Bx4 — *1C *2 + *3 D4 is not single-locus by the above
+definition because it violates condition (iii), even though the A and B could be viewed as a finite region to read from and
+write to. To do so, however, we would have to view the A-B region as a single region on a branched polymer, and for
+the same reason, implementing this reaction schema (up to PRN bisimulation) with “physically possible” (i.e., single-locus)
+reactions of linear polymers is impossible. We will, however, return to this topic in Section 6. An augmented single-locus
+PRN is not exactly local, and reaction schemata may read (but not change) unbounded regions; however, it turns out that
+augmented single-locus PRNs are a natural class of PRNs closed under PRN bisimulation.
+
+Theorem 5.1. For any formal single-locus PRN (x, e, W), there is a PRN (X’, (X’)*, W’) and bisimulation up to reachability interpre-
+tation (7, 4) such that all reaction schemata in ©’ are of one of the following four forms:
+
+*, ABx2 > *1CDx2 (Context-sensitive Replacement)
+*1A *2 +B = *1Cx2 (Monomer-dependent Replacement)
+*y = 4,E or *1 =F (Reversible Addition)
+*y +2 = #1) 2 (Reversible End-joining)
+
+Proof. This proof is centered around a way to implement any reaction schema of the form
+
+*4X,...Xn 2 +11 + FR *1Y1--- Vm 2 +P1 +::-+ + DI,
+
+where x; and y; are monomers, rj =1j,1...Tin,; and similarly p; are strings of monomers. First we show how to convert
+any single-locus PRN into that form. Reactants or products of the form *;w , + w2*2 (here w; are strings of monomers)
+can be replaced by *1w ,Iw2x2 together with the reaction schema +*; + *2 = *1/*2, where m(J) = (+; @). Reactants or
+products without *; (resp. *2) can replace wx2 with *;F,wx*z with the reaction schema *; = F,*1 (resp. replace *;w
+R.E Johnson, E. Winfree / Theoretical Computer Science 843 (2020) 84-114 107
+
+with *;wFrx2 and add the reaction schema *; = *;Fr), where m(F,) = m(Fr) = (€; 0). This argument implicitly makes
+use of the transitivity property of CRN bisimulation [27], which applies equally well to infinite CRNs and thus to PRNs. For
+example, it is simple to confirm that (for any reasonable &, e, &’, e’) {*,;AIBx*2 — *1C*2, *1 + *2 = *1]*2} is a correct
+(up to PRN bisimulation) implementation of {*;A + Bx2 — *;Cx2}, so by transitivity, any correct implementation of the
+former PRN will be a correct implementation of the latter. We also assume that ux;...x,v € L(e) > uy1... ymv € L(e);
+since e is local, this is easily checkable in terms of the corresponding compatibility relation o: we require that {z | (Zz, x1) €
+P} = {z| (Zz, v1) € pe}, and similarly {Zz | (Xn, Z) € 0} = {Z| (Ym, Z) € ep}. If this is not the case, we can replace this schema
+with multiple schemata of the form +1X0X1 ...XnX—1 *2 +++: > *1X0 V1... VmX—1 *2 +--+ for every combination xg and x_4
+allowed by ¢ (and consider each such schema separately), each of which trivially satisfies the condition. Such a replacement
+will again be a correct implementation up to bisimulation of the original single schema, and again transitivity applies. Given
+an implementation of each reaction schema in a formal PRN, combining the implementation reaction schemata will produce
+a correct implementation of the formal PRN; this relies on the modularity property of CRN bisimulation [27], and in fact
+the implementation we give will satisfy the condition for modularity to hold.
+
+Given a formal reaction schema of the above form, we can implement it as follows: use *;AB*2 = *;CEx 2 and/or
+*1 A *2 +B = *1Cx2 trivial reactions to combine all reactants into two monomers on one polymer; use a «1 ABx2 > *1CDx2
+reaction to convert those two into two monomers representing the products; finally use the reverse of the first process to
+separate those into the intended products. In the implementation CRN we have a monomer a for each formal monomer
+A, and a monomer for each prefix w of x, y, or any r; or pj. (If a string w is a prefix of multiple such strings, they will
+use the same w monomer.) We have an implementation monomer E with m(E) = (€,@), and reaction schemata *; = *1E
+and *«;wEx2 = *;Ewx2 for every prefix monomer w (including formal monomers as prefixes of length 1). Where w is a
+prefix of any of the above and WA is the next prefix, we have a reaction schema «1 WAx2 = *,E(WA)x2, where wA on the
+left means the two monomers w and A while (WA) on the right means the one monomer for the prefix wA; with these
+schemata, we can collect, reversibly, any prefix of any individual reactant or product into one monomer. We have monomers
+r' for 1<i<k and p! for 1 <i <I; where 1; (resp. p;) refers to the “prefix” monomer that is the entire string of the formal
+species r; (resp. pj) and r? = p® = E, we have reaction schemata *yr'~! x9 +1; = «yr! (resp. *,p'~! *2 +p; = *1 p!*2);
+with these schemata, we can collect, reversibly, all reactants or products into two monomers on one polymer. Finally, we
+have a reaction schema to convert the two monomers representing the reactants into the two monomers representing the
+products: where x (resp. y) is the prefix monomer for the entire string x1...X, (resp. y1... Ym), we have the reaction
+schema *11*x:2 — *1p! yx. As an edge case, if n = 0 the reactants of that last reaction are *;r*x>, if k=O the reactants
+are *1X*2, and ifn —=k=0 the reactants are *;Ex*2; the products are treated similarly if m and/or |=0. We let e’ = (x’)*;
+anything can bind to anything else, but we rely on the reaction schemata to keep the polymers formally valid and the
+consistency condition to ensure that they do. We show that this is a correct implementation, according to modular PRN
+bisimulation up to reachability, of the given formal reaction schema.
+
+To show that this implementation is correct, we construct an interpretation; show that it satisfies the consistency
+condition; then show that it satisfies the atomic, delimiting, permissive, and modularity conditions. The interpretation is in-
+tuitive: where w is an implementation monomer that is a string of formal monomers, m(w) = (w; @), m(r') = (e; via rj),
+
+m(p') = (e; via pj), and m(E) = (€,%). The consistency condition then follows from the assumption that {Xo | (xo, X1) €
+P} = {xo | (Xo, v1) € EP} and {x_q | (Xn, xX_1) € EC} = {X_1 | (Vm, X-1) € pe}: the only reaction schema that changes the z-
+interpretation of any polymer is the intended formal schema, *11r*xx2 > 1 ply x2, which replaces an x; after *; and xp
+before «2 with y, after *; and ym before *2. (The *,r’~! x2 +r; = *yr'x2 and similar p' schemata create and destroy z-
+interpretations, but those rj; and p; are by assumption valid formal species.) This allows m as a CRN interpretation to be
+defined.
+
+The atomic condition follows from the polymer atomic condition, which is satisfied by the formal monomers as imple-
+mentation monomers. The delimiting condition follows from the polymer delimiting condition: it is simple to confirm that
+all reaction schemata are syntactically interpreted as trivial except *rx*2 — +1 p!y*2, which is syntactically interpreted
+as the single formal reaction schema. To prove the permissive condition, it is simpler to prove the modularity condition
+first, with respect to all formal species as common formal species and all polymers made of only formal species as com-
+mon implementation species. We thus show that any implementation species can be decomposed, via trivial reactions, into
+common implementation species. Given an arbitrary non-common implementation species, decompose it as follows: first,
+use 472 > *yr'—! x2 +17; and +1 p!*2 > *,p'—!*x2 schemata to produce a set of species with only prefix monomers and E
+monomers. Observe that *; = *,;E and *«;wEx2 = *,;Ewx 2 schemata can take any such polymer to any other such polymer
+with the same sequence of prefix monomers interspersed with any pattern of E’s. In particular, for each polymer in the cur-
+rent decomposition, take that polymer to one where each prefix monomer wi is to the right of exactly |w| — 1 E monomers.
+From such a state, *;E(wA)*2 — *1wAx2 schemata will produce polymers with only formal monomers, finishing the de-
+composition to only common implementation species.
+
+Given that every non-common implementation species can be decomposed via trivial reactions to common implemen-
+tation species, we need only prove the permissive condition from minimal states consisting of only common species.
+For each formal reaction, i.e. each choice of w; and wy to be substituted for *; and +2, exactly one such minimal
+state exists: W1X1...%,W2 +11 +--:+ 1p. This minimal state implements the formal reaction by the intuitive path:
+*1WAx2 > « E(WA) 9 reactions to reach wyE"~ xw2 (in the edge case where k>1 and n= 0 or n=1, use *; > *1E
+and *1WEx2 — *;Ewx2 to reach w,Exwz2); *47r'~! *2 +r; > *117!*2 reactions with the initial r? = E on the E directly to
+108 R.E Johnson, E. Winfree / Theoretical Computer Science 843 (2020) 84-114
+
+the left of x, reaching w,E"~2r*xwz (in the edge case k = 0 ignore this step; in the edge case n <2 the result will be
+wirkxw2); then the reaction w,E"~2rkxw2 > w1E"-2p! yw is enumerated from *,r*x*2 — +p! yx2 and is interpreted as
+W 1X1...XnW2 +17 +--+ +re > W1y1-..Y¥mW2+pi+-::-+p), satisfying the permissive condition. Any minimal state within
+this module implements that formal reaction by first decomposing all non-common implementation species then following
+the above path; any minimal state from outside this module satisfies the permissive condition by the modularity theorem;
+
+so this completes the proof that this interpretation is a PRN bisimulation up to reachability. O
+
+Initially we expected the class of single-locus PRNs would be closed under PRN bisimulation, but quickly found a coun-
+terexample: a formal PRN with reaction schemata A *; X > A x*; Y and B *; X > B x; Z is not single-locus, but can
+be implemented by single-locus reaction schemata *;X4 — *;y and *4Xg — *1Z where z(x4) = (xg) = X, W(y)=Y,
+mz (Z) = Z, if the implementation compatibility relation guarantees that x4 can only appear in a polymer whose interpreta-
+tion begins with A, and xg only in a polymer whose interpretation begins with B. Intuitively, a single-locus implementation
+schema has “computational power” equal to the computational power of its formal syntactic interpretation (in the sense of
+the polymer delimiting condition, Theorem 2.3) plus that of the regular expression restriction. (Given Lemma 2.2, this extra
+power would still be present had we defined PRNs using compatibility relations instead of regular expressions.) It is also
+important to note that in Definition 2.13 we defined PRN bisimulation as roughly a (7, jz) polymer interpretation whose
+induced CRN interpretation m is well-defined and is a CRN bisimulation, which cares about the set of implementation and
+formal reactions but not about the set of reaction schemata from which they were enumerated. Thus our statement about
+closed classes takes the form, “given a (possibly infinite) formal CRN and a single-locus implementation PRN with polymer
+interpretation that is a CRN bisimulation, the set of formal reactions is equal to the set of reactions enumerated from some
+set of augmented single-locus formal reaction schemata”.
+
+The proof given below requires m to use the wildcard-based interpretation (Definition 2.10) because it depends on,
+for each implementation schema, “syntactically interpreting” it to create a formal schema. Conveniently, the definition of
+single-locus schema implies that the multisets of wildcards in reactants and in products of a schema are equal, so the
+wildcard-based interpretation is defined for any reaction that can only be enumerated in one way from one schema. The
+process of “syntactically interpreting” a schema inherently interprets wildcards as wildcards, discarding any members of
+the j-interpretation of monomers in wildcards, thus naturally corresponding to the wildcard-based interpretation, which is
+why we argue that is the “natural” definition of what is a spurious catalyst in a polymer reaction. If an alternate spurious
+catalyst interpretation is used, the proof and/or the theorem may or may not hold; we suspect a sufficiently complex
+spurious catalyst interpretation may effectively add “non-single-locus behavior” to a PRN, in which case we would not even
+want the theorem to hold.
+
+Theorem 5.2. Let (’, e’, &’) be a single-locus implementation PRN, (x, e) a formal species schema, and Fe a set of formal reactions
+such that (S(X, e), 7) is a formal CRN. Let (zr, 4) be a polymer interpretation between the above species schemata that satisfies
+the consistency condition and whose induced interpretation m, using the wildcard-based interpretation for spurious catalysts in each
+reaction, is a CRN bisimulation. Then there is some set Yo of augmented single-locus reaction schemata such that R(X, e, Vo) =F.
+Conversely, given an augmented single-locus PRN (X, e, Yo) there is an implementation PRN (x’, e’, &’) where all schemata in W’ are
+of the types described in Theorem 5.1 with PRN bisimulation interpretation (zr, j1). If e is local, then (x’, e’, ©’) is single-locus, and
+further (X’, (X’)*, W’) is also single-locus and the same (zr, ,2) defined on that PRN is a PRN bisimulation up to reachability.
+
+Proof. Given (d’,e’, ¥’), (X,e), R, and (7, ww), we produce a set Wo of augmented single-locus reaction schemata with
+R(X, e, Yo) =F. Recall the concept of “syntactically interpreting” a reaction schema, as used in Theorem 2.3: replace each
+implementation monomer with its z-interpretation and add its «-interpretation to the appropriate side of the reaction
+schema, producing a reaction schema defined in terms of formal monomers. The desired Wo is the set of syntactic interpre-
+tations yy; of each reaction schema w; € W’ (which, given that syntactic interpretations preserve the placement of wildcards,
+will be single-locus). For each *; (or *2) in Wi , because the schema is single-locus, it appears as either *1x’..., ...x/1, *1*2,
+or *; alone. In either case, the set of possible implementation sequences preceding or following some x’, or forming the
+first (or last) part of a polymer, or forming an entire polymer, can be described by a regular expression over »’. The regular
+expression restriction e; (or ej,2) is obtained from this regular expression by replacing each implementation monomer
+with its z-interpretation.
+
+It follows from the three conditions of CRN bisimulation that the set of formal reactions 7 equals the set of nontrivial in-
+terpretations of implementation reactions in R(>’, e’, W’). (If a satisfies the consistency condition but not the compatibility
+condition, then this is true for the set of nontrivial interpretations of implementation reactions whose reactants are inter-
+preted as valid formal species.) Then given any reaction enumerated from some w; € W’ (with the above condition if 7 only
+satisfies the consistency condition), its interpretation will be enumerated from the corresponding w;: whatever values x
+and x2 take in the implementation enumeration, their z-interpretations will be the values of *; and x2 in the formal enu-
+meration. Those values, by construction, will satisfy the regular expressions e;,; and e;.2, and the full (i.e., combining z and
+j) interpretation of the monomers in yw; will be the monomers and extra polymers in w;; the compatibility or consistency
+condition, as appropriate, ensures that the formal interpretations match e so that the reaction is in fact enumerated. (If the
+j.-interpretation of implementation monomers in *; or «2 is nonempty, then those monomers will appear as both reactants
+and products, and its wildcard-based interpretation, which must appear in 72 for m to be a CRN bisimulation, is the reaction
+R.E Johnson, E. Winfree / Theoretical Computer Science 843 (2020) 84-114 109
+
+without those spurious catalysts.) Given any reaction enumerated from some yj; € Wo, similarly consider the corresponding
+y; € ’. By construction, the regular expression restrictions on yj; represent all strings that are 7-interpretations of some
+string of implementation monomers that would be a valid substitution for the appropriate wildcard; those strings for the
+formal values of *; and «2 will be the implementation values of *; and x*2. Recalling that the spurious catalysts definition
+of bisimulation removes nonempty j/-interpretations, the interpretation of the implementation reaction so produced will be
+the formal reaction in question. Thus the set of reactions enumerated from Wg with restrictions is the set of interpretations
+of nontrivial reactions enumerated from ’, which since m is a CRN bisimulation is equal to ?.
+
+Given a formal augmented single-locus PRN (2%, e, {y}) with one reaction schema, we construct an unaugmented imple-
+mentation PRN (>’, e’, ’) and PRN bisimulation interpretation (7, 4), where every reaction schema in W’ is single-locus,
+and if e is local then so is e’. Given Theorem 5.1 and the transitivity and modularity results, this is sufficient to prove the
+statement of this theorem. Effectively, we will construct an implementation PRN that uses (non-augmented) single-locus
+trivial reactions to check that the wildcards satisfy their regular expression restrictions, and if the check passes, imple-
+ments w. The information that the check passed will be stored next to the “single locus” that w affects, thus making the
+implementation single-locus without augmentation.
+
+Say w takes the form *4X1...Xn *2 +fy +--+ + 1p > *1Y1--- Ym *2 +P1 +---+ py, where some x; and/or yj; may be +
+(if *; and «2 are on different polymers), and «1 is restricted to match the regular expression e; while *2 must match ep.
+Let M; be an NFA recognizing e; and M2 an NFA recognizing the reverse of e2. Let &’ be & together with, for each x € X
+and q a state in M, or Mp2, two additional species xg and Xq: Construct e’ as the intersection of two regular expressions as
+follows. First, replacing each xg and x, with x should produce a string that matches e. Second, starting from the leftmost
+
+q
+monomer may trace a valid partial computation of M, as follows: k — 1 monomers of the form (Xi)g,> 0 <i<k, followed
+
+by a monomer (Xx)g,, such that where qo is the start state of M1, qi-1 “, qi for 1 <i<k; and starting from the rightmost
+monomer reading right-to-left may trace a valid partial computation of M2 in the same manner, while between these partial
+computations only monomers x € & appear. Observe that because the partial computation regular expression is local, if e is
+local then so is e’.
+
+W’ will have reversible reaction schemata
+
+x
+X*1 = Xq *1 for (F,xX) © P, do:m, > W
+
+and
+
+y
+#1 XqV*2 = *1X_ Vs *2 for (x,y) €p,q>seMy
+
+to simulate Mj; similarly
+
+x
+1X = 1Xq for (x, 4) € P, do:m, > 9
+
+and
+
+x
+«1 XYqk2 = *1XsVq *2 for (x,y)€ Pp, q>sEeMo
+
+to simulate M2; and
+
+1 XgX1...XnVs *2 +11 +++ +e > *1XgV1--- Vm Vs *2 +P1 +-°+ + Pl
+
+for any pair of formal monomers (x, y) and any pair (q,s) of accepting states of M; and Mp respectively. (For clarity, in
+that last reaction schema xX; ...Xn and y1... Ym are the monomers in & that appear in y, while xg, ys, etc. are monomers
+x, y € & subscripted with NFA states.) The polymer interpretation will have
+
+7 (X) = 1 (Xq) = 1 (X_) =X
+
+and
+
+[U(X) = [L(Xq) = (xq) =D
+
+for all x, q.
+
+The construction of e’ implies that 2 satisfies the compatibility condition, and © C »’ with strings matching e also
+matching e’ implies the atomic condition. For the delimiting condition, first, any reaction enumerated from one of the
+reversible reaction schemata will be trivial. For any reaction enumerated from the last schema, which matches the formal
+schema, to be made of valid implementation species, it must have *;xX, be an accepting computation of M, and y;x*2
+(the reverse of) an accepting computation of M2, implying that the corresponding formal strings match e; and e2. The
+Same requirement implies that the interpreted string matches e, which means that the interpreted formal reaction is a
+reaction enumerated from wy with the restrictions; thus the delimiting condition is satisfied. For the permissive condition,
+observe that any implementation polymer containing partial computations can reverse itself to a formal polymer, thus
+proving modularity (with respect to both sets of common species being S). Starting from only formal polymers whose
+110 R.E Johnson, E. Winfree / Theoretical Computer Science 843 (2020) 84-114
+
+interpretation can implement a reaction enumerated from W, the applicable implementation polymers can use the reversible
+reaction schemata to simulate M, on the beginning and Mp2 on the end, at which point the nontrivial schema applies and
+the formal reaction can be implemented.
+
+If e is not local, then applying Theorem 5.1 with transitivity and modularity to any number of reaction schemata in
+(Xx, e, Wo) produces a (>’,e’, W’) with single-locus schemata in W’ (since the classes of schemata in Theorem 5.1 are all
+single-locus), but the PRN itself is not single-locus since e’ is not local. However, if e is local, then so is e’, so the same
+(x’, e’, W’) is single-locus. In that case, given the compatibility relation o that is equivalent to e, we can remove from the
+Ww’ any schema where the interpretations of two adjacent monomers are not compatible according to p. (For example, the
+last schema would only be present for (x, x1), (Xn, y), (X, ¥1), and (ym, y) all € po.) Since we are no longer relying on e’ to
+ensure that enumerated reactions respect e, we can define a PRN (’, (X’)*, W’) and guarantee that (7, 1) defined on that
+PRN will satisfy the consistency condition, since the only reaction schemata defined are those that respect o everywhere
+outside the wildcards and leave monomers adjacent to wildcards unchanged. For the same reason as shown in Theorem 5.1,
+this (77, 2) is a PRN bisimulation up to reachability. O
+
+While, as mentioned above, the class of single-locus PRNs are not closed under PRN bisimulation, combining Theorem 5.2
+with the transitivity of PRN bisimulation provides us with the desired related result that the class of augmented single-locus
+PRNs are closed under PRN bisimulation.
+
+Corollary 5.3. Let (x’, e’, &’) be an augmented single-locus implementation PRN, (x, e, VY) a formal PRN, and (zr, j1) a PRN bisimu-
+lation interpretation. Then R(X, e, V) = R(X, e, Vo) where (X, e, Vo) is an augmented single-locus PRN.
+
+6. Alternate polymer models and extended models
+
+In defining linear Polymer Reaction Networks and PRN bisimulation, we made various choices of model properties.
+Alternative choices would have led to different models, some of which would have similar theorems applicable, some of
+which would have had different results. Here we briefly discuss two of those alternative choices, and what effects they
+would have had on the above theory.
+
+6.1. Altered wildcards
+
+Recall again the one-step and local string copying and comparison models in Fig. 3. As opposed to the previous section,
+here we pay attention to what behaviors we can define if we don’t care about single-locus restrictions on wildcards. If we
+want to copy, move, or remove an arbitrary polymer, or compare two polymers, wildcards as defined can do that:
+
+*y + P> *1 +%1, +P
+
+On the other hand, consider a simplified model of RNA polymerase, written (in not-yet-defined notation) as:
+
+*1{A,T,C,G}+ P > *14+-P+x*;[A—-a,T—->u,C->c,G—- g]
+
+Here RNA polymerase acting on a polymer made up of the DNA bases A, T, C, and G produces a copy replacing each
+DNA base with the corresponding RNA base a, u, c, or g, similar to the result of the string copying local model. String
+transcription is not significantly stranger than string copying, and it seems reasonable to construct a model that, if it can
+describe one as a one-step process, can do the same for both. We might similarly want to model effects that have a
+wildcard and its reverse, such as polymerase reverse-copying a single strand of DNA, or a stack and its reverse meeting and
+annihilating each other (also shown as a multi-step mechanism in Fig. 3), or possibly other transformations of wildcards.
+
+One way to define such a model is as follows: In a reaction schema, each wildcard +; must, in exactly one spot in the
+reactants, be written *;{Ai,..., An}, for some set of monomers {Aj}. (As a notational convenience, *;{2X} can be written as
+just *;.) At any other point in the reactants and/or products where *; appears, it can appear as «;[A; — By,..., Ap — Bgl,
+and/or be tagged *;°". Such a schema is enumerated as follows: *;{A1,..., An} is replaced by a string w; containing only the
+Aj’s, and modified instances of *; are replaced by w; reversed and/or with each Aj replaced by Bj, as appropriate. Other
+tags, with the same syntax as reverse and with corresponding modifications in the semantics, could be defined as necessary.
+More generally, wildcards in reactants and products could be related by finite state transducers [45]. Schemata that use these
+features, however, would seldom be single-locus, since these features involve reading and/or writing arbitrarily large strings
+in the wildcards.
+
+Mostly, the main content of this paper is orthogonal to this aspect of the model. A PRN with this extension is still
+enumerated into and treated as a (probably infinite) CRN; PRN bisimulation is still defined as previously discussed; the
+hardness results still apply. Single-locus PRNs are defined (as they should be) to exclude these features, so those results are
+similarly unaffected. Overall, we did not define PRNs with these features because we did not need these features to discuss
+the DNA stack machine, but the model should handle these features without too much difficulty.
+
+It is also of interest when physically rotating a polymer in a way that reverses left and right causes the same molecule
+to be described by a different string of monomers. For example, say we want to represent fully double-stranded DNA as a
+R.E Johnson, E. Winfree / Theoretical Computer Science 843 (2020) 84-114 111
+
+linear polymer, and we let the monomer T represent a T base on the top strand paired with an A on the bottom strand,
+and similarly for A, C, and G. Then e.g. the strings TGGC and GCCA represent the same physical molecule, and any good
+model should recognize that. To handle this we could say that in a rotatable PRN, there is some function on monomers
+x — x’ with (x°)' =x, which extends to polymers such that (uv)! = u'v‘, and the species of the enumerated CRN are pairs
+of equivalent strings {w, w'}. Reactions are enumerated from schemata such that for some substitution into the wildcards,
+whatever strings are produced, the pairs containing those strings are the CRN species involved in the enumerated reaction.
+This requires intuitive restrictions on the compatibility relation, (x, y)€ 0 <=> (y',x') € o where K’ =H, and on polymer
+interpretations, 7 (x') = (x)! and y(x') = w(x). The rest of the theory should be compatible without further changes. As
+an example, if the string-reverse detection local model from Fig. 3 is taken as a rotatable PRN with 0; =0,, 1) =1;, S'=S,
+and Y' =Y, then it will identify a string over {0), 1;} with its reverse over {0,,1,}, and two copies of the same such string
+will go through the mechanism that eventually produces Y.
+
+6.2. Branched polymers
+
+Examples of Turing-universal computation used in molecular programming, such as register machines [13,51], stack
+machines [42,33], and Turing machines themselves [43,55], tend to be linear, so we studied a system of linear PRNs: each
+monomer can bind to at most two other monomers, and we can write a polymer as a string of monomers. We could
+instead have allowed each monomer to make either an arbitrary number of bonds, or up to some finite (characteristic of the
+monomer) number of bonds, either of which would allow us to model much more general systems. Such an approach would
+present some complications for defining reaction schemata, and present further complications for defining bisimulation, but
+we believe those complications are all solvable.
+
+The obvious way to extend our definition of linear Polymer Reaction Networks to more general PRNs is effectively a
+graph-rewriting system with wildcards [44]. In this sense, a (linear) polymer reaction schema such as +1;A *2 +B —> *1Cx2
+is already a graph rewriting rule, where all graphs must be lines, and this is a straightforward generalization. Two examples
+of this would be:
+
+“1 (D) ©)
+*1 2
+(BB) )
+
+*Q*3
+*3
+
+When we defined polymer interpretations for PRN bisimulation, we defined a z-interpretation and a j-interpretation.
+With linear polymers, it was easy to say that, given a string of monomers, we interpret them by concatenating their 7 -
+interpretations. The equivalent for nonlinear polymers, if a monomer’s z-interpretation is anything other than a single
+monomer, is not obvious. One solution might be to say that each monomer must have a finite set of “faces”, i.e. potential
+bonds, and for each face of an implementation monomer, its z-interpretation specifies a face of a formal monomer in
+the z-interpretation to correspond to that implementation face. As a special case, we could say that an implementation
+monomer whose z-interpretation is € must have at most two faces, and if it has two faces both connected to something,
+the connections are connected to each other in the interpreted formal polymer. This concept of faces would also solve a
+similar problem with defining the compatibility relation, and would allow linear PRNs as defined above to be a subcase of
+branched PRNs, where every monomer has exactly two faces, “left” and “right”. The rest of the theory of PRN bisimulation
+should extend naturally to branched PRNs. To develop this idea into a working theory, chemistry-inspired graph rewriting
+approaches might be a good place to start [1 ].
+
+Single-locus PRNs can be defined for branched PRNs, and in fact can be defined in a somewhat more natural way than
+for linear PRNs. Recall Definition 5.1 of linear single-locus PRNs, in particular condition (iii), that no two distinct wildcards
+appear at the beginning of a polymer, and similarly for the end. This definition was motivated by that, when imagining a
+physical implementation of a single-locus reaction schema, such an implementation of a schema that violates condition (iii)
+would require an intermediate step that is not linear. When the underlying PRN model allows branched polymers, this is
+not as much of a problem. For branched PRNs, we would define single-locus reaction schemata as follows: (i) any wildcard
+that appears at all, appears exactly once in the reactants and exactly once in the products, and (ii) all wildcards have at
+most one bond. (Of the above branched reaction schemata, the first is single-locus and the second is in multiple ways not
+single-locus.) We suspect a theorem similar to Theorem 5.1 would be provable for branched single-locus PRNs.
+
+The Biochemical Ground Form (BGF), discussed by Cardelli and Zavattaro [13], serves as an example of what a branched
+polymer model could look like. (The concept of faces, for example, corresponds roughly to association labels in the BGF.) The
+112 R.E Johnson, E. Winfree / Theoretical Computer Science 843 (2020) 84-114
+
+BGF, instead of graph rewriting reaction schemata, defines reactions in terms of the actions of different “agents” (monomers),
+some of which may require coordination with other agents. Implicitly, if a monomer A can take an action a, it can do so
+regardless of what that monomer is bound to, which in our way of writing means every reaction (schema) has all possible
+wildcards. In particular, we suspect every BGF system could be written a single-locus branched PRN. The BGF as described
+has no mechanism for a monomer to coordinate specifically with another monomer bound to it, as opposed to another monomer
+of the specific type that may be on a different polymer; with such a mechanism, we suspect but have not proven that the
+BGF could implement, up to bisimulation, any single-locus branched PRN.
+
+Extending bisimulation from branched polymers to molecules with arbitrary graph topology, again with reactions imple-
+mented as graph rewriting rules [44,1], would also be an interesting research direction. Indeed, certain types of bisimulation
+for graph grammars have been studied [6].
+
+6.3. Relation to string rewriting models
+
+Linear Polymer Reaction Networks have a number of close connections to string rewriting systems [8], not the least
+of which being that objects are simply represented as strings. For example, semi-Thue systems, which allow derivations
+wherein at each step a substring u; from a given set is replaced by the corresponding v;, can be modeled exactly by a PRN
+with the unimolecular reactions *,uj*2 — *1Vj;*2. Semi-Thue systems are already Turing universal [40]. (For example, the
+copy-tolerant Turing machine in Fig. 3 illustrates this point.) Not only do PRNs allow a wide range of rewriting operations,
+but they also allow bimolecular reactions and reactions with more than one product, making them in our opinion more
+appropriate and natural for modeling chemical reaction networks involving polymers (despite that the computational power
+is not increased). Similarly, branched Polymer Reaction Networks would be related to term rewriting systems [4] as the
+main representation is a tree; again, the notion of bimolecular reactions and counts of species are novel to the chemistry
+context.
+
+L-systems [41] are another related string rewriting model from the study of natural computing that has been used
+effectively to model growth processes ranging from chains of dividing bacteria to multicellular plant development. Like
+cellular automata, L-systems are one-dimensional and invoke a simultaneous parallel update semantics, but unlike cellular
+automata, each cell (character of the string) is replaced by either a length-1 string (cell state update) or a longer string
+(growth) or an empty string (death). While synchronous updates are not natural in the PRN model, unimolecular PRN
+reaction schemata can directly model asynchronous variants of both cellular automata and L-systems. More generally, our
+PRN model can be considered an example of a string-based artificial chemistry [19,22].
+
+7. Discussion
+
+Our main claim is that polymer CRN-like systems are a strong candidate for powerful and practical molecular com-
+putation; that formal verification is useful for systematic construction of (eventually, large) polymer systems; and that
+bisimulation is a useful technique in formal verification of polymer systems. To show this, we defined a model of linear
+Polymer Reaction Networks, and defined PRN bisimulation based on that model. We proved some useful properties of PRN
+bisimulation; we showed how to use PRN bisimulation to verify an existing system; and we showed an example of how
+PRN bisimulation can identify good design strategies for implementing a large class of systems. Although we did all of this
+within the model of linear PRNs, we discussed how PRN bisimulation is likely to be applicable, and our results translatable,
+to other models of polymer CRN-like systems. Thus, even if this model of linear PRNs is not the optimal model for polymer
+systems in molecular programming, the concept of PRN bisimulation will likely remain useful.
+
+Our definition of PRN bisimulation interprets each state of the implementation system as a state of the formal system,
+and checks whether, from any initial state, the possible trajectories of the two systems are equivalent under that interpreta-
+tion. However, it ignores quantitative aspects of the system such as rate constants, meaning PRN bisimulation says nothing
+about the kinetics of the system (i.e. how long things take) or the probabilities of the various possible trajectories. It also
+assumes that the model of the implementation system as a PRN is accurate, and the model we used in this case ignores the
+“leak reactions” and other side reactions typical of DNA strand displacement systems; with no way to distinguish between
+likely and unlikely reactions, PRN bisimulation evaluated on a model including leak reactions would say that the imple-
+mentation is incorrect. This means that when an implementation is proven correct according to PRN bisimulation, we know that a
+specific class of its behavior is equivalent to the corresponding behavior of its specification (formal PRN), namely the rate-independent
+behavior up to (if applicable) whatever model we used to describe the implementation system as an implementation PRN. In systems
+such as stack machines and Turing machines, the rate-independent behavior is the only relevant behavior of the abstract
+system, so PRN bisimulation proves that the implementation has the behavior we want. In systems such as oscillators or
+dynamic instability, while PRN bisimulation can prove some correspondence between the implementation and the abstract
+system, it may not be able to say anything about the kinetics that imply the relevant behavior. (Whether an extension of
+PRN bisimulation can take kinetics into account is, as it is for CRN bisimulation [27], an important open question.) Intu-
+itively we expect that for “systematic implementations” such as the stack machine or the various CRN translation schemes,
+if the scheme has no qualitative (i.e., detectable by CRN/PRN bisimulation) errors then its kinetics are “close enough” to
+and/or can be tuned to match those of the abstract system. Experimental implementations such as the CRN oscillator by
+Srinivas et al. [49] suggest this is the case, and the experiments of Chen et al. [17] demonstrate an experimentally working
+R.E Johnson, E. Winfree / Theoretical Computer Science 843 (2020) 84-114 113
+
+CRN even when CRN bisimulation identifies a potential error (that, presumably, averages out). In our experience, polymer
+systems (compared to well-mixed CRNs) are more likely to depend on rate-independent computation and not care about
+kinetics; for example, well-mixed CRNs require kinetics to approximate the behavior of “A happens, then B happens”, while
+polymer systems can use geometric separation to achieve the same thing with less probability of error. (This is more often
+true for polymer systems that simulate classic models of computation than for those found in biology.) Consequently, while
+PRN bisimulation cannot prove correct every relevant aspect of an implementation PRN in general, it is a useful tool to
+verify the important aspects of many useful polymer systems.
+
+The simplest thing to do with PRN bisimulation is to, given one formal PRN and one putative implementation, verify by
+hand that the implementation matches the formal PRN. We demonstrated an example of this with the DNA stack machine
+from Qian et al. [42]. (Lakin and Phillips [33] also provide verification of their improved DNA stack machine implementation,
+but unlike our symbolic approach that guarantees correctness for all possible inputs, their application of probabilistic model
+checking relies on explicit enumeration of the state space for specific inputs. This is likely to catch systematic errors in
+the implementation, but not guaranteed to.) We suspect that bisimulation can be used in more powerful ways, such as
+automated verification of systems too large to verify by hand, or as a basis for formal proofs that certain classes of systems
+will or will not be correct implementations of other classes, or as an intuition to guide designers of molecular devices in
+their search for correct implementations.
+
+As we would expect for a model equivalent in power to Turing machines, whether two systems are PRN bisimulation
+equivalent is undecidable in general, but this does not rule out any form of computer-aided verification. Exactly what form
+such verification could take, we don’t know, but we have two possibilities to suggest. The main problem that produces
+the undecidability result stems from the permissive condition, that for every formal reaction in any implementation state
+whose interpretation can do that reaction, the implementation state can implement the formal reaction after some sequence
+of zero or more trivial reactions. The problem is that there is no upper bound on the number of trivial reactions; the
+undecidability result uses a formal reaction that can be implemented only if a Turing machine computation made of trivial
+reactions halts. Systems intended to be built in practice typically use a small, and in particular bounded, number of trivial
+reactions per formal reaction. Based on this, the first suggestion is that some bound on the number of trivial reactions may
+give a definition of PRN bisimulation that is decidable or even tractable. Exactly what type of bound is best, and whether
+this idea covers all the physical implementations we care about, is unknown. Similarly, systems intended to be built in
+practice typically have a designer who knows how the system is intended to work, and can provide a “proof” that the
+permissive condition is satisfied, as we did for the DNA stack machine above. The hardness result shows that not every
+correct implementation will have a finite proof at all, let alone one that can be checked in reasonable time, but it may be
+that a large enough class of “reasonable” implementations does. How exactly such a proof should be specified, and what
+class of systems can be proven correct this way, is unknown.
+
+That formal verification methods such as PRN bisimulation can be used to guide design is a speculation of ours. We
+showed a concrete example of this idea with the proof that any “physically realistic” (single-locus) PRN can be implemented
+by five reaction schema “primitives”. This sort of result will likely be helpful for designing complex polymer systems,
+where whatever complex behavior the designer needs can be implemented in a known way with simple primitives, which
+themselves can be implemented in some known way yet to be discovered. We further hope that, with a formal definition
+in mind of what makes a correct implementation, someone designing physical implementations would have a better idea of
+what systems to design.
+
+Declaration of competing interest
+
+The authors declare that they have no known competing financial interests or personal relationships that could have
+appeared to influence the work reported in this paper.
+
+Acknowledgements
+
+The authors would like to thank Chris Thachuk, Damien Woods, Dave Doty, Seung Woo Shin, and Lulu Qian for helpful
+discussions. RF] and EW were supported by NSF grants 1317694, 1213127, and 0832824. RFJ was also supported by Caltech’s
+Summer Undergraduate Research Fellowship and an NSF graduate fellowship.
+
+References
+
+[1] J.L. Andersen, C. Flamm, D. Merkle, P.F. Stadler, A software package for chemically inspired graph transformation, in: International Conference on Graph
+Transformation, Springer, 2016, pp. 73-88.
+
+[2] D. Angluin, J. Aspnes, D. Eisenstat, Stably computable predicates are semilinear, in: Proceedings of the Twenty-Fifth Annual ACM Symposium on
+Principles of Distributed Computing, ACM, 2006, pp. 292-299.
+
+[3] D. Angluin, J. Aspnes, D. Eisenstat, A simple population protocol for fast robust approximate majority, Distrib. Comput. 21 (2008) 87-102.
+
+[4] F. Baader, T. Nipkow, Term Rewriting and All That, Cambridge University Press, 1999.
+
+[5] S. Badelt, C. Grun, K.V. Sarma, B. Wolfe, S.W. Shin, E. Winfree, A domain-level DNA strand displacement reaction enumerator allowing arbitrary non-
+pseudoknotted secondary structures, J. R. Soc. Interface 17 (2020) 20190866.
+
+[6] P. Baldan, A. Corradini, U. Montanari, Bisimulation equivalences for graph grammars, in: Formal and Natural Computing, Springer, 2002, pp. 158-187.
+
+[7] C.H. Bennett, The thermodynamics of computation—-a review, Int. J. Theor. Phys. 21 (12) (1982) 905-940.
+114 R.E Johnson, E. Winfree / Theoretical Computer Science 843 (2020) 84-114
+
+[8] R.V. Book, F. Otto, String-Rewriting Systems, Springer, 1993.
+[9] L. Cardelli, Two-domain DNA strand displacement, Math. Struct. Comput. Sci. 23 (2013) 247-271.
+
+[10] L. Cardelli, M. Tribastone, M. Tschaikowski, A. Vandin, Forward and backward bisimulations for chemical reaction networks, in: 26th International
+Conference on Concurrency Theory (CONCUR 2015), Schloss Dagstuhl-Leibniz-Zentrum fuer Informatik, 2015.
+
+[11] L. Cardelli, M. Tribastone, M. Tschaikowski, A. Vandin, Syntactic Markovian bisimulation for chemical reaction networks, in: Models, Algorithms, Logics
+and Tools, Springer, 2017, pp. 466-483.
+
+[12] L. Cardelli, M. Tribastone, M. Tschaikowski, A. Vandin, Comparing chemical reaction networks: a categorical and algorithmic perspective, Theor. Comput.
+Sci. 765 (2019) 47-66.
+
+[13] L. Cardelli, G. Zavattaro, On the computational power of biochemistry, in: Algebraic Biology, Springer, 2008, pp. 65-80.
+
+[14] G. Chatterjee, N. Dalchau, R.A. Muscat, A. Phillips, G. Seelig, A spatially localized architecture for fast and modular DNA computing, Nat. Nanotechnol.
+12 (2017) 920.
+
+[15] H.-L. Chen, D. Doty, D. Soloveichik, Deterministic function computation with chemical reaction networks, Nat. Comput. 13 (2014) 517-534.
+
+[16] H.-L. Chen, D. Doty, D. Soloveichik, Rate-independent computation in continuous chemical reaction networks, in: Proceedings of the 5th Conference on
+Innovations in Theoretical Computer Science (ITCS), 2014, pp. 313-326.
+
+[17] Y.-J. Chen, N. Dalchau, N. Srinivas, A. Phillips, L. Cardelli, D. Soloveichik, G. Seelig, Programmable chemical controllers made from DNA, Nat. Nanotechnol.
+8 (2013) 755-762.
+
+[18] A. Desai, T.J. Mitchison, Microtubule polymerization dynamics, Annu. Rev. Cell Dev. Biol. 13 (1997) 83-117.
+
+[19] P. Dittrich, J. Ziegler, W. Banzhaf, Artificial chemistries—a review, Artif. Life 7 (2001) 225-275.
+
+[20] A. Dobrinevski, E. Frey, Extinction in neutrally stable stochastic Lotka-Volterra models, Phys. Rev. E 85 (2012) 051903.
+
+[21] D. Doty, M. Hajiaghayi, Leaderless deterministic chemical reaction networks, Nat. Comput. 14 (2015) 213-223.
+
+[22] J.-L. Giavitto, G. Malcolm, O. Michel, Rewriting systems and the modelling of biological systems, Comp. Funct. Genomics 5 (2004) 95-99.
+
+[23] D.T. Gillespie, Exact stochastic simulation of coupled chemical reactions, J. Phys. Chem. 81 (1977) 2340-2361.
+
+[24] G.T. Herman, Strong computability and variants of the uniform halting problem, Math. Log. Q. 17 (1971) 115-131.
+
+[25] A. Hjelmfelt, E.D. Weinberger, J. Ross, Chemical implementation of neural networks and Turing machines, Proc. Natl. Acad. Sci. 88 (1991) 10983-10987.
+
+[26] H.B. Hunt III, D.J. Rosenkrantz, T.G. Szymanski, On the equivalence, containment, and covering problems for the regular and context-free languages, J.
+Comput. Syst. Sci. 12 (1976) 222-268.
+
+[27] R.F. Johnson, Q. Dong, E. Winfree, Verifying chemical reaction network implementations: a bisimulation approach, Theor. Comput. Sci. 765 (2019) 3-46.
+
+[28] N.D. Jones, LH. Landweber, Y.E. Lien, Complexity of some problems in Petri nets, Theor. Comput. Sci. 4 (1977) 277-299.
+
+[29] R.M. Karp, R.E. Miller, Parallel program schemata, J. Comput. Syst. Sci. 3 (1969) 147-195.
+
+[30] D. Kozen, Automata and Computability, Springer, 1997.
+
+[31] S. Kurtz, S. Mahaney, J. Royer, J. Simon, Biological computing, in: Complexity Theory Retrospective II, 1997, pp. 179-195.
+
+[32] M. Lachmann, G. Sella, The computationally complete ant colony: global coordination in a system with no hierarchy, in: F. Moran, A. Moreno, J.J.
+Merelo, P. Chacon (Eds.), Advances in Artificial Life: Third European Conference on Artificial Life, Springer, 1995, pp. 784-800.
+
+[33] M.R. Lakin, A. Phillips, Modelling simulating and verifying Turing-powerful strand displacement systems, in: L. Cardelli, W. Shih (Eds.), DNA Computing
+and Molecular Programming, in: Lecture Notes in Computer Science, vol. 6937, Springer, 2011, pp. 130-144.
+
+[34] M.R. Lakin, D. Stefanovic, A. Phillips, Modular verification of chemical reaction network encodings via serializability analysis, Theor. Comput. Sci. 632
+(2016) 21-42.
+
+[35] M.R. Lakin, S. Youssef, F. Polo, S. Emmott, A. Phillips, Visual DSD: a design and analysis tool for DNA strand displacement systems, Bioinformatics 27
+(2011) 3211-3213.
+
+[36] J. Leroux, Vector addition systems reachability problem (a simpler solution), in: EPiC, vol. 10, 2012, pp. 214-228.
+
+[37] S. Lin, T. Rado, Computer studies of Turing machine problems, J. ACM 12 (1965) 196-212.
+
+[38] M.O. Magnasco, Chemical kinetics is Turing universal, Phys. Rev. Lett. 78 (6) (1997) 1190-1193.
+
+[39] A.R. Meyer, L.J. Stockmeyer, The equivalence problem for regular expressions with squaring requires exponential space, in: IEEE Annual Symposium on
+Switching and Automata Theory, IEEE, 1972, pp. 125-129.
+
+[40] E.L. Post, Recursive unsolvability of a problem of Thue, J. Symb. Log. 12 (1947) 1-11.
+
+[41] P. Prusinkiewicz, A. Lindenmayer, The Algorithmic Beauty of Plants, Springer-Verlag, 1990.
+
+[42] L. Qian, D. Soloveichik, E. Winfree, Efficient Turing-universal computation with DNA polymers, in: Y. Sakakibara, Y. Mi (Eds.), DNA Computing and
+Molecular Programming, in: Lecture Notes in Computer Science., vol. 6518, Springer, 2011, pp. 123-140.
+
+[43] L. Qian, E. Winfree, Parallel and scalable computation and spatial dynamics with DNA-based chemical reaction networks on a surface, in: S. Murata, S.
+Kobayashi (Eds.), DNA Computing and Molecular Programming, in: Lecture Notes in Computer Science., vol. 8727, Springer, 2014, pp. 114-131.
+
+[44] G. Rozenberg, Handbook of Graph Grammars and Computing by Graph Transformation, vol. 1, World Scientific, 1997.
+
+[45] D.B. Searls, Linguistic approaches to biological sequences, Bioinformatics 13 (1997) 333-344.
+
+[46] S.W. Shin, C. Thachuk, E. Winfree, Verifying chemical reaction network implementations: a pathway decomposition approach, Theor. Comput. Sci. 765
+(2019) 67-96.
+
+[47] D. Soloveichik, M. Cook, E. Winfree, J. Bruck, Computation with finite stochastic chemical reaction networks, Nat. Comput. 7 (2008) 615-633.
+
+[48] D. Soloveichik, G. Seelig, E. Winfree, DNA as a universal substrate for chemical kinetics, Proc. Natl. Acad. Sci. 107 (2010) 5393-5398.
+
+[49] N. Srinivas, J. Parkin, G. Seelig, E. Winfree, D. Soloveichik, Enzyme-free nucleic acid dynamical systems, Science 358 (2017) eaal2052.
+
+[50] LJ. Stockmeyer, A.R. Meyer, Word problems requiring exponential time (preliminary report), in: Proceedings of the Fifth Annual ACM Symposium on
+Theory of Computing, STOC, ACM, New York, NY, USA, 1973, pp. 1-9.
+
+[51] A. Tai, A. Condon, Error-free stable computation with polymer-supplemented chemical reaction networks, in: C. Thachuk, Y. Liu (Eds.), DNA Computing
+and Molecular Programming, in: Lecture Notes in Computer Science, vol. 11648, Springer, 2019, pp. 197-218.
+
+[52] AJ. Thubagere, W. Li, R.F. Johnson, Z. Chen, S. Doroudi, Y.L. Lee, G. Izatt, S. Wittman, N. Srinivas, D. Woods, E. Winfree, L. Qian, A cargo-sorting DNA
+robot, Science 357 (2017) eaan6558.
+
+[53] RJ. Van Glabbeek, The linear time-branching time spectrum IJ. The semantics of concrete, sequential processes, in: Handbook of Process Algebra,
+Elsevier, 2001, pp. 3-99.
+
+[54] E. Winfree, http://www.dna.caltech.edu/ReactionSchemaSimulator/.
+
+[55] W. Yahiro, M. Hagiya, Implementation of Turing machine using DNA strand displacement, in: International Conference on Theory and Practice of
+Natural Computing, Springer, 2016, pp. 161-172.

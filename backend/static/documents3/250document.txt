@@ -1,0 +1,1500 @@
+Zhang et al. EURASIP Journal on Information Security
+https://doi.org/10.1186/s13635-020-00112-z
+
+(2020) 2020:15
+
+EURASIP Journal on
+Information Security
+
+RESEARCH Open Access
+
+Smooth adversarial examples
+
+Check for
+updates
+
+ 
+
+Hanwei Zhang!*° ®, Yannis Avrithis' ®, Teddy Furon! ® and Laurent Amsaleg! ©
+
+Abstract
+
+This paper investigates the visual quality of the adversarial examples. Recent papers propose to smooth the
+perturbations to get rid of high frequency artifacts. In this work, smoothing has a different meaning as it perceptually
+shapes the perturbation according to the visual content of the image to be attacked. The perturbation becomes
+locally smooth on the flat areas of the input image, but it may be noisy on its textured areas and sharp across its edges.
+This operation relies on Laplacian smoothing, well-known in graph signal processing, which we integrate in the attack
+pipeline. We benchmark several attacks with and without smoothing under a white box scenario and evaluate their
+transferability. Despite the additional constraint of smoothness, our attack has the same probability of success at
+
+lower distortion.
+
+Keywords: Adversarial example, Image classification, Deep neural network
+
+1 Introduction
+Adversarial examples where introduced by Szegedy et al.
+[1] as imperceptible perturbations of a test image that can
+change a neural network’s prediction. This has spawned
+active research on adversarial attacks and defenses with
+competitions among research teams [2]. Despite the the-
+oretical and practical progress in understanding, the sen-
+sitivity of neural networks to their input, assessing the
+imperceptibility of adversarial attacks remains elusive:
+user studies show that L, norms are largely unsuitable,
+whereas more sophisticated measures are limited too [3].
+Machine assessment of perceptual similarity between
+two images (the input image and its adversarial example)
+is arguably as difficult as the original classification task,
+while human assessment of whether one image is adver-
+sarial is hard when the L, norm of the perturbation is
+small. Of course, when both images are available and the
+perturbation is isolated, one can always see it. To make
+the problem interesting, we ask the following question:
+given a single image, can the effect of a perturbation be
+magnified to the extent that it becomes visible and a
+
+ 
+
+*Correspondence: hanwei.zhang@irisa.fr
+
+'Univ Rennes, Inria, CNRS, IRISA, Campus de Beaulieu, Rennes, France
+East China Normal University, North Zhongshan Road Campus, Shanghai,
+China
+
+o) Springer Open
+
+ 
+
+human may decide whether this example is benign or
+adversarial?
+
+Figure 1 shows that the answer is positive for a range of
+popular adversarial attacks. In Appendix 1, we propose a
+simple adversarial magnification producing a “magnified”
+version of a given image, without the knowledge of any
+other reference image. Assuming that natural images are
+locally smooth, this can reveal not only the existence of
+an adversarial perturbation but also its pattern. One can
+recognize, for instance, the pattern of Fig. 4 of [4] in our
+Fig. 1f, revealing a universal adversarial perturbation.
+
+Motivated by this example, we argue that popular adver-
+sarial attacks have a fundamental limitation in terms of
+imperceptibility that we attempt to overcome by intro-
+ducing smooth adversarial examples. Our attack assumes
+local smoothness and generates examples that are con-
+sistent with the precise smoothness pattern of the input
+image. More than just looking “natural” [5] or being
+smooth [6, 7], our adversarial examples are photorealistic,
+low-distortion, and virtually invisible even under mag-
+nification. This is evident by comparing our magnified
+example in Fig. 1d to the magnified original in Fig. 1b.
+
+Given that our adversarial examples are more con-
+strained, an interesting question is whether they per-
+form well according to metrics like probability of success
+and L, distortion. We show that our attack not only is
+
+© The Author(s). 2020 Open Access This article is licensed under a Creative Commons Attribution 4.0 International License, which
+permits use, sharing, adaptation, distribution and reproduction in any medium or format, as long as you give appropriate credit
+to the original author(s) and the source, provide a link to the Creative Commons licence, and indicate if changes were made. The
+
+images or other third party material in this article are included in the article’s Creative Commons licence, unless indicated
+otherwise in a credit line to the material. If material is not included in the article’s Creative Commons licence and your intended
+use is not permitted by statutory regulation or exceeds the permitted use, you will need to obtain permission directly from the
+copyright holder. To view a copy of this licence, visit http://creativecommons.org/licenses/by/4.0/.
+Zhang et al. EURASIP Journal on Information Security (2020) 2020:15 Page 2 of 12
+
+ 
+
+ 
+
+(a) Original image (b) Original, magnified
+
+  
+
+(c) C&W [8] (d) sC&W (this work)
+
+ 
+
+(ec) DeepFool [11| (f) Universal |4|
+
+ 
+
+(g) FGSM [9| (h) I-FGSM [10]
+
+Fig. 1 Given a single input image, our adversarial magnification (cf Appendix 1) reveals the effect of a potential adversarial perturbation. We show
+a the original image followed by b its own magnified version as well as e-h magnified versions of adversarial examples generated by different
+attacks. Our smooth adversarial example (d) is invisible even when magnified
+
+ 
+
+ 
+
+competitive but outperforms Carlini & Wagner [8], from 3. Magnify perturbations to facilitate qualitative
+which our own attack differs basically by a smoothness evaluation of their imperceptibility;
+penalty. 4. Show that properly integrating the smoothness
+
+constraint is not as easy as smoothing the
+perturbation generated by an attack; and
+
+. Define a new, more complete/fair evaluation
+protocol.
+
+1.1 Contributions
+As primary contributions, we 5
+
+1 Investigate the behavior of existing attacks when
+perturbations become “smooth like” the input image;
+and
+
+2 Devise one attack that performs well on standard
+metrics while satisfying the new constraint.
+
+The remaining text is organized as follows. Section 2
+formulates the problem and introduces a classification
+of attacks. It describes the C&W attack and the related
+work. Section 3 explains Laplacian smoothing, on which
+As secondary contributions, we we build our method. Section 4 presents our smooth
+Zhang et al. EURASIP Journal on Information Security (2020) 2020:15
+
+adversarial attacks, and Section 5 provides experimen-
+tal evaluation. Conclusions are drawn in Section 6. Our
+adversarial magnification used to generate Fig. 1 is speci-
+fied in Appendix 1.
+
+2 Problem formulation and related work
+Let us denote by x € ¥ :=[0,1]”*4 an image of n pixels
+and d color channels that has been flattened in a given
+ordering of the spatial components. A classifier network f
+maps that input image x to an output y = f(x) € RX which
+contains the logits of k classes. It is typically followed by
+softmax and cross-entropy loss at supervised training or
+by arg max at test time. An input x with logits y = f(x)
+is correctly classified if the prediction p(x) := arg max; 4;
+equals the true label of x.
+
+The attacker mounts a white box attack that is specific to
+f, public and known. The attack modifies an original image
+X, € X with given true label ¢ € {1,...,k} into an adver-
+sarial example x, € 1, which may be incorrectly classified
+by the network, that is p(x,) 4 ¢, although it looks similar
+to the original x,. The latter is often expressed by a small
+L» distortion ||Xq — Xo||.
+
+2.1 Families of attacks
+
+In a white box setting, attacks typically rely on exploiting
+the gradient of some loss function. We propose to classify
+known attacks into three families.
+
+2.1.1 Target distortion
+
+This family gathers attacks targeting a distortion € given
+as an input parameter. Examples are early attacks like Fast
+Gradient Sign Method (FGSM) [9] and Iterative-FGSM (I-
+FGSM) [10]. Their performance is then measured by the
+probability of success Psyc := P(p(xqg)  t) as a function
+of €.
+
+2.1.2 Target success
+
+This family gathers attacks that always succeed in mis-
+classifying x,, at the price of a possible large distortion.
+DeepFool [11] is a typical example. Their performance is
+then measured by the expected distortion D := E(||Xxq —
+Xo|l).
+
+These two first families are implemented with variations
+of a gradient descent method. A classification loss func-
+tion is defined on an output logit vector y = f(x) with
+respect to the original true label ¢, denoted by €(y, ¢).
+
+2.1.3 Target optimality
+
+The above attacks are not optimal because they a priori
+do not solve the problem of succeeding under minimal
+distortion,
+
+min
+XxEX:p(x) At
+
+|x — Xo]. (1)
+
+Page 3 of 12
+
+Szegedy et al. [1] approximate this constrained minimiza-
+tion problem by a Lagrangian formulation
+
+min A ||x — xo||? + 2(f(x), d. (2)
+XEX
+
+Parameter i controls the trade-off between the distortion
+and the classification loss. Szegedy et al. [1] carry out this
+optimization by box-constrained L-BFGS.
+
+The attack of Carlini & Wagner [8], denoted C&W in
+the sequel, pertains to this approach. A change of variable
+eliminates the box constraint: x € ¥ is replaced by o(w),
+where w € R”*@ is a latent vector and o is the element-
+wise sigmoid function that projects R”*? to Y. A margin
+is introduced: an untargeted attack makes the logit y; less
+than any other logit y; for i ~¢ ¢t by at least a margin
+m > O. Similar to the multi-class SVM loss by Crammer
+and Singer [12] (where m = 1), the loss function ¢ is then
+defined as
+
+Uy, 0) Lye — maxyi + m+» (3)
+
+where [-|4 denotes the positive part. The C&W attack uses
+the Adam optimizer [13] to minimize the functional
+
+I (w, A) := Allo (w) — xoll? + (f(a (w)), 8), (4)
+
+initializing by w. := o +(x). When the margin is
+reached, loss £(y,f) (3) vanishes and the distortion term
+pulls o(w) back towards X,, causing oscillations around
+the margin. Among all successful iterates, the one with the
+least distortion is kept; if there is none, the attack fails. The
+process is repeated for different Lagrangian multiplier 4
+according to line search. This family of attacks is typically
+more expensive than the two first.
+
+2.2 Imperceptibility of adversarial perturbations
+Adversarial perturbations are often invisible only because
+their amplitude is extremely small. Few papers deal with
+the need of improving the imperceptibility of the adver-
+sarial perturbations. The main idea in this direction is to
+create low or mid-frequency perturbation patterns.
+
+Zhou et al. [14] add a regularization term for the sake
+of transferability, which removes the high frequencies of
+the perturbation via low-pass spatial filtering. Heng et
+al. [6] propose a harmonic adversarial attack where per-
+turbations are very smooth gradient-like images. Guo et
+al. [7] design an attack explicitly in the Fourier domain.
+However, in all cases above, the convolution and the bases
+of the harmonic functions and of the Fourier transform
+are independent of the visual content of the input image.
+
+In contrast, the adversarial examples in this work are
+crafted to be locally compliant with the smoothness of
+the original image. Our perturbation may be sharp across
+the edges of x, but smooth wherever x, is, e.g., on back-
+ground regions. It is not just smooth but photorealistic,
+Zhang et al. EURASIP Journal on Information Security (2020) 2020:15
+
+because its smoothness pattern is guided by the input
+image.
+
+An analogy becomes evident with digital watermarking
+[15]. In this application, the watermark signal pushes the
+input image into the detection region (the set of images
+deemed as watermarked by the detector), whereas here
+the adversarial perturbation drives the image outside its
+class region. The watermark is invisible thanks to the
+masking property of the input image [16]. Its textured
+areas and its contours can hide a lot of watermarking
+power, but the flat areas cannot be modified without
+producing noticeable artifacts. Perceptually shaping the
+watermark signal allows a stronger power, which in turn
+yields more robustness.
+
+Another related problem, with similar solutions math-
+ematically, is photorealistic style transfer. Luan et al. [17]
+transfer style from a reference style image to an input
+image, while constraining the output to being photore-
+alistic with respect to the input. This work as well as
+follow-up works [18, 19] is based on variants of Laplacian
+smoothing or regularization much like we do.
+
+It is important to highlight that high frequencies can
+be powerful for deluding a network, as illustrated by the
+extreme example of the one pixel attack |20]. However,
+this is arguably one of the most visible attacks.
+
+3 Background on graph Laplacian smoothing
+Popular attacks typically produce noisy patterns that are
+not found in natural images. They may not be visible at
+first sight because of their low amplitude, but they are eas-
+ily detected once magnified (see Fig. 1). Our objective is to
+craft an adversarial perturbation that is locally as smooth
+as the input image, remaining invisible through mag-
+nification. This section gives background on Laplacian
+smoothing [21, 22], a classical operator in graph signal pro-
+cessing [23, 24], which we adapt to images here. Section 4
+uses it to generate a smooth perturbation guided by the
+original input image.
+
+3.1 Graph
+
+Laplacian smoothing builds on a weighted undirected
+graph whose un vertices correspond to the 7 pixels of the
+input image x,. The ith vertex of the graph is associated
+with feature x; €[0,1]% that is the ith row of x,, that is,
+X, =[x1,...,x,]'. Matrix p € R”** denotes the spa-
+tial coordinates of the 1 pixels in the image, and similarly
+p =[p1,..-,Pu] |. An edge (i, /) of the graph is associated
+with weight wz; > 0, giving rise to an 1 x n symmetric
+adjacency matrix W, for instance defined as
+
+Wa we | MOD X/)Ks (Di Pi), tft A 7
+yo 0, if i =j
+
+for i,j € {1,...,n}, where k¢ is a feature kernel and k, is a
+spatial kernel, both being usually Gaussian or Laplacian.
+
+(5)
+
+Page 4 of 12
+
+The spatial kernel is typically nonzero only on nearest
+neighbors, resulting in a sparse matrix W. We further
+define the 1 x n degree matrix D := diag(W1,,)) where 1,
+is the all-ones n-vector.
+
+3.2 Regularization [21]
+
+Now, given a new signal z € R”*¢ on this graph, the objec-
+tive of graph smoothing is to find another signal r, which
+is close to z, while at the same time being smooth accord-
+ing to the neighborhood system represented by the graph.
+Precisely, given z, we define the output signal sy(z) :=
+arg MIN, cpnxd Po (L, Z), with
+
+ 
+
+ 
+
+ 
+
+ 
+
+dat 2) = 5 wy |i —¥)I? + — a) Ie — 2p
+ij
+
+where f := D7!/*r and ||-||- is the Frobenius norm. The
+first summand is the smoothness term. It encourages fr; to
+be close to r; when wz, is large, ie., when pixels i and j of
+input x, are neighbors and similar. This encourages r to
+be smooth wherever x, is. The second summand is the
+fitness term that encourages r to stay close to z. Parameter
+a €[ 0,1) controls the trade-off between the two.
+
+3.3 Filtering
+If we symmetrically normalize matrix W as W :=
+D~!/2WwD~-!/? and define the 1 x n regularized Laplacian
+matrix Ly := (I, — aYW)/(1 — a), then the expression (6)
+simplifies to the following quadratic form:
+du(r,z) = (1 —a)tr (r' Lor —Qz'r+ zz) . (7)
+This reveals, by letting the derivative 0¢/dr vanish inde-
+pendently per column, that the smoothed signal is given
+in closed form:
+
+Sy (Zz) = Leia.
+
+(8)
+
+This solution is unique because matrix Ly is positive-
+definite. Parameter a controls the bandwidth of the
+smoothing: function Sy, is the all-pass filter for a = 0 and
+becomes a strict “low-pass” filter when a — 1 [25].
+Variants of the model above have been used for instance
+for interactive image segmentation [22, 26, 27], transduc-
+tive semi-supervised classification [21, 28], and ranking
+on manifolds [29, 30]. Input z expresses labels known for
+some input pixels (for segmentation) or samples (for clas-
+sification), or identifies queries (for ranking), and is null
+for the remaining vertices. Smoothing then spreads the
+labels to these vertices according the weights of the graph.
+
+3.4 Normalization
+
+Contrary to applications like interactive segmentation or
+semi-supervised classification [21, 22], z does not repre-
+sent a binary labeling but rather an arbitrary perturbation
+Zhang et al. EURASIP Journal on Information Security (2020) 2020:15
+
+in this work. Also contrary to such applications, the out-
+put is neither normalized nor taken as the maximum over
+feature dimensions (channels). If Ly} is seen as a Spatial
+filter, we therefore row-wise normalize it to one in order
+to preserve the dynamic range of z. We therefore define
+the normalized smoothing function as
+
+§u(z) = diag(Se(1n))” ‘Se (z). (9)
+
+This function of course depends on xy. We omit this from
+notation but we say Sq is smoothing guided by x, and the
+output is smooth like xo.
+
+4 Integrating smoothness into the attack
+
+The key idea of the paper is that the smoothness of the
+perturbation is now consistent with the smoothness of the
+original input image x,, which is achieved by smoothing
+operations guided by x,. This section integrates smooth-
+ness into attacks targeting distortion (Section 4.1) and
+attacks targeting optimality (Section 4.2), but in very
+different ways.
+
+4.1. Simple attacks
+
+We consider here simple attacks targeting distortion or
+success based on gradient descent of the loss function.
+There are many variations which normalize or clip the
+update according to the norm used for measuring the dis-
+tortion, a learning rate or a fixed step etc. These variants
+are loosely prototyped as the iterative process
+
+g = Val (fexa),£), (10)
+
+xght) =C (xa — n(g)) ’ (11)
+
+where C is a clipping function and n a normalization func-
+tion according to the variant. Function c should at least
+produce a valid image: c(x) € ¥ =[0,1]”*?.
+
+4.1.1 Quick and dirty
+To keep these simple attacks simple, smoothness is loosely
+integrated after the gradient computation and before the
+update normalization:
+
+xgQht) =¢ (xa — n(a(g))) . (12)
+This approach can be seen as a projected gradient descent
+on the manifold of perturbations that are smooth like xo.
+When applied to PGDg, we call this attack qPGD2 where
+
+the “q” stands for a “quick and dirty” integration of the
+smoothness constraint.
+
+4.2 Attack targeting optimality
+This section integrates smoothness in the attacks tar-
+geting optimality like C&W. Our starting point is the
+
+Page 5 of 12
+
+unconstrained problem (4) [8]. However, instead of repre-
+senting the perturbation signal r := x — X, implicitly as
+a function o (Ww) — x, of another parameter w, we express
+the objective explicitly as a function of variable r, as in
+the original formulation of (2) in [1]. We make this choice
+because we need to directly process the perturbation r. On
+the other hand, we now need the element-wise clipping
+function c(x) := min([x]+,1) to satisfy the constraint
+X=x,+reé X& (2). Our problem is then
+
+min A Ill? + £(f(C(xp + 4), £), (13)
+
+where r is unconstrained in R”*%,
+
+4.2.1 Smoothness penalty
+
+At this point, optimizing (13) results in “independent”
+updates at each pixel. We would rather like to take the
+smoothness structure of the input x, into account and
+impose a similar structure on r. Representing the pair-
+wise relations by a graph as discussed in Section 3, a
+straightforward choice is to introduce a pairwise loss term
+
+A a 2
+> wy 8 — 8)
+r
+
+(14)
+
+into (13), where we recall that wj are the elements of
+the adjacency matrix W of x,, # := D-!/*r and D :=
+diag(W1,,). A problem is that the spatial kernel is typ-
+ically narrow to capture smoothness only locally. Even
+if parameter y is large, it would take a lot of iterations
+for the information to propagate globally, each itera-
+tion needing a forward and backward pass through the
+network.
+
+4.2.2 Smoothness constraint
+
+What we advocate instead is to apply a global smoothing
+process at each iteration: we introduce a latent variable
+z € R"*4 and seek for a joint solution with respect to r
+and z of the following
+
+min
+
+d
+
+Mpa (tz) +A [Ie + CFC +4), 2), (15)
+where ¢ is defined by (6). In words, z represents an uncon-
+strained perturbation, while r should be close to z, smooth
+like xg, small, and such that the perturbed input x, + r
+satisfies the classification objective. Then, by letting u —
+oo, the first term becomes a hard constraint imposing a
+globally smooth solution at each iteration:
+
+min A [[rl|” + €(F(C(X + ¥)), 2) (16)
+
+subject to r= S,(z), (17)
+where Sy is defined by (9). During optimization, every
+
+iterate of this perturbation r is smooth like xo.
+Zhang et al. EURASIP Journal on Information Security (2020) 2020:15
+
+4.2.3 Optimization
+With this definition in place, we solve for z the following
+unconstrained problem over R”*?:
+min 2 [82] + (CCX + Su(2))), 6). (18)
+
+Observe that this problem has the same form as (13),
+where r has been replaced by S,(z). This implies that
+we can use the same optimization method as the Ck W
+attack. The only difference is that the variable is z, which
+we initialize by z = 0,,.g, and we apply function Sq at each
+iteration.
+
+Gradients are easy to compute because our smoothing is
+a linear operator. We denote the loss on this new variable
+by L(z) := €(f(c(Xo + Sq(z))), £). Its gradient is
+
+VzL(z) = Jz, (z)' + Vxl(F(C(Xo + §(z))), £); (19)
+
+where Js, (z) is the 1 x n Jacobian matrix of the smooth-
+ing operator at z. Since our smoothing operator is defined
+by (8) and (9) is linear, Jz, (z) = diag(Sy(1,)) 1 Ly" isa
+matrix constant in z, and multiplication by this matrix is
+equivalent to smoothing. The same holds for the distor-
+tion penalty | Sc« (Z) \’. This means that in the backward
+pass, the gradient of the objective (18) w.r.t. z is obtained
+from the gradient w.r.t. r (or x) by smoothing, much like
+how r is obtained from z in the forward pass (17).
+
+Matrix Ly is fixed during optimization, depending only
+on input x,. For small images like in the MNIST dataset
+[31], it can be inverted: function S$, is really a matrix multi-
+plication. For larger images, we use the conjugate gradient
+(CG) method [32] to solve the set of linear systems Lar =
+z for r given z. Again, this is possible because matrix Ly is
+positive-definite, and indeed, it is the most common solu-
+tion in similar problems [26, 30, 33]. At each iteration, one
+computes a product of the form v + Lyv, which is effi-
+cient because £, is sparse. In the backward pass, one can
+either use CG on the gradient, or auto-differentiate (AD)
+through the forward CG iterations. We choose the latter
+because it is the simplest implementation-wise. The two
+options have the same complexity and should have the
+same run-time in theory. In practice, Tensorflow AD takes
+0.43 s on average for 50 CG iterations on ImageNet and
+InceptionV3, while CG forward takes 0.33 s.
+
+4.2.4 Discussion
+
+The clipping function c that we use is just the identity over
+the interval | 0, 1], but outside this interval, its derivative is
+zero. Carlini & Wagner [8] therefore argue that the numer-
+ical solver of problem (13) suffers from getting stuck in flat
+spots: when a pixel of the perturbed input x, + r falls out-
+side [0,1], it keeps having zero derivative after that and
+with no chance of returning to [0,1] even if this is bene-
+ficial. This limitation does not apply to our case thanks to
+the Ly distortion penalty in (13) and to the updates in its
+
+Page 6 of 12
+
+neighborhood: such a value may return to [0, 1] thanks to
+the smoothing operation.
+
+5 Experiments
+
+Our experiments focus on the white box setting, where the
+defender first exhibits a network, and then the attacker
+mounts an attack specific to this network, but we also
+investigate a transferability scenario. All attacks are untar-
+getted, as defined by loss function (3).
+
+5.1 Evaluation protocol
+
+For the perceptual evaluation of the quality of the adver-
+sarial images, we follow the recommendation of [34]. This
+paper compares fifteen metrics (including SSIM, PSNR,
+and wPSNR) to the subjective perceptual evaluation of
+a panel of users. The conclusion is that most apparent
+distortion (MAD) [35] is the metric best reflecting user
+assessment. A low MAD score means better fidelity.
+
+For quantitative evaluation of the strength of an attack,
+we use two global statistics and an operating character-
+istic curve. Given a test image set of N’ images, we only
+consider its subset X of N images that are classified cor-
+rectly without any attack. The accuracy of the classifier
+is N/N’. Let Xsuc be the subset of X with Neuc := |Xsuc|
+where the attack succeeds and let D(x,) := ||xz — Xo|| be
+the distortion for image xp € Xguc.
+
+The global statistics are the success probability Psyc and
+expected distortion D as defined in Section 2, estimated by
+
+Nsuc 1
+
+Psuc = , D=
+
+(20)
+N Nsuc
+
+ 
+
+ 
+
+D(X);
+
+Xo EXguc
+
+with the exception that D here is the conditional aver-
+age distortion, where conditioning is on success. Indeed,
+distortion makes no sense for a failure.
+
+If Dmax = Maxx,€x,,, D(X) is the maximum distortion,
+the operating characteristic function P :[ 0, Dmax] >[9, 1]
+measures the probability of success as a function of a given
+upper bound D on distortion. For D €[ 0, Dmax],
+
+P(D) := < Ite & Xeue D(X») < DY. (21)
+
+This function increases from P(0) = 0 to P(Dmax) = Psuc:
+It is difficult to define a fair comparison of distortion tar-
+geting attacks to optimality targeting attacks. For the first
+family, we run a given attack several times over the test
+set with different target distortion €. The attack succeeds
+on image x, € X if it succeeds on any of the runs. For
+Xo © Xsyc, the distortion D(x,) is the minimum distortion
+over all runs. All statistics are then evaluated as above.
+
+5.2 Datasets, networks, and attacks
+
+5.2.1 MNIST [36]
+
+We consider a simple convolutional network with three
+convolutional layers and one fully connected layer that we
+Zhang et al. EURASIP Journal on Information Security (2020) 2020:15
+
+denote as C4, giving accuracy 0.99. In detail, the first con-
+volutional layer has 64 features, kernel of size 8 and stride
+2; the second layer has 128 features, kernel of size 6 and
+stride 2; the third has also 128 features, but kernel of size
+5 and stride 1.
+
+5.2.2 ImageNet
+
+We use the dataset of the NIPS 2017 adversarial compe-
+tition [37], comprising 1000 images from ImageNet [38].
+We use InceptionV3 [39] and ResNetV2-50 [40] networks,
+with accuracy 0.96 and 0.93 respectively.
+
+5.2.3 Attacks
+The following six attacks are benchmarked:
+
+Page 7 of 12
+
+e J distortion: FGSM [41] and I-FGSM [10].
+
+e [> distortion: An L2 version of I-FGSM [42], denoted
+as PGD» (projected gradient descent).
+
+e Optimality: The Zz version of C&W [8].
+
+e Smooth: Our smooth versions qPGD2 of PGD2
+(Section 4.1) and sC&W of C&W (Section 4.2). Note
+that the smoothness constraint integration differs a
+lot between gPGD» and sC&W.
+
+5.2.4 Parameters
+
+On MNIST, we use € = 0.3 for FGSM; € = 0.3,a@ = 0.08
+for I-FGSM; « = 5,a = 3 for PGDy; confidence mar-
+gin m = 1, learning rate 7 = 0.1, and initial constant
+
+ 
+
+ 
+
+qPGD»2
+D=6.00
+
+ 
+
+PGD2
+D=4.00
+
+qPGD2
+D=6.00
+
+ 
+
+attack succeeds; in red, it fails
+
+ 
+
+ 
+
+ 
+
+ 
+
+Fig. 2 For a given attack (denoted by an asterisk and bold typeface), the adversarial image with the strongest distortion D over MNIST. In green, the
+
+sC&W
+D=0.52
+
+ 
+
+C&W sC& W
+D=3.33 D=2.57
+
+ 
+
+C&W *
+D=4,22
+
+sC&W
+D=3.31
+
+C&W
+D=4.15
+
+sC&W *
+D=4.85
+
+ 
+Zhang et al. EURASIP Journal on Information Security (2020) 2020:15
+
+c = 15 (the inverse of A in (4)) for C&W. For smooth-
+ing, we use Laplacian feature kernel, set a = 0.95, and
+pre-compute Ly 1 On ImageNet, we use € = 0.1255 for
+FGSM; € = 0.1255,a = 0.08 for I-FGSM; € = 5,a = 3
+for PGD2; m = 0, n = 0.1, and c = 100 for C&W. For
+smoothing, we use Laplacian feature kernel, set a = 0.997,
+and use 50 iterations of CG. These settings are used in
+Section 5.5.
+
+5.3 White box scenario
+5.3.1. Qualitative results and perceptual evaluation
+Figures 2 and 3 show MNIST and ImageNet examples,
+respectively, focusing on worst cases. Both sC&W and
+qPGDz2 produce smooth perturbations that look more nat-
+ural. However, smoothing of qPGD2 is more aggressive
+especially on MNIST, as these images contain flat black or
+white areas.
+
+This is due to the “quick and dirty” integration of the
+smoothness constraint: On some images, the perturbation
+
+Page 8 of 12
+
+update S,(g) is weakly correlated with gradient g, which
+does not help in lowering the classification loss. Conse-
+quently, the perturbation becomes stronger in order to
+succeed. For the same reason, qPGD2 completely fails on
+natural images like Fig. 3a and c. It consumes way more
+distortion than PGD», and although this perturbation is
+smoother, it becomes visible.
+
+By contrast, the proper integration of the smooth-
+ness constraint in sC&W produces totally invisible
+perturbation. For images like Fig. 3a or c, sC&W con-
+sumes more distortion than C&W, but the perturbation
+remains less visible according to the MAD score. The rea-
+son is the “phantom” of the original that is revealed when
+the perturbation is isolated.
+
+The superior perceptual quality of our smooth adver-
+sarial examples is also confirmed quantitatively: On Ima-
+geNet, 93% of the images produced by sC&W have lower
+MAD score than the ones by C&W. Figure 4 shows that
+when the MAD score of sC&W is greater than the one
+
+ 
+
+original image C&W: D=3.64
+
+ 
+
+ 
+
+C&W: MAD=14.80
+
+(a)
+C&W: D=6.55
+
+original image
+
+C&W: MAD=0.05
+
+(b)
+sC&W: D= 10.32
+
+original image
+
+ 
+
+C&W: MAD=0.93
+
+(c)
+
+ 
+
+sC&W: D= 4.59
+
+  
+
+sC&W: MAD= 0.28
+
+ 
+
+sC&W: D= 4.14
+
+sC&W: MAD= 0.01
+
+ 
+
+  
+
+= 0.40
+
+sC&W: MAD
+
+ 
+
+PGD2: D=2.77 qPGDe2: D=5.15
+
+ 
+
+PGD2: MAD=0.32 qPGD2: MAD=5.61
+
+ 
+
+PGD2: D=2.78 qPGDe2: D=2.82
+
+ 
+
+PGD2: MAD=0.00 qPGD2: MAD=0.00
+
+  
+
+PGD2: D=2.77 qPGD2: D=31.76
+
+  
+
+ 
+
+PGD2: MAD=0.00 qPGD2: MAD=8.44
+
+  
+
+Fig. 3 Original image Xp (left), adversarial image Xg = X> + r (above) and scaled perturbation r (below; distortion D = ||r|| and MAD scores) against
+InceptionV3 on ImageNet. Scaling maps each perturbation and each color channel independently to [0, 1]. The perturbation ris indeed smooth like
+X for sC&W. a Despite the higher distortion compared to C&W, the perturbation of sC&W is totally invisible, even when magnified (cf Fig. 1). b One
+of the failing examples of [6] that look unnatural to human vision. ¢ One of the examples with the strongest distortion over ImageNet for sC&W: Xo is
+flat along stripes, reducing the dimensionality of the “smooth like x5” manifold
+
+ 
+
+ 
+Zhang et al. EURASIP Journal on Information Security (2020) 2020:15
+
+Page 9 of 12
+
+ 
+
+sC&Ww
+
+ 
+
+according to MAD score
+
+XX
+
+of C&W, it usually happens for very small score val-
+ues (below 0.1), meaning that both are almost equally
+imperceptible.
+
+5.3.2 Quantitative results on success and distortion
+
+The global statistics Psyc, D are shown in Table 1. Operat-
+ing characteristics over MNIST and ImageNet are shown
+in Figs. 5 and 6 respectively.
+
+We observe that our sC&W, with the proper integra-
+tion via a latent variable (18), improves a lot the original
+C&W in terms of distortion, while keeping the probabil-
+ity of success roughly the same. This result, consistent in
+all experiments, is surprising. We would expect a price to
+be paid for a better invisibility as the smoothing is adding
+an extra constraint on the perturbation. This price can be
+rather high in the literature: In order to preserve the suc-
+cess rate, Table 1 of [7] reports an increase of distortion by
+a factor of 3 when integrating smoothness in the attack.
+An explanation may be that the smoothing operation of
+[7] is independent of the input image; while in our case,
+smoothing is guided by the input.
+
+On the contrary, the “quick and dirty” integration (12)
+dramatically spoils qPGD»2 with big distortion especially
+
+Table 1 Success probability Psyc and average /2 distortion D
+
+ 
+
+ 
+
+ 
+
+ 
+
+MNIST. ImageNet
+
+C4 InceptionV3 ResNetV2
+
+Psuc D Psuc D Psuc D
+FGSM 0.89 5.02 0.97 5.92 0.92 8.20
+I-FGSM 1.00 2.69 1.00 5.54 0.99 7.58
+PGD2 1.00 1.7] 1.00 1.80 1.00 3.63
+C&W 1.00 2.49 0.99 4.9] 0.99 9.84
+qPGD2 0.97 3.36 0.96 2.10 0.93 4.80
+sC&W 1.00 1.97 0.99 3.00 0.98 5.99
+
+ 
+
+ 
+
+Fig. 4 MAD scores [35] of sC&W vs. C&W for all images of ImageNet. For 93% of the images below the diagonal, sC&W is less perceptible than C&W
+
+2.5 3 3.5 4 4.5 5
+
+C&W
+
+ 
+
+on MNIST. This reveals the utmost importance of prop-
+erly integrating the smoothness constraint. It cannot be
+just a post-processing filtering of the perturbation.
+
+The price to pay for smoothing is the run-time: using
+Tensorflow and 50 CG iterations on ImageNet and Incep-
+tionV3, sC&W takes 205 s per image on average, while
+C&W takes 47 s. This is with our own implementation of
+CG without particular optimization effort. Runtime was
+not within our objectives.
+
+We further observe that PGD2 outperforms by a vast
+margin the C&W attack, which is supposed to be close
+to optimality. This may be due in part to how the Adam
+optimizer treats Ly norm penalties as studied in [43]. This
+interesting finding is a result of our new evaluation pro-
+tocol: C&W internally optimizes its parameter c = 1/A
+independently per image, while for PGD2, we externally
+try a small set of target distortions D on the entire dataset.
+This is visible in Fig. 5, where the operating characteristic
+is piecewise constant. Our comparison is fair, given that
+C&W is more expensive.
+
+As already observed in the literature, ResnetV2 is more
+robust to attacks than InceptionV3: The operating char-
+acteristic curves are shifted to the right and increase at a
+slower rate.
+
+5.4 Adversarial training
+The defender now uses adversarial training [41] to gain
+robustness against attacks. Yet, the white box scenario still
+holds: this network is public. The training set comprises
+images attacked with “step 1.1” model [10]. The accuracy
+of C4 on MNIST (resp. InceptionV3 on ImageNet) is now
+0.99 (resp. 0.94).
+
+Table 2 shows interesting results. As expected, FGSM
+is defeated in all cases, while average distortion of all
+
+ 
+
+1 Model taken from https://github.com/tensorflow/models/tree/master/
+research/adv_imagenet_models
+Zhang et al. EURASIP Journal on Information Security (2020) 2020:15
+
+Page 10 of 12
+
+ 
+
+Psuc
+
+ 
+
+ 
+
+Fig. 5 Operating characteristics of the attacks over MNIST. Attacks PGD2 and qPGD2 are tested with target distortion D €[ 1,6]
+
+ 
+
+ 
+
+attacks is increased in general. What is unexpected is
+that on MNIST, sC&W remains successful while the
+probability of C&W drops. On ImageNet however, it
+is the probability of the smooth versions qPGD2 and
+sC&W that drops. I-FGSM is also defeated in this
+case, in the sense that average distortion increases too
+much.
+
+5.5 Transferability
+This section investigates the transferability of the attacks
+under the following scenario: the attacker has now a
+partial knowledge about the network. For instance, he/she
+knows that the defender chose a variant of InceptionV3,
+but this variant is not public so he/she attacks Incep-
+tionV3 instead. Also, this time, he/she is not allowed to
+test different distortion targets. The results are shown in
+Table 3.
+
+The first variant uses a bilateral filter (with standard
+deviations 0.5 and 0.2 in the domain and range ker-
+nel respectively; cf Appendix 1) before feeding the net-
+
+work. This does not really prevent the attacks. PGD2
+remains a very powerful attack if the distortion is large
+enough. Smoothing makes the attack less effective, but the
+perturbations are less visible. The second variant uses
+the adversarially trained InceptionV3, which is, on the
+contrary, a very efficient counter-measure under this sce-
+nario.
+
+Figure 7 shows the operating characteristics of C&W
+and sC&W corresponding to the bilateral filter results
+of Table 3. We see that within a distortion budget of
+5, SC&W succeeds with 67% probability, whereas C&W
+with 50%. Yet, at larger distortion budgets, C&W keeps
+on forging more adversarial images whereas sC&W stops
+making progress. This is understandable: C&W creates
+strong artifacts clearly visible when the distortion is larger
+or equal to 5, as shown in Fig. 3. The upfront defense fil-
+ters out some of these strong perturbations, but the rest
+remain successful. These images are adversarial by defini-
+tion, yet not useful in practice because they are too much
+distorted.
+
+ 
+
+Psuc
+
+ 
+
+ 
+
+Fig. 6 Operating characteristics over ImageNet attacking InceptionV3 (solid lines) and ResNetV2-50 (dotted lines)
+
+10 12 14 16
+D
+
+ 
+
+ 
+Zhang et al. EURASIP Journal on Information Security (2020) 2020:15
+
+Table 2 Success probability and average L» distortion D when
+attacking networks adversarially trained against FGSM
+
+ 
+
+ 
+
+ 
+
+ 
+
+MNIST - C4 ImageNet - InceptionV3
+Psuc D Psuc D
+FGSM 0.15 4.53 0.06 6.40
+I-FGSM 1.00 3.48 0.97 29.94
+PGD2 1.00 2.52 1.00 3.89
+C&W 0.93 3.03 0.95 6.43
+qPGD2 0.99 2.94 0.69 7.86
+sC&W 0.99 2.39 0.75 6.22
+
+ 
+
+6 Conclusion
+
+Smoothing helps masking the adversarial perturbation
+by shaping it “like” the input image. However, this rule
+holds only when smoothness is properly integrated in the
+attack. Filtering the perturbation by post-processing is not
+a sound idea, even if it is done in accordance with the orig-
+inal image, even if it is done at each attack iteration. A
+sounder integration is to inject smoothness as a constraint
+inside the loss function.
+
+It is impressive how sC&W improves upon C&W in
+terms of distortion and imperceptibility at the same time
+while maintaining the same success rate. To our knowl-
+edge and as far as a white box scenario is considered,
+this is the first time smoothness comes for free from
+this viewpoint. Yet, a price to be paid is the larger
+complexity.
+
+Smoothing allows the attacker to delude more robust
+networks thanks to larger distortions while still being
+invisible. However, its impact on transferability is mit-
+igated. The question raised in the introduction is still
+open: Fig. 1 shows that a human does not make the
+difference between the input image and its adversar-
+ial example even with magnification. This does not
+prove that an algorithm will not detect some statistical
+evidence.
+
+Table 3 Success probability and average L2 distortion D of
+attacks on variants of InceptionV3 under transferability
+
+ 
+
+ 
+
+ 
+
+ 
+
+Bilateral filter Adv. training
+
+Psuc D Psuc D
+FGSM 0.77 5.13 0.04 10.20
+I-FGSM 0.82 5.12 0.02 10.10
+PGD> 1.00 5.14 0.12 10.26
+C&W 0.82 4.75 0.02 10.21
+qPGD2 0.95 5.13 0.01 10.17
+sC&W 0.68 2.91 0.01 4.63
+
+ 
+
+Page 11 of 12
+
+ 
+
+P, suc
+
+ 
+
+ 
+
+Fig. 7 Operating characteristics of C&W and sC&W on ImageNet with
+InceptionV3 under bilateral filter transferability, corresponding to
+Table 3
+
+ 
+
+ 
+
+ 
+
+Appendix 1
+
+Adversarial magnification
+
+Given a single-channel image x : Q — R as input, its
+adversarial magnification mag(x) : & — R is defined as
+the following local normalization operation
+
+X — [Lx(X)
+Box(x) + (1 — B)og(x)’
+
+mag(x) := (22)
+
+where [1x(x) and ox(x) are the local mean and standard
+deviation of x respectively, and og(x) € R® is the global
+standard deviation of x over Q. Parameter 6 €[0,1]
+determines how much local variation is magnified in x.
+
+In our implementation, x(x) = b(x), the bilateral fil-
+tering of x [44]. It applies a local kernel at each point p € Q
+that is the product of a domain and a range Gaussian ker-
+nel. The domain kernel measures the geometric proximity
+of every point g € Q to p as a function of } p—4q|\|, and
+the range kernel measures the photometric similarity of
+every point q € Q to pasa function |x(p) — x(q)|. On the
+other hand, ox(x) = bx((x — [tx (x))”)~!/”. Here, bx is a
+guided version of the bilateral filter, where it is the refer-
+ence image x rather than (x — j1x(x))* that is used in the
+range kernel.
+
+When x : Q — R? is a d-channel image, we apply
+all the filters independently per channel, but photomet-
+ric similarity is just one scalar per point as a function of
+the Euclidean distance ||x(p) — x(q) } measured over all d
+channels.
+
+In Fig. 1, 6 = 0.8. The standard deviation of both the
+domain and range Gaussian kernels is 5.
+
+ 
+
+ 
+
+Acknowledgements
+Not applicable.
+
+Authors’ contributions
+The authors declare equal contributions. The authors read and approved the
+final manuscript.
+Zhang et al. EURASIP Journal on Information Security
+
+(2020) 2020:15
+
+Funding
+The Ph.D. thesis of Hanwei Zhang is funded by the Chinese Scholarship
+Council. Teddy Furon is funded by the chaire on artificial intelligence SAIDA.
+
+Availability of data and materials
+We use public datasets MNIST [36] and a subset of ImageNet [37], comprising
+1000 images [38], and published networks InceptionV3 [39] and ResNetV2-50
+
+[40].
+
+Competing interests
+The authors declare that they have no competing interests.
+
+Received: 10 October 2019 Accepted: 2 June 2020
+Published online: 17 November 2020
+
+References
+
+1,
+
+10.
+
+11.
+
+12.
+
+13.
+
+14.
+
+15,
+
+16.
+
+17.
+
+18.
+
+19,
+
+20.
+
+21.
+
+22.
+
+23.
+
+C. Szegedy, W. Zaremba, |. Sutskever, J. Bruna, D. Erhan, |. Goodfellow, R.
+Fergus, Intriguing properties of neural networks (2013). arXiv:1312.6199
+A. Kurakin, |. Goodfellow, S. Bengio, Y. Dong, F. Liao, M. Liang, T. Pang, J.
+Zhu, X. Hu, C. Xie, J. Wang, Z. Zhang, Z. Ren, A. Yuille, S. Huang, Y. Zhao, Y.
+Zhao, Z. Han, J. Long, Y. Berdibekov, T. Akiba, S. Tokui, M. Abe, Adversarial
+attacks and defences competition (2018). arXiv:1804.00097
+
+M. Sharif, L. Bauer, M. K. Reiter, On the suitability of Z,-norms for creating
+and preventing adversarial examples (2018). arXiv:1802.09653
+
+S. Moosavi-Dezfooli, A. Fawzi, O. Fawzi, P. Frossard, in CVPR. Universal
+adversarial perturbations (IEEE, 2017), pp. 86-94
+
+Z. Zhao, D. Dua, S. Singh, in /CLR. Generating natural adversarial examples,
+(2018). https://doi.org/10.18653/v1/d18- 1316
+
+W. Heng, S. Zhou, T. Jiang, Harmonic adversarial attack method (2018).
+arXiv:1807.10590
+
+C. Guo, J. S. Frank, K. Q. Weinberger, Low frequency adversarial
+perturbation (2018). arXiv:1809.08758
+
+N. Carlini, D. Wagner, in EEE Symp. on Security and Privacy. Towards
+evaluating the robustness of neural networks, (2017). https://doi.org/10.
+1109/sp.2017.49
+
+|. J. Goodfellow, J. Shlens, C. Szegedy, Explaining and harnessing
+adversarial examples (2014). arXiv:1412.6572
+
+A. Kurakin, |. Goodfellow, S. Bengio, Adversarial examples in the physical
+world (2016). arXiv:1607.02533
+
+S.-M. Moosavi-Dezfooli, A. Fawzi, P. Frossard, in CVPR. Deepfool: a simple
+and accurate method to fool deep neural networks, (2016). https://doi.
+org/10.1109/cvpr.2016.282
+
+K. Crammer, Y. Singer, On the algorithmic implementation of multiclass
+kernel-based vector machines. J. Mach. Learn. Res. 2(Dec), 265-292 (2001)
+D. Kingma, J. Ba, Adam: a method for stochastic optimization (2015).
+arXiv:1412.6980
+
+W. Zhou, X. Hou, Y. Chen, M. Tang, X. Huang, X. Gan, Y. Yang, in ECCV.
+Transferable adversarial perturbations (Springer International Publishing,
+Cham, 2018), pp. 471-486
+
+E. Quiring, D. Arp, K. Rieck, in 2078 IEEE European Symposium on Security
+and Privacy (EuroS P). Forgotten siblings: unifying attacks on machine
+learning and digital watermarking, (2018), pp. 488-502. https://doi.org/
+10.1109/EuroSP.2018.00041
+
+|. Cox, M. Miller, J. Bloom, J. Fridrich, T. Kalker, Digital Watermarking, 2nd
+edn. (Elsevier, 2008)
+
+F. Luan, S. Paris, E. Shechtman, K. Bala, in The IEEE Conference on Computer
+Vision and Pattern Recognition (CVPR). Deep Photo Style Transfer, (201 7)
+G. Puy, P. Pérez, A flexible convolutional solver with application to
+photorealistic style transfer (2018). arXiv:1806.05285
+
+Y. Li, M.-Y. Liu, X. Li, M.-H. Yang, J. Kautz, A closed-form solution to
+photorealistic image stylization (2018). arXiv:1802.06474
+
+J. Su, D. Vargas, K. Sakurai, One pixel attack for fooling deep neural
+networks. IEEE Trans. Evol. Comput. (2019). https://doi.org/10.1109/teve.
+2019.2890858
+
+D. Zhou, O. Bousquet, T. N. Lal, J. Weston, B. Schdlkopf, in NIPS. Learning
+with local and global consistency (MIT Press, 2003), pp. 321-328
+
+T.H. Kim, K. M. Lee, S. U. Lee, in ECCV. Generative image segmentation
+using random walks with restart, (2008). https://doi.org/10.1007/978-3-
+540-88690-7_20
+
+A. Sandryhaila, J. M. Moura, Discrete signal processing on graphs. IEEE
+Trans. Sig. Process. 61(7) (2013). https://doi.org/10.1 109/tsp.2013.2238935
+
+24.
+
+25.
+
+26.
+
+2/.
+
+28.
+
+29,
+
+30.
+
+31.
+
+32.
+
+33.
+
+34.
+
+35.
+
+36.
+
+37.
+
+38.
+
+39.
+
+40.
+
+41.
+
+42.
+
+ 
+
+Page 12 of 12
+
+D. |. Shuman, S. K. Narang, P. Frossard, A. Ortega, P. Vandergheynst, The
+emerging field of signal processing on graphs: extending high-
+dimensional data analysis to networks and other irregular domains. IEEE
+Sig. Process. Mag. 30(3) (2013). https://doi.org/10.1109/msp.2012.2235192
+A. Iscen, Y. Avrithis, G. Tolias, T. Furon, O. Chum, in CVPR. Fast spectral
+ranking for similarity search, (2018). https://doi.org/10.1109/cvpr.2018.
+00796
+
+L. Grady, Random walks for image segmentation. IEEE Trans. PAMI. 28(11),
+1768-1783 (2006)
+
+P. Vernaza, M. Chandraker, in CVPR. Learning random-walk label
+propagation for weakly-supervised semantic segmentation, (2017).
+https://doi.org/10.1109/cvpr.2017.315
+
+X. Zhu, Z. Ghahramani, J. Lafferty, in CML. Semi-supervised learning using
+Gaussian fields and harmonic functions, (2003), pp. 912-919
+
+D. Zhou, J. Weston, A. Gretton, O. Bousquet, B. Schdélkopf, in N/PS. Ranking
+on data manifolds (MIT Press, 2003), pp. 169-176. http://papers.nips.cc/
+paper/2447-ranking-on-data-manifolds.pdf
+
+A. Iscen, G. Tolias, Y. Avrithis, T. Furon, O. Chum, in CVPR. Efficient diffusion
+on region manifolds: recovering small objects with compact CNN
+representations, (2017). https://doi.org/10.1109/cvpr.2017.105
+
+Y. Lecun, L. Bottou, Y. Bengio, P. Haffner, Gradient-based learning applied
+to document recognition. Proc. IEEE. 86(11) (1998). https://doi.org/10.
+1109/5.726791
+
+J. Nocedal, S. Wright, Numerical Optimization. (Springer, 2006). https://doi.
+org/10.1007/978-3-540-35447-5
+
+S. Chandra, |. Kokkinos, in ECCV. Fast, exact and multi-scale inference for
+semantic image segmentation with deep Gaussian CRFs, (2016). https://
+doi.org/10.1007/978-3-319-46478-7_25
+
+S. A. Fezza, Y. Bakhti, W. Hamidouche, O. Déforges, in 2019 Eleventh
+International Conference on Quality of Multimedia Experience (QOMEX).
+Perceptual evaluation of adversarial attacks for CNN-based image
+classification, (2019), pp. 1-6. https://doi.org/10.1109/QOMEX.2019.
+8743213
+
+E.C. Larson, D. M. Chandler, Most apparent distortion: full-reference
+image quality assessment and the role of strategy. J. Electron. Imaging.
+19(1), 011006 (2010). https://doi.org/10.1117/1.3267105
+
+Y. LeCun, C. Cortes, C. Burges, MNIST handwritten digit database. 2 (2010).
+AT&T Labs [Online]. Available: http://yann.lecun.com/exdb/mnist.
+Accessed 30 June 2020
+
+A. Kurakin, |. Goodfellow, S. Bengio, Y. Dong, F. Liao, M. Liang, T. Pang, J.
+Zhu, X. Hu, C. Xie, et al., Adversarial attacks and defences competition
+(2018). arXiv:1804.00097
+
+J, Deng, W. Dong, R. Socher, L.-J. Li, K. Li, L. Fei-Fei, in CVPR. Imagenet: a
+large-scale hierarchical image database (leee, 2009), pp. 248-255. https://
+doi.org/10.1109/cvpr.2009.5206848
+
+C. Szegedy, V. Vanhoucke, S. loffe, J. Shlens, Z. Wojna, in Proceedings of the
+IEEE Conference on Computer Vision and Pattern Recognition. Rethinking
+the inception architecture for computer vision, (2016), pp. 2818-2826.
+https://doi.org/10.1109/cvpr.2016.308
+
+K. He, X. Zhang, S. Ren, J. Sun, in Computer Vision —- ECCV 2016, ed. by B.
+Leibe, J. Matas, N. Sebe, and M. Welling. Identity Mappings in Deep
+Residual Networks (Springer International Publishing, Cham, 2016),
+
+pp. 630-645. https://github.com/KaimingHe/resnet- 1 k-layers
+
+|. J. Goodfellow, J. Shlens, C. Szegedy, in 3rd International Conference on
+Learning Representations, ICLR 2015, San Diego, CA, USA, May 7-9, 2015,
+Conference Track Proceedings. Explaining and harnessing adversarial
+examples, (2015). http://arxiv.org/abs/1412.6572
+
+N. Papernot, F. Faghri, N. Carlini, |. Goodfellow, R. Feinman, A. Kurakin, C.
+Xie, Y. Sharma, T. Brown, A. Roy, A. Matyasko, V. Behzadan, K.
+Hambardzumyan, Z. Zhang, Y.-L. Juang, Z. Li, R. Sheatsley, A. Garg, J.
+Uesato, W. Gierke, Y. Dong, D. Berthelot, P. Hendricks, J. Rauber, R. Long,
+Technical report on the cleverhans v2.1.0 adversarial examples library
+(2018). arXiv:1610.00768
+
+|. Loshchilov, F. Hutter, Fixing weight decay regularization in adam. CoRR.
+abs/1711.05101 (2017)
+
+C. Tomasi, R. Manduchi, in /CCV. Bilateral filtering for gray and color
+images, (1998). https://doi.org/10.1109/iccv.1998.710815
+
+Publisher’s Note
+Springer Nature remains neutral with regard to jurisdictional claims in
+published maps and institutional affiliations.
