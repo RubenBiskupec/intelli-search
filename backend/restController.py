@@ -34,7 +34,7 @@ def query():
     print("calling finder ")
     token_paths, highlights = finder(query)
     doc_paths = replace_tokens_with_docs(token_paths)
-    docs = read_docs_from_paths(doc_paths, highlights)
+    docs = read_docs_from_paths(doc_paths, highlights, query)
     return render_template("docs.html", context=docs, dym="dym")
 
 def finder(query):
@@ -73,10 +73,21 @@ def replace_tokens_with_docs(tokens):
         docs.append(token)
     return docs 
 
-def read_docs_from_paths(paths, highlights):
+def read_docs_from_paths(paths, highlights, query):
     docs = []
     i = 0
-    print("PAHTS!!!! ")
+    query = query.split(" ")
+    print("Splitting")
+    for term in query:
+        print(term)
+    terms = ""
+    words = ""
+    for term in query:
+        if (term != " "):
+            terms = terms + term + "_"
+            words = words + term + " "
+    thes = "https://cso.kmi.open.ac.uk/topics/" + terms
+    thes = thes[:-1]
     for path in paths:
         doc = {}
         summary = highlights[i] 
@@ -84,8 +95,7 @@ def read_docs_from_paths(paths, highlights):
         url = url[5:]
         url = str(url[0]) + "/" + str(url[1])
         url = "../static/" + url
-        doc.update({"high": summary, "url": url})
+        doc.update({"high": summary, "url": url, "thes": thes, "terms": words})
         docs.append(doc)
         i += 1
-
     return docs
