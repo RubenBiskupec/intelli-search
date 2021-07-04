@@ -45,6 +45,4 @@ for folder in dirs:
     ## txtFIle gets automatically closed 
 print("=======================")
 print("converted every file :)")
-print("time for pre processing")
-print("AUTHOR:  Ruben Biskupec")
-print("=======================")
+
