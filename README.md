@@ -40,6 +40,9 @@ You’ll see output similar to this:
 
 TEST
 1.Digit http://127.0.0.1:500/home on you browser
-1.Type your query on the search bar
-2.Click search and check the results
-3.Click open cso (near the search bar) to discover more info on the query
+
+2.Type your query on the search bar
+
+3.Click search and check the results
+
+4.Click open cso (near the search bar) to discover more info on the query
