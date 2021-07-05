@@ -5,14 +5,17 @@ A vertical search engine on AI articles
 Any Linux distribution and MacOs System
 
 1.Open your terminal
+
 2.Check python3 --version (better if you have a version >= 3.7),
   if you have an older version you can type and execute: sudo apt-get update, sudo apt-get install python 3.9
+
 3.Check pip3 --version, if there isn't any pip3 type and execute: sudo apt install python3-pip.
+
 4.Install all the pip packages in the requirements.txt file
-9.cd /path/to/intelli-search/backend 
-10.export FLASK_APP=__init__.py
-11.export FLASK_ENV=development
-12.flask run
+5.cd /path/to/intelli-search/backend 
+6.export FLASK_APP=__init__.py
+7.export FLASK_ENV=development
+8.flask run
 
 For Windows cmd, use set instead of export:
 1.set FLASK_APP=__init__.py
